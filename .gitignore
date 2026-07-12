@@ -1,0 +1,11 @@
+.env
+Config/Signing.xcconfig
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+.DS_Store
+/build/
+*.ipa
+*.dSYM

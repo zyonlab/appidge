@@ -38,7 +38,10 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
 
         let processID = ProcessIdentifierDTO(flow.metaData.sourceAppSigningIdentifier)
         let remoteEndpoint = tcpFlow.remoteFlowEndpoint
-        flowLogger.log("handleNewFlow sourceAppSigningIdentifier=\(flow.metaData.sourceAppSigningIdentifier, privacy: .public) remote=\(String(describing: remoteEndpoint), privacy: .public)")
+        flowLogger.log("""
+        handleNewFlow sourceAppSigningIdentifier=\(flow.metaData.sourceAppSigningIdentifier, privacy: .public) \
+        remote=\(String(describing: remoteEndpoint), privacy: .public)
+        """)
 
         tcpFlow.open(withLocalFlowEndpoint: nil) { [weak self] error in
             guard let self, error == nil else {

@@ -32,10 +32,8 @@ struct B4EngineKitActorAndMockOnlyTests {
         var offenders: [String] = []
         for file in testFiles {
             let contents = try String(contentsOf: file, encoding: .utf8)
-            for forbidden in ["import Network", "import NetworkExtension", "NEFlowTransport"] {
-                if contents.contains(forbidden) {
-                    offenders.append("\(file.lastPathComponent) references \(forbidden)")
-                }
+            for forbidden in ["import Network", "import NetworkExtension", "NEFlowTransport"] where contents.contains(forbidden) {
+                offenders.append("\(file.lastPathComponent) references \(forbidden)")
             }
         }
         #expect(offenders.isEmpty, "\(offenders.joined(separator: ", "))")

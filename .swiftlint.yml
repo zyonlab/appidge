@@ -1,0 +1,28 @@
+included:
+  - App
+  - Extension
+  - Packages
+
+excluded:
+  - Packages/Core/.build
+  - Packages/IPCContract/.build
+  - Packages/EngineKit/.build
+  - Packages/AppFeature/.build
+  - Packages/ArchitectureTests/.build
+  - build
+  - appidge.xcodeproj
+
+disabled_rules:
+  - todo
+
+opt_in_rules:
+  - empty_count
+
+line_length:
+  warning: 160
+  error: 200
+
+identifier_name:
+  min_length:
+    warning: 1
+    error: 1

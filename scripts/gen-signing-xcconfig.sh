@@ -26,8 +26,10 @@ extract_field() {
   security cms -D -i "$1" 2>/dev/null | plutil -extract "$2" xml1 -o - - 2>/dev/null | sed -n 's/.*<string>\(.*\)<\/string>.*/\1/p'
 }
 
-APP_PROFILE_UUID="$(extract_field "$PROFILE_APP" UUID)"
-EXT_PROFILE_UUID="$(extract_field "$PROFILE_EXT" UUID)"
+# UUID 优先用 .env 里已经填好的 PROFILE_APP_UUID/PROFILE_EXT_UUID（跳过 security/plutil 解析，
+# 更快、也不依赖这两个工具在场）；没填就照旧从 profile 文件里自动解析。
+APP_PROFILE_UUID="${PROFILE_APP_UUID:-$(extract_field "$PROFILE_APP" UUID)}"
+EXT_PROFILE_UUID="${PROFILE_EXT_UUID:-$(extract_field "$PROFILE_EXT" UUID)}"
 APP_PROFILE_NAME="$(extract_field "$PROFILE_APP" Name)"
 EXT_PROFILE_NAME="$(extract_field "$PROFILE_EXT" Name)"
 

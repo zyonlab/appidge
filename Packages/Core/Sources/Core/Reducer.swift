@@ -140,6 +140,15 @@ public enum Reducer {
         (state, [.scanDirectory])
     }
 
+    /// 代理配置发生真实变更后，产出"把当前完整配置推给扩展"的 effect。servers 按 id 排序，
+    /// 让推送内容确定、幂等，也便于测试断言。
+    private static func proxyConfigPush(_ state: AppState) -> Effect {
+        .applyProxyConfig(
+            servers: state.proxyServers.values.sorted { $0.id.value < $1.id.value },
+            activeID: state.activeProxyServerID
+        )
+    }
+
     private static func addProxyServer(_ server: ProxyServer, _ state: AppState) -> (AppState, [Effect]) {
         var state = state
         state.proxyServers[server.id] = server
@@ -147,34 +156,36 @@ public enum Reducer {
         if state.activeProxyServerID == nil {
             state.activeProxyServerID = server.id
         }
-        return (state, [])
+        return (state, [proxyConfigPush(state)])
     }
 
     private static func updateProxyServer(_ server: ProxyServer, _ state: AppState) -> (AppState, [Effect]) {
         var state = state
-        // 只更新已存在的，不借 update 之名做插入（插入走 addProxyServer）。
+        // 只更新已存在的，不借 update 之名做插入（插入走 addProxyServer）。无变更不推送。
         guard state.proxyServers[server.id] != nil else { return (state, []) }
         state.proxyServers[server.id] = server
-        return (state, [])
+        return (state, [proxyConfigPush(state)])
     }
 
     private static func removeProxyServer(_ id: ProxyServerID, _ state: AppState) -> (AppState, [Effect]) {
         var state = state
+        // 不存在就是 no-op，不推送。
+        guard state.proxyServers[id] != nil else { return (state, []) }
         state.proxyServers[id] = nil
         if state.activeProxyServerID == id {
             state.activeProxyServerID = nil
         }
-        return (state, [])
+        return (state, [proxyConfigPush(state)])
     }
 
     private static func setActiveProxyServer(_ id: ProxyServerID?, _ state: AppState) -> (AppState, [Effect]) {
         var state = state
-        // nil 明确表示"清空 active"；非 nil 但指向不存在的 id 则拒绝（保持原 active）。
+        // nil 明确表示"清空 active"；非 nil 但指向不存在的 id 则拒绝（保持原 active），不推送。
         if let id, state.proxyServers[id] == nil {
             return (state, [])
         }
         state.activeProxyServerID = id
-        return (state, [])
+        return (state, [proxyConfigPush(state)])
     }
 }
 

@@ -30,6 +30,37 @@ public extension PersistedConfiguration {
             hasCompletedOnboarding: state.hasCompletedOnboarding
         )
     }
+
+    /// 把持久化的配置还原成一串要在启动时 dispatch 给 store 的 `Core.Action`，顺序确定
+    /// （按 `ProcessID.value` 排序），方便单测断言、也让重复启动可重现。
+    ///
+    /// 只用 `Core.Action` 里已经存在的 case 组装——`directoryScanned` 一次性批量灌回目录，
+    /// 每个进程先 `processDiscovered`（默认落地为 `.direct`），规则不是默认值才追加
+    /// `assignRule`；最后如果引导已完成，追加一个 `onboardingCompleted`。没有新增任何
+    /// `Core.Action` case。
+    func restorationActions() -> [Core.Action] {
+        var actions: [Core.Action] = []
+
+        if !catalog.isEmpty {
+            let entries = catalog.values.sorted { $0.id.value < $1.id.value }
+            actions.append(.directoryScanned(entries))
+        }
+
+        for process in processes.values.sorted(by: { $0.id.value < $1.id.value }) {
+            actions.append(.processDiscovered(
+                id: process.id, displayName: process.displayName, executablePath: process.executablePath
+            ))
+            if process.rule != .direct {
+                actions.append(.assignRule(processID: process.id, rule: process.rule))
+            }
+        }
+
+        if hasCompletedOnboarding {
+            actions.append(.onboardingCompleted)
+        }
+
+        return actions
+    }
 }
 
 /// app 启动/关闭之间持久化配置的出口协议。跟 `EngineKit.Transport` /

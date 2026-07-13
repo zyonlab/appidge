@@ -16,6 +16,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Select Xcode 16 (Swift 6 toolchain)
+        run: |
+          # macos-14 runner defaults to Swift 5.10; our packages need Swift 6.
+          # Pick the newest installed Xcode 16.x.
+          latest=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
+          echo "Selecting $latest"
+          sudo xcode-select -s "$latest/Contents/Developer"
+
       - name: Show Swift version
         run: swift --version
 

@@ -320,3 +320,47 @@ ArchitectureTests 11），五个包零警告；`swiftlint lint --strict` 57 个�
   界面本身用截图确认渲染正确（标题、说明文字、按钮都在），按钮点击后的完整流程
   没能用 GUI 自动化跑通，只验证到了单元测试层面（`PersistenceRestorationTests`
   覆盖了 restoration 的 action 序列，`DirectoryScannerTests` 覆盖了真实扫描）。
+
+## Phase 3：P0 真代理（对齐 Proxifier，worktree + PR 模式）
+
+调研 Proxifier 后（见 `docs/proxifier-feature-alignment.md`）确认最大缺口：**没地方配代理，
+且 `.proxied` 从不真的走代理**。这轮把它补上，全程 worktree + GitHub PR + CI 绿才 merge。
+
+**PR #1 基础（我，先合）**：`Core.ProxyServer`/`ProxyKind(.socks5)`/`AppState.proxyServers`
++`activeProxyServerID`+四个 action+reducer（11 测试）；`IPCContract.ProxyServerDTO`/
+`ProxyConfigMessage`/`applyProxyConfig`（4 round-trip 测试）；`.github/workflows/ci.yml`
+（每 PR 跑 5 包 swift test + swiftlint --strict，真实绿勾）。
+
+**三个并行 PR（独立 worktree，文件边界互不重叠）**：
+- **PR #4 SOCKS5**（EngineKit）：RFC 1928/1929 客户端，纯字节级 `SOCKS5Handshake` +
+  `SOCKS5Connector`（注入 `ByteStream`，测试用 mock 流，真实 `NWConnectionByteStream` 不进测试）。
+- **PR #2 上游排除**（EngineKit）：`UpstreamExclusion` 按 host+port 地址规范化匹配
+  （`inet_pton` 折叠 IPv4/IPv6 各种写法），把防环从"靠回环巧合"变成显式。16 测试。
+- **PR #3 配置 UI + 持久化**（App/AppFeature）：`App/ProxyServersPaneView.swift` 新增
+  "代理服务器"tab（增删改 + 选 active）；`ProxyConfigMapping`（Core→IPC 映射）；持久化用
+  独立 `PersistedProxyServer` 类型**结构上就没有 password 字段**——明文密码不可能落盘
+  （Keychain 是 P1）。13 测试。
+
+**PR #5 集成（我）**：`.proxied` 真的走代理了——
+- `Core.Effect.applyProxyConfig` 由代理 action 真实变更时发出（no-op 不发），app 的
+  effectHandler 下发给扩展。
+- `NWConnectionByteStream.tunnelConnection` 暴露握手后的连接供转发层 pump。
+- `ProxyExtensionProvider` 重写：`effectiveRule` 三层（回环 → 上游排除 → 进程规则）；
+  `openRemote` 对 `.proxied`+active 上游做真实 SOCKS5 CONNECT，否则直连（含 fail-open）；
+  `applyProxyConfig` 锁保护存下 + 重建诊断器指向新上游。
+
+**过程踩的坑**：(1) CI 首跑红——macos-14 runner 默认 Swift 5.10，加"选 Xcode 16"一步才对；
+(2) 几次 CI 红是 GitHub 基建瞬断（下载 `actions/checkout` Service Unavailable），rerun 即绿；
+(3) squash 合并后本地 main 会 desync，每次 merge 后 `git fetch && git reset --hard origin/main` 收尾。
+
+**最终**：五个 PR 全 CI 绿后 merge，189 SPM 测试全绿（Core 31 · IPCContract 8 · EngineKit 88 ·
+AppFeature 51 · ArchitectureTests 11），`xcodebuild` Debug 零并发警告，swiftlint 零违规，
+codesign 通过。
+
+**这轮的已知遗留（诚实记录，别当已完成）**：
+- **DNS-over-proxy 未做**：`.proxied` 走 SOCKS5 时目的地是系统已解析的 IP，DNS 查询仍走
+  本地明文——有 DNS 泄漏面，是紧接着的下一步。
+- **上游用主机名时**，`UpstreamExclusion` 纯文本匹配不解析 DNS，主机名上游匹配不到其解析后 IP。
+- **只有 SOCKS5**：HTTPS/HTTP CONNECT 代理未做。
+- **凭据只在内存 + IPC**：密码不落盘（好），但也还没进 Keychain；重启后需重填密码。
+- 真机端到端（配代理 → 某 app 真走该代理 → 抓到流量）仍需系统扩展被批准，卡在既有的两个人工步骤。

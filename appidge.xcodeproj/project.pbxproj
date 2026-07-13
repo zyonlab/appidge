@@ -12,6 +12,7 @@
 		5DD53B8CA098AAE20D297B7F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7106009A56C24078709224DC /* ContentView.swift */; };
 		62F04AAF57F01ECD1256C923 /* ProxyExtension.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = 88C15509479EC265EC4FD6F2 /* ProxyExtension.systemextension */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		711D141A26AF974CB274C155 /* AppFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 9CA290E7910714860681AC10 /* AppFeature */; };
+		98D1829068AA9598B8F08A3B /* SystemExtensionActivator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF69302A0C9EBB787D6C4B95 /* SystemExtensionActivator.swift */; };
 		9BC7BA6ED15CB67313DA620F /* ProxyExtensionProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A939873201BCD22128098DF5 /* ProxyExtensionProvider.swift */; };
 		B419714D1E5E144ED39353BB /* AppidgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AADB654447DCB49FB372FAE /* AppidgeApp.swift */; };
 		D81B1C44E7FA0F18207CF8AD /* Core in Frameworks */ = {isa = PBXBuildFile; productRef = 070C87CD751D657AB4653E16 /* Core */; };
@@ -58,6 +59,7 @@
 		A3B0E63976E8ACBBACCC8C7B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		A939873201BCD22128098DF5 /* ProxyExtensionProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyExtensionProvider.swift; sourceTree = "<group>"; };
 		AD0EC770164D4561F3BFC0BD /* IPCContract */ = {isa = PBXFileReference; lastKnownFileType = folder; name = IPCContract; path = Packages/IPCContract; sourceTree = SOURCE_ROOT; };
+		AF69302A0C9EBB787D6C4B95 /* SystemExtensionActivator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemExtensionActivator.swift; sourceTree = "<group>"; };
 		B3C329A4A885B31BFA3C7A26 /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -124,6 +126,7 @@
 				7AADB654447DCB49FB372FAE /* AppidgeApp.swift */,
 				7106009A56C24078709224DC /* ContentView.swift */,
 				A3B0E63976E8ACBBACCC8C7B /* Info.plist */,
+				AF69302A0C9EBB787D6C4B95 /* SystemExtensionActivator.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -252,6 +255,7 @@
 			files = (
 				B419714D1E5E144ED39353BB /* AppidgeApp.swift in Sources */,
 				5DD53B8CA098AAE20D297B7F /* ContentView.swift in Sources */,
+				98D1829068AA9598B8F08A3B /* SystemExtensionActivator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -200,3 +200,123 @@ Write/Edit），分别去核实 CRITERIA.md 的 A / B+C+D / E / F 四段，模�
      所以这条不算这轮判据的问题。等到后面「打包公证」阶段（CLAUDE.md 第 5 节，
      这轮不做）要留意：Release/Archive 配置下这个 entitlement 应该自动消失，
      真出公证包前记得再查一遍 `codesign -d --entitlements -`。
+
+## Phase 2：四个用户故事（CLAUDE.md 第 5 节，并行实现）
+
+架构阶段（上面全部内容）之后，做了 CLAUDE.md 第 5 节列的四个功能用户故事。做法：
+先由我自己顺序做一版共享基础（Core 的 Action/State/Effect 新增 + 一个新的
+`AppFeature.AppSideTransport` 双向 IPC 契约），提交进 main；再拆 4 个独立 agent，
+每个在自己的 git worktree 里跑，边界严格限定在各自的新文件（+ 各自专属的一个
+入口文件），互不touch同一个文件，全部走 TDD（先写测试、跑红、实现、跑绿、
+commit）；四个都完工后我把分支一个个 merge 回 main（全部干净、零冲突），再由我
+自己做「把四块接起来」的集成（这部分四个 agent 谁都不该做，因为它们互相看不到
+对方在写什么）。
+
+### 共享基础（先做，避免四个 agent 抢同一个文件）
+- Core：新增 `DirectoryEntry`/`IndustryTag`/`IndustrySeedIndex`（倒排索引打标）、
+  `DiagnosticKind`/`DiagnosticOutcome`、`AppState.catalog`/`.diagnostics`/
+  `.hasCompletedOnboarding`、`Action.directoryScanned`/`.requestDiagnostic`/
+  `.diagnosticResultReceived`/`.onboardingCompleted`、`Effect.runDiagnostic`。
+  **假设记录**：CLAUDE.md「行业种子打标（薪资倒排）」只有一行没有数据源说明，
+  按字面理解成「倒排索引」这个匹配机制去实现（行业 → bundle id 前缀集合，
+  最长前缀匹配），种子数据只是几条示例（Xcode/JetBrains→technology、
+  Microsoft→productivity 等），不是真实的「薪资」数据集——真实数据源需要人补充。
+- AppFeature：新增 `AppSideTransport` 协议（跟 EngineKit.Transport 同款设计）+
+  `MockAppSideTransport` + `AppGroupAppSideTransport`（真实实现：App Group
+  UserDefaults + Darwin 通知，跟 EngineKit.NEFlowTransport 对称但方向反过来）。
+  这是补上 Phase 1 遗留的一个洞：`NEFlowTransport.deliver` 能把消息从扩展送出来，
+  但当时 App 侧完全没人监听，而且完全没有 App → Extension 的发送通道（诊断请求、
+  规则下发都需要这个方向）。
+
+### Story A — 目录扫描 + 行业种子打标 + 回环排除
+`Packages/EngineKit/Sources/EngineKit/LoopbackDetector.swift`（纯函数，POSIX
+`inet_pton` 严格解析 127.0.0.0/8、::1、localhost，不含 IPv4-mapped IPv6 的
+`::ffff:127.0.0.1`——这条明确记成已知限制，有测试钉住这个行为，以后要改是显式
+diff 不是默默改）；`Packages/AppFeature/Sources/AppFeature/DirectoryScanner.swift`
+（`FileSystemDirectoryScanner` 真扫 `/Applications`，测试用真实临时目录，从不碰
+真的 `/Applications`）。
+
+### Story B — 活动监视器接真 Engine + 每行代理开关/诊断入口
+`ExtensionMessageHandling.swift`（纯函数翻译层，`IPCContract.ExtensionToAppMessage`
+→ `[Core.Action]`，穷举 switch 不带 default）、`IPCReceiver.swift`（接
+AppSideTransport 监听、翻译、dispatch 进 store）、`App/ContentView.swift` 的
+`ActivityMonitorPaneView` 加了每行规则切换 + 诊断按钮。
+
+### Story C — 诊断器
+`Packages/EngineKit/Sources/EngineKit/DiagnosticsRunner.swift`。ruleHit/
+actuallyProxied/upstreamReachable/dnsResolution/envConflict 全部真实实现、协议
+注入、测试零真实网络。**诚实记录的限制**：
+- `udpIPv6QuicLeak` 恒定 `passed: false` + 详细说明——`NETransparentProxyProvider`
+  只拦截 TCP，这是这个 provider 类型的架构限制，不是没测好；诊断本身准确反映了
+  这个事实（对用户来说是有用信息：UDP/QUIC 确实会绕过代理）。
+- `envConflict` 只能读扩展进程自己的环境变量，读不到目标 app 的（需要这个 app
+  没有的特殊 entitlement），每条结果的 detail 里都写明了这一点。
+
+### Story D — 首次安装引导 + 状态持久化 + 打包公证脚本骨架
+`PersistenceStore.swift`（`FilePersistenceStore` 真实 JSON 文件读写，默认路径
+`~/Library/Application Support/appidge/config.json`；`PersistedConfiguration`
+只存配置——扫描到的目录、分配的规则、引导完成与否，不存运行时/瞬时状态）、
+`App/OnboardingView.swift`（故意简单：一段说明 + 一个「开始使用」按钮）、
+`scripts/archive-and-notarize.sh`（真实的 `xcodebuild archive` →
+`-exportArchive` → `xcrun notarytool submit --wait` → `xcrun stapler staple`
+四步流程，支持 Apple ID+密码或 API key 两种认证方式；`.env` 里没配公证凭据时
+提前失败并给出明确指引，不会真的去跑公证——跟 Phase 1 处理 System Extension
+capability 缺口一样的诚实原则）。
+
+### 集成（四个 agent 都不该做、只有我做的部分）
+1. `Core.Action.appLaunched` → `Effect.scanDirectory`（新增，走了完整 TDD）。
+2. **提交前抓到的真 bug**：`directoryScanned` 一开始只写 `state.catalog`，没写
+   `state.processes`——这样扫描到的 app 会出现在目录里，但规则/活动监视器两个
+   Tab（只读 `processes`）永远看不到它们，没法分配规则。补了一版：
+   `directoryScanned` 现在也会给每个目录条目在 `processes` 里占一个位（幂等，
+   重复扫描不清掉已经分配的规则）。加了两个新测试锁住这个行为。
+3. **另一个提交前抓到的真 bug**：`Extension/ProxyExtensionProvider.swift` 最初
+   给 `DiagnosticsRunner` 传了全新的、跟 `handleAppMessage`/`handleNewFlow`
+   实际在写的 `appliedRuleSetStore`/`routingHistoryTracker` 完全不是同一个实例
+   的空壳——诊断器永远查不到真实规则/路由历史。改成三处共用同一个实例。
+4. `ExtensionMessageHandling` 补了反方向映射（`Core.DiagnosticKind` →
+   `IPCContract.DiagnosticKindDTO`、`diagnosticRequestMessage`）——Story B
+   只做了「扩展→App」方向，「App→扩展」的诊断请求需要反过来的映射，这是集成
+   时才需要的，两个 story 都不该做。
+5. `EngineKit.NEFlowTransport` 新增 `startListeningForAppMessages`（扩展侧监听
+   App 发来的消息），跟 App 侧的 `AppGroupAppSideTransport.startListening` 对称，
+   同样的 CFNotificationCenter C 回调注册手法。
+6. `ProxyExtensionProvider.handleNewFlow` 现在真的会：查当前分配的规则、查是否
+   回环（回环强制直连，无视分配的规则）、转发后把结果记进 `routingHistoryTracker`
+   （给 `actuallyProxied` 诊断用）。
+7. `App/AppidgeApp.swift`：Store 的 effectHandler 接了 `scanDirectory`（真跑
+   `FileSystemDirectoryScanner`）和 `runDiagnostic`（真发 IPC 请求）；构造并
+   启动了 `IPCReceiver`，扩展推回来的流量统计/诊断结果/engineFailure 现在真的
+   会落到 store 里，不是发进虚空。
+8. **集成后又抓到一个真 bug**：`DiagnosticsRunner` 的 `upstreamReachable` 默认
+   探活 `1.1.1.1:443`（公网可达性），跟这个 app 实际配置的上游代理
+   `127.0.0.1:1080`（`NEFlowTransport` 用的那个）不是一回事——诊断会答非所问
+   （公网正常但代理其实挂了，还是显示"通过"）。改成显式传入跟 `NEFlowTransport`
+   一致的 host/port。
+
+### 最终验证
+108 个测试全绿（Core 18 + IPCContract 5 + EngineKit 36 + AppFeature 38 +
+ArchitectureTests 11），五个包零警告；`swiftlint lint --strict` 57 个文件零
+违规；`xcodebuild -scheme App -configuration Debug ... build` 成功，对完整
+日志 grep 并发相关关键词零命中；`codesign --verify --deep --strict` exit 0。
+
+### 没做完 / 已知缺口（诚实记录，不是漏了没提）
+- UI 是故意简单的（用户要求这轮先简单、以后再精修）：诊断结果目前只写进
+  `state.diagnostics`，`ActivityMonitorPaneView` 还没渲染出来；规则表/活动监视器
+  两个 Tab 现在读的是同一个 `processes` 字典，没有单独的「目录」浏览界面（扫描
+  结果直接并入了可分配规则的进程列表，见上面「集成」第 2 条的设计选择）。
+- 实际转发路径（`relay`/`pumpClientToRemote`/`pumpRemoteToClient`）现在会用
+  真实分配的规则做计量和路由历史记录，但字节转发本身还是"直连到目的地"这一条
+  路径——`rule == .proxied` 时并没有真的把流量导去一个上游代理服务器转发
+  （那需要实现一个真实的上游代理协议客户端，是明显更大的一块功能，这轮没做，
+  记在这里免得以后误以为"规则=代理"已经端到端生效）。
+- `RoutingHistoryTracker`/`AppliedRuleSetStore` 在 EngineKitTests 里独立单测
+  完全绿，现在也真的接进了 `ProxyExtensionProvider`——但整条链路（扫描到的目录
+  → 分配规则 → 真实流量 → 诊断结果回显在 UI）还没有一次端到端的真机验证（需要
+  系统扩展被批准，还是卡在 Phase 1 记录的那两个人工步骤上）。
+- GUI 自动化验证 onboarding 按钮点击时，在其中一台副屏（Redmi 27 NU）上 computer-use
+  工具的坐标映射有问题（所有点击都被误判成点在程序坞上，换了台屏幕/用 accessibility
+  API 都没绕开，怀疑是这台机器多屏配置的问题，不是应用本身的 bug）——onboarding
+  界面本身用截图确认渲染正确（标题、说明文字、按钮都在），按钮点击后的完整流程
+  没能用 GUI 自动化跑通，只验证到了单元测试层面（`PersistenceRestorationTests`
+  覆盖了 restoration 的 action 序列，`DirectoryScannerTests` 覆盖了真实扫描）。

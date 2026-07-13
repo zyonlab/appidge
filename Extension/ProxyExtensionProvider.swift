@@ -38,12 +38,17 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
 
         // 复用同一个 appliedRuleSetStore/routingHistoryTracker 实例——诊断器读到的必须是
         // handleAppMessage/handleNewFlow 实际在写的那两个 store，不是各查各的空壳。
+        // upstreamHost/Port 覆盖成跟上面 NEFlowTransport 一样的真实上游代理地址——
+        // 默认值 1.1.1.1:443 探的是公网可达性，不是"我们自己配的代理还在不在"，
+        // 那样 upstreamReachable 诊断跟这个 app 实际用的上游没关系，诊断意义不对。
         diagnosticsRunner = DiagnosticsRunner(
             ruleLookup: appliedRuleSetStore,
             routingLookup: routingHistoryTracker,
             upstreamProbe: NWConnectionUpstreamProbe(),
             dnsResolver: NWConnectionDNSResolver(),
-            environmentReader: ProcessInfoEnvironmentReader()
+            environmentReader: ProcessInfoEnvironmentReader(),
+            upstreamHost: "127.0.0.1",
+            upstreamPort: 1080
         )
 
         transport.startListeningForAppMessages { [weak self] message in

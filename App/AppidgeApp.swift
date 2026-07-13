@@ -22,6 +22,10 @@ struct AppidgeApp: App {
                 let message = ExtensionMessageHandling.diagnosticRequestMessage(processID: processID, kinds: kinds)
                 await transport.send(message)
                 return nil // 结果异步经 IPCReceiver -> diagnosticResultReceived 回灌
+            case .applyProxyConfig(let servers, let activeID):
+                let message = ProxyConfigMapping.proxyConfigMessage(servers: servers, activeID: activeID)
+                await transport.send(message)
+                return nil // 纯下发，扩展据此更新 active 上游 + 上游排除集合
             }
         })
         _store = State(initialValue: store)

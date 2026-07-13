@@ -15,14 +15,17 @@ private let flowLogger = Logger(subsystem: "com.appidge.app.ProxyExtension", cat
 /// 零并发警告，`@retroactive` 避免了「未来 Apple 自己加 Sendable 会冲突」的警告）。
 extension NEAppProxyTCPFlow: @retroactive @unchecked Sendable {}
 
-/// NETransparentProxyProvider 的真实实现（E1）：接管每条 flow，向真实远端拨号并双向
-/// 转发字节（不是空壳），流量计量经 ``FlowRouter`` 按固定节奏批量上报给 app。
-/// fail-open：拨号或转发失败时直接关闭该 flow，不阻塞其它流量，也不会把整机卡死。
+/// NETransparentProxyProvider 的真实实现（E1）：接管每条 flow，真实双向转发字节（不是空壳），
+/// 计量经 ``FlowRouter`` 批量上报，诊断经 ``DiagnosticsRunner``。
 ///
-/// 规则应用 + 诊断：监听 App 发来的 `AppToExtensionMessage`（规则下发写进
-/// ``AppliedRuleSetStore``，诊断请求跑 ``DiagnosticsRunner`` 后把结果 deliver 回去）。
-/// 回环排除：转发前用 ``LoopbackDetector`` 查目的地址，命中就无视分配的规则强制直连——
-/// 这条在真实字节转发路径上生效，不只是计量标签。
+/// 路由决策（``effectiveRule``）三层，从强到弱：
+/// 1. **回环排除**（``LoopbackDetector``）：目的地是 127.0.0.0/8 / ::1 / localhost → 强制直连。
+/// 2. **上游排除**（``UpstreamExclusion``）：目的地正是配置的某台上游代理 → 强制直连，
+///    否则"扩展连上游"这一跳会被自己再抓一次，形成转发环。
+/// 3. 否则用该进程分配的规则（``AppliedRuleSetStore``）。
+///
+/// 转发（``openRemote``）：`.proxied` 且有 active 上游 → 经 ``SOCKS5Connector`` 隧道；
+/// 否则直连目的地。拨号/握手失败 fail-open：关掉这条 flow，不阻塞其它流量。
 final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Sendable {
     private var router: FlowRouter?
     private var transport: NEFlowTransport?
@@ -31,25 +34,20 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     private let appliedRuleSetStore = AppliedRuleSetStore()
     private let routingHistoryTracker = RoutingHistoryTracker()
 
+    // App 下发的代理配置。handleAppMessage（写）和 handleNewFlow 的 Task（读）并发访问，
+    // 用锁保护——provider 已是 @unchecked Sendable，这里显式担起这份线程安全。
+    private let configLock = NSLock()
+    private var storedProxyConfig: ProxyConfigMessage?
+
+    private var proxyConfig: ProxyConfigMessage? {
+        configLock.withLock { storedProxyConfig }
+    }
+
     override func startProxy(options: [String: Any]?, completionHandler: @escaping (Error?) -> Void) {
         let transport = NEFlowTransport(upstreamHost: "127.0.0.1", upstreamPort: 1080, appGroup: appGroup)
         self.transport = transport
         router = FlowRouter(transport: transport, flushInterval: 0.5, now: Date())
-
-        // 复用同一个 appliedRuleSetStore/routingHistoryTracker 实例——诊断器读到的必须是
-        // handleAppMessage/handleNewFlow 实际在写的那两个 store，不是各查各的空壳。
-        // upstreamHost/Port 覆盖成跟上面 NEFlowTransport 一样的真实上游代理地址——
-        // 默认值 1.1.1.1:443 探的是公网可达性，不是"我们自己配的代理还在不在"，
-        // 那样 upstreamReachable 诊断跟这个 app 实际用的上游没关系，诊断意义不对。
-        diagnosticsRunner = DiagnosticsRunner(
-            ruleLookup: appliedRuleSetStore,
-            routingLookup: routingHistoryTracker,
-            upstreamProbe: NWConnectionUpstreamProbe(),
-            dnsResolver: NWConnectionDNSResolver(),
-            environmentReader: ProcessInfoEnvironmentReader(),
-            upstreamHost: "127.0.0.1",
-            upstreamPort: 1080
-        )
+        diagnosticsRunner = makeDiagnosticsRunner(upstreamHost: "127.0.0.1", upstreamPort: 1080)
 
         transport.startListeningForAppMessages { [weak self] message in
             guard let self else { return }
@@ -66,6 +64,21 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         completionHandler()
     }
 
+    /// 复用同一个 appliedRuleSetStore/routingHistoryTracker 实例——诊断器读到的必须是
+    /// handleAppMessage/handleNewFlow 实际在写的那两个 store，不是各查各的空壳。
+    /// upstreamHost/Port 指向真实上游，让 upstreamReachable 诊断探的是"我们配的代理还在不在"。
+    private func makeDiagnosticsRunner(upstreamHost: String, upstreamPort: UInt16) -> DiagnosticsRunner {
+        DiagnosticsRunner(
+            ruleLookup: appliedRuleSetStore,
+            routingLookup: routingHistoryTracker,
+            upstreamProbe: NWConnectionUpstreamProbe(),
+            dnsResolver: NWConnectionDNSResolver(),
+            environmentReader: ProcessInfoEnvironmentReader(),
+            upstreamHost: upstreamHost,
+            upstreamPort: upstreamPort
+        )
+    }
+
     private func handleAppMessage(_ message: AppToExtensionMessage, transport: NEFlowTransport) async {
         switch message {
         case .applyRuleSet(let ruleSet):
@@ -75,6 +88,12 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             let results = await diagnosticsRunner.run(processID: request.processID, kinds: request.kinds)
             for result in results {
                 await transport.deliver(.diagnosticResult(result))
+            }
+        case .applyProxyConfig(let config):
+            configLock.withLock { storedProxyConfig = config }
+            // active 上游变了，让 upstreamReachable 诊断跟着探新的上游地址。
+            if let active = config.activeServer {
+                diagnosticsRunner = makeDiagnosticsRunner(upstreamHost: active.host, upstreamPort: active.port)
             }
         }
     }
@@ -95,55 +114,82 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
                 tcpFlow.closeWriteWithError(error)
                 return
             }
-            Task {
-                let rule = await self.effectiveRule(for: processID, destination: remoteEndpoint)
-                await self.routingHistoryTracker.record(processID: processID, wasProxied: rule == .proxied)
-                self.relay(tcpFlow: tcpFlow, to: remoteEndpoint, processID: processID, rule: rule, router: router)
-            }
+            Task { await self.beginFlow(tcpFlow: tcpFlow, to: remoteEndpoint, processID: processID, router: router) }
         }
         return true
     }
 
-    /// 分配的规则 + 回环排除：目的地是 127.0.0.0/8、::1、localhost 时，不管规则怎么配都强制直连——
-    /// 避免代理自己的回环流量造成转发环路。
+    private func beginFlow(
+        tcpFlow: NEAppProxyTCPFlow,
+        to remoteEndpoint: Network.NWEndpoint,
+        processID: ProcessIdentifierDTO,
+        router: FlowRouter
+    ) async {
+        let rule = await effectiveRule(for: processID, destination: remoteEndpoint)
+        await routingHistoryTracker.record(processID: processID, wasProxied: rule == .proxied)
+        do {
+            let remote = try await openRemote(to: remoteEndpoint, rule: rule)
+            pumpClientToRemote(tcpFlow: tcpFlow, remote: remote, processID: processID, rule: rule, router: router)
+            pumpRemoteToClient(tcpFlow: tcpFlow, remote: remote, processID: processID, rule: rule, router: router)
+        } catch {
+            flowLogger.error("openRemote failed, closing flow: \(String(describing: error), privacy: .public)")
+            tcpFlow.closeReadWithError(error)
+            tcpFlow.closeWriteWithError(error)
+        }
+    }
+
+    /// 见类型注释的三层决策。回环 / 命中上游 → 强制直连；否则按进程规则。
     private func effectiveRule(for processID: ProcessIdentifierDTO, destination: Network.NWEndpoint) async -> ProxyRuleDTO {
-        if let host = Self.hostString(from: destination), LoopbackDetector.isLoopback(host: host) {
-            return .direct
+        if let (host, port) = Self.hostPort(from: destination) {
+            if LoopbackDetector.isLoopback(host: host) { return .direct }
+            let upstreams = Set((proxyConfig?.servers ?? []).map { UpstreamEndpoint(host: $0.host, port: $0.port) })
+            if UpstreamExclusion.isUpstream(host: host, port: port, upstreams: upstreams) { return .direct }
         }
         return await appliedRuleSetStore.currentRule(for: processID) ?? .direct
     }
 
-    private static func hostString(from endpoint: Network.NWEndpoint) -> String? {
-        guard case .hostPort(let host, _) = endpoint else { return nil }
-        switch host {
-        case .name(let name, _): return name
-        case .ipv4(let address): return "\(address)"
-        case .ipv6(let address): return "\(address)"
-        @unknown default: return nil
+    /// `.proxied` 且有 active 上游 → 拨上游、做 SOCKS5 CONNECT，返回已就绪的隧道连接；
+    /// 否则（含 proxied 但没配上游的 fail-open）直连目的地。返回的连接一律"已 ready"，可直接 pump。
+    private func openRemote(to endpoint: Network.NWEndpoint, rule: ProxyRuleDTO) async throws -> NWConnection {
+        if rule == .proxied,
+           let active = proxyConfig?.activeServer,
+           let (destHost, destPort) = Self.hostPort(from: endpoint) {
+            let stream = NWConnectionByteStream(proxyServer: active)
+            try await stream.open()
+            try await SOCKS5Connector(proxyServer: active).establish(toHost: destHost, port: destPort, over: stream)
+            return stream.tunnelConnection
         }
+        return try await Self.openDirect(to: endpoint)
     }
 
-    private func relay(
-        tcpFlow: NEAppProxyTCPFlow,
-        to remoteEndpoint: Network.NWEndpoint,
-        processID: ProcessIdentifierDTO,
-        rule: ProxyRuleDTO,
-        router: FlowRouter
-    ) {
-        let remote = NWConnection(to: remoteEndpoint, using: .tcp)
-        remote.stateUpdateHandler = { [weak self] state in
-            switch state {
-            case .ready:
-                self?.pumpClientToRemote(tcpFlow: tcpFlow, remote: remote, processID: processID, rule: rule, router: router)
-                self?.pumpRemoteToClient(tcpFlow: tcpFlow, remote: remote, processID: processID, rule: rule, router: router)
-            case .failed, .cancelled:
-                tcpFlow.closeReadWithError(nil)
-                tcpFlow.closeWriteWithError(nil)
-            default:
-                break
+    /// 直连目的地并挂起到 `.ready`（或失败）。返回时连接已可读写。
+    private static func openDirect(to endpoint: Network.NWEndpoint) async throws -> NWConnection {
+        let connection = NWConnection(to: endpoint, using: .tcp)
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            let box = ResumeOnceBox(continuation)
+            connection.stateUpdateHandler = { state in
+                switch state {
+                case .ready: box.resume(.success(()))
+                case .failed(let error): box.resume(.failure(error))
+                case .cancelled: box.resume(.failure(OpenRemoteError.cancelled))
+                default: break
+                }
             }
+            connection.start(queue: .global(qos: .utility))
         }
-        remote.start(queue: .global(qos: .utility))
+        return connection
+    }
+
+    private static func hostPort(from endpoint: Network.NWEndpoint) -> (host: String, port: UInt16)? {
+        guard case .hostPort(let host, let port) = endpoint else { return nil }
+        let hostString: String
+        switch host {
+        case .name(let name, _): hostString = name
+        case .ipv4(let address): hostString = "\(address)"
+        case .ipv6(let address): hostString = "\(address)"
+        @unknown default: return nil
+        }
+        return (hostString, port.rawValue)
     }
 
     private func pumpClientToRemote(
@@ -194,5 +240,28 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
                 self.pumpRemoteToClient(tcpFlow: tcpFlow, remote: remote, processID: processID, rule: rule, router: router)
             }
         }
+    }
+}
+
+private enum OpenRemoteError: Error, Sendable {
+    case cancelled
+}
+
+/// CheckedContinuation 只能 resume 一次；NWConnection 的 stateUpdateHandler 可能在 ready 之后
+/// 还回调 cancelled，用锁保护避免二次 resume 崩溃。同 NEFlowTransport 的 ContinuationBox。
+private final class ResumeOnceBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Error>?
+
+    init(_ continuation: CheckedContinuation<Void, Error>) {
+        self.continuation = continuation
+    }
+
+    func resume(_ result: Result<Void, Error>) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let continuation else { return }
+        self.continuation = nil
+        continuation.resume(with: result)
     }
 }

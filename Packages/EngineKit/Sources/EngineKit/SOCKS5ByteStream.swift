@@ -52,6 +52,13 @@ public final class NWConnectionByteStream: ByteStream, @unchecked Sendable {
         connection.cancel()
     }
 
+    /// The live `NWConnection` underneath. After a successful `SOCKS5Connector.establish(...)` the
+    /// handshake has consumed *exactly* its reply bytes (each phase reads an exact count), so the
+    /// connection is left clean and now tunnels straight to the destination — hand it to the flow
+    /// relay to pump raw bytes. Only meaningful post-handshake; touching it before/during the
+    /// handshake races the connector's own reads.
+    public var tunnelConnection: NWConnection { connection }
+
     public func write(_ bytes: [UInt8]) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             connection.send(content: Data(bytes), completion: .contentProcessed { error in

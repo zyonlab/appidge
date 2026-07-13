@@ -9,4 +9,8 @@ public enum Action: Sendable, Equatable {
     case diagnosticResultReceived(processID: ProcessID, kind: DiagnosticKind, passed: Bool, detail: String)
     case onboardingCompleted
     case appLaunched
+    case addProxyServer(ProxyServer)
+    case updateProxyServer(ProxyServer)
+    case removeProxyServer(ProxyServerID)
+    case setActiveProxyServer(ProxyServerID?)
 }

@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  spm-tests:
+    name: SPM tests (Core / IPCContract / EngineKit / AppFeature / ArchitectureTests)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 16 (Swift 6 toolchain)
+        run: |
+          # macos-14 runner defaults to Swift 5.10; our packages need Swift 6.
+          # Pick the newest installed Xcode 16.x.
+          latest=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
+          echo "Selecting $latest"
+          sudo xcode-select -s "$latest/Contents/Developer"
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Test all packages
+        run: |
+          set -euo pipefail
+          for pkg in Core IPCContract EngineKit AppFeature ArchitectureTests; do
+            echo "::group::swift test — $pkg"
+            (cd "Packages/$pkg" && swift test)
+            echo "::endgroup::"
+          done
+
+  lint:
+    name: SwiftLint (strict)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      - name: Lint (strict — warnings fail)
+        run: swiftlint lint --strict

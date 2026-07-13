@@ -135,6 +135,20 @@ swiftlint lint --strict   # Found 0 violations
    能在本地修的（要登录 developer.apple.com、给 App ID 打开 capability、
    重新下载 profile），所以把 entitlement 改动撤回，保住 Debug build 绿，
    把这个发现记在这里和 CRITERIA.md 里，不要下次又重试一遍同一条死路。
+9. **CRITERIA.md 自己泄了明文 TEAM_ID。** 写 A4/E3 两条证据描述时，为了「贴证据」
+   直接把 `codesign -dv` 输出里 `Authority=Developer ID Application: zhongyu
+   wang (<TEAM_ID>)` 那一整段（含明文团队 ID）抄了进去，正好违反 CLAUDE.md 自己
+   那条「team id 绝不进源码或提交历史」的规则——而且是在写「A4 已验证 TEAM_ID
+   不会泄漏」这一条的
+   时候泄漏的，很讽刺。这是本轮跑的独立对抗式复核（用 Workflow 拆了 A/B-C-D/E/F
+   四路 agent 各自拿真实命令去核实，不看彼此结论）抓到的，不是我自己发现的。
+   **修复**：CRITERIA.md 改成不打印明文（团队 ID 出现处一律替换成占位符/说明去
+   哪查），因为泄漏就在最新一次 commit（还没推到任何 remote，`git remote -v`
+   为空），直接 `git commit --amend` 重写掉那个 commit，而不是叠一个「移除」的
+   新 commit——后者仍然会在 `git log -p` 里留下明文（旧 blob 还在历史里）。
+   **教训**：以后写「这里证明没有泄漏 X」这种证据性文字时，要用占位符描述
+   证据长什么样，别把真实敏感值抄进解释性文字里——尤其是写判据文件本身的时候，
+   最容易在「展示证据」和「制造新泄漏」之间踩坑。
 
 ## 遗留：需要人做的两步（loop 已经推到能推的最远处）
 
@@ -154,3 +168,35 @@ swiftlint lint --strict   # Found 0 violations
    > **待回填**：（人跑完 smoke-ne.sh 之后，把观测结果写在这一行）
 
 这两步都是 API 决定的、物理上没法绕过的人工步骤，不是 loop 偷懒或拆分任务。
+
+## 独立对抗式复核（Workflow：4 路并行核实 + 1 路综合）
+
+跑完全部判据后，用 Workflow 拆了 4 个互不知情的独立 agent（每个只给 Bash，不给
+Write/Edit），分别去核实 CRITERIA.md 的 A / B+C+D / E / F 四段，模拟 evaluator
+「只信证据不信声称」；最后一个 agent 综合四份报告。结果：
+
+- **A4 抓到真问题**：CRITERIA.md 自己的证据描述里手滑打印了明文 TEAM_ID（见上面
+  失败尝试 #9）。已用 `git commit --amend` 修复并重写掉那条历史（仓库还没推到
+  任何 remote，本地改写安全；改完对 `git log -p` 搜团队 ID 确认零命中——注意
+  这句本身也不能真的把团队 ID 打出来当"搜索词示例"，见失败尝试 #9 的教训）。
+- **B1-B4 / C1-C3 / D1-D2 / E1-E4 / F1-F3 全部独立复核为 PASS**，且复核方式是
+  真的读代码、真的重新跑命令（比如重新跑了一遍 `swift build`/`swift test`、
+  重新触发过一次 B3 的负例编译、diff 过 `Config/Signing.xcconfig` 跟生成脚本
+  是否字节一致），不是照抄 PROGRESS.md 的说法。
+- **两个非判据阻断但值得记录的观察**：
+  1. `ProxyExtension.systemextension is a Foundation extension and must be
+     embedded in the parent app bundle's PlugIns directory` 这条 warning——
+     去查了 `appidge.xcodeproj/project.pbxproj`，确认只有一个 `Embed System
+     Extensions` phase，`dstSubfolderSpec = 16`（系统扩展应该去的
+     `SYSTEM_EXTENSIONS_FOLDER_PATH`），没有重复/配错的 embed phase。这条
+     warning 是 `embeddedBinaryValidationUtility` 这个校验工具本身没跟上系统
+     扩展这个品类，苹果自己的系统扩展样板工程也有同样的 warning，属于已知的
+     良性噪音，不是真配置错误。
+  2. App 和 Extension 的签名里都带着 `com.apple.security.get-task-allow =
+     true`——这在 Developer ID（发行级）签名上不常见，正常只在开发期签名才有，
+     如果原样进了公证包会被拒。但这是 **Debug 配置**下 Xcode 的标准行为（不管
+     签名身份是什么，Debug 配置默认会加这个 entitlement 方便挂调试器），CRITERIA
+     A2 明确要求的就是 `-configuration Debug` 的 build，不是 Release/Archive，
+     所以这条不算这轮判据的问题。等到后面「打包公证」阶段（CLAUDE.md 第 5 节，
+     这轮不做）要留意：Release/Archive 配置下这个 entitlement 应该自动消失，
+     真出公证包前记得再查一遍 `codesign -d --entitlements -`。

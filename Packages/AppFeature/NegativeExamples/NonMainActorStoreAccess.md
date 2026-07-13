@@ -26,7 +26,7 @@ rm Sources/AppFeature/_TEMP_NegativeExample.swift
 ## 实际拿到的诊断（Swift 6 language mode，2026-07-13）
 
 ```
-/Users/admin/tapyr/Packages/AppFeature/Sources/AppFeature/_TEMP_NegativeExample.swift:5:30: error: main actor-isolated property 'state' can not be referenced on a nonisolated actor instance
+/Users/admin/appidge/Packages/AppFeature/Sources/AppFeature/_TEMP_NegativeExample.swift:5:30: error: main actor-isolated property 'state' can not be referenced on a nonisolated actor instance
 3 | actor RogueBackgroundWorker {
 4 |     func mutateStateFromBackground(_ store: Store) {
 5 |         let snapshot = store.state
@@ -34,7 +34,7 @@ rm Sources/AppFeature/_TEMP_NegativeExample.swift
 6 |         _ = snapshot
 7 |     }
 
-/Users/admin/tapyr/Packages/AppFeature/Sources/AppFeature/Store.swift:10:29: note: property declared here
+/Users/admin/appidge/Packages/AppFeature/Sources/AppFeature/Store.swift:10:29: note: property declared here
  8 | @Observable
  9 | public final class Store {
 10 |     public private(set) var state: Core.AppState

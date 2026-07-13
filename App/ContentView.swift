@@ -76,6 +76,18 @@ struct ActivityMonitorPaneView: View {
                 Text("↑\(process.stats.bytesUp)B ↓\(process.stats.bytesDown)B")
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
+                Picker("规则", selection: Binding(
+                    get: { process.rule },
+                    set: { store.dispatch(.assignRule(processID: process.id, rule: $0)) }
+                )) {
+                    Text("直连").tag(ProxyRule.direct)
+                    Text("代理").tag(ProxyRule.proxied)
+                }
+                .labelsHidden()
+                .frame(width: 120)
+                Button("诊断") {
+                    store.dispatch(.requestDiagnostic(processID: process.id, kinds: Core.DiagnosticKind.allCases))
+                }
             }
         }
     }

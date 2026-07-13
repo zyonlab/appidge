@@ -1,21 +1,70 @@
 import Foundation
 import Core
 
+/// 一台上游代理的**磁盘持久化孪生**——刻意**没有 `password` 字段**。
+///
+/// 安全约束（本轮的关键要求）：明文密码**绝不**写进磁盘上的 JSON。用一个结构上就
+/// 不含密码字段的类型来保证这件事，比"记得在编码时把密码置空"更硬——泄漏在类型系统
+/// 层面就是不可能的，而不是靠某处代码自觉。`id`/`host`/`port`/`kind`/`username`
+/// 都保留（username 不是凭据，是"用哪个账号"的标识，丢了会导致连不上）。
+///
+/// **P1 遗留**：真正的凭据存储要走 Keychain（`SecItemAdd`/`SecItemCopyMatching`），
+/// 磁盘上这份配置只记"有这么一台代理、用户名是谁"，密码运行时从 Keychain 取。
+public struct PersistedProxyServer: Sendable, Equatable, Codable {
+    public let id: String
+    public let host: String
+    public let port: UInt16
+    public let kind: Core.ProxyKind
+    public let username: String?
+
+    public init(id: String, host: String, port: UInt16, kind: Core.ProxyKind, username: String?) {
+        self.id = id
+        self.host = host
+        self.port = port
+        self.kind = kind
+        self.username = username
+    }
+
+    /// 从 `Core.ProxyServer` 抽取可持久化字段，**丢掉 password**。
+    public init(stripping server: Core.ProxyServer) {
+        self.init(
+            id: server.id.value, host: server.host, port: server.port,
+            kind: server.kind, username: server.username
+        )
+    }
+
+    /// 还原成 `Core.ProxyServer`，`password` 必然为 nil（磁盘上从来没存过）。
+    /// 运行时若需要密码，P1 会在这一步从 Keychain 回填。
+    public func toProxyServer() -> Core.ProxyServer {
+        Core.ProxyServer(
+            id: Core.ProxyServerID(id), host: host, port: port,
+            kind: kind, username: username, password: nil
+        )
+    }
+}
+
 /// 跨启动持久化的「配置」子集：只包含用户设置过的东西（扫描到的目录、分配的规则、
-/// 是否已完成引导），不包含运行时/瞬时状态（`isGlobalProxyEnabled`、`isEngineHealthy`、
-/// `diagnostics`、以及 `MonitoredProcess.stats` 里的实时流量——那些每次启动都应该重置）。
+/// 配置过的上游代理、是否已完成引导），不包含运行时/瞬时状态（`isGlobalProxyEnabled`、
+/// `isEngineHealthy`、`diagnostics`、以及 `MonitoredProcess.stats` 里的实时流量——
+/// 那些每次启动都应该重置）。代理密码也**不在**持久化范围（见 `PersistedProxyServer`）。
 public struct PersistedConfiguration: Sendable, Equatable, Codable {
     public var processes: [Core.ProcessID: Core.MonitoredProcess]
     public var catalog: [Core.ProcessID: Core.DirectoryEntry]
+    public var proxyServers: [PersistedProxyServer]
+    public var activeProxyServerID: String?
     public var hasCompletedOnboarding: Bool
 
     public init(
         processes: [Core.ProcessID: Core.MonitoredProcess] = [:],
         catalog: [Core.ProcessID: Core.DirectoryEntry] = [:],
+        proxyServers: [PersistedProxyServer] = [],
+        activeProxyServerID: String? = nil,
         hasCompletedOnboarding: Bool = false
     ) {
         self.processes = processes
         self.catalog = catalog
+        self.proxyServers = proxyServers
+        self.activeProxyServerID = activeProxyServerID
         self.hasCompletedOnboarding = hasCompletedOnboarding
     }
 }
@@ -27,6 +76,11 @@ public extension PersistedConfiguration {
         self.init(
             processes: state.processes,
             catalog: state.catalog,
+            // 排序确定（按 id），且逐台 strip 掉 password——明文密码绝不落盘。
+            proxyServers: state.proxyServers.values
+                .sorted { $0.id.value < $1.id.value }
+                .map(PersistedProxyServer.init(stripping:)),
+            activeProxyServerID: state.activeProxyServerID?.value,
             hasCompletedOnboarding: state.hasCompletedOnboarding
         )
     }
@@ -53,6 +107,18 @@ public extension PersistedConfiguration {
             if process.rule != .direct {
                 actions.append(.assignRule(processID: process.id, rule: process.rule))
             }
+        }
+
+        // proxyServers 已经在 init(from:) 里按 id 排好；密码持久化时被剥离，还原出来
+        // 的 Core.ProxyServer.password 必为 nil。每台一个 addProxyServer。
+        for server in proxyServers {
+            actions.append(.addProxyServer(server.toProxyServer()))
+        }
+        // 只要有代理就补一条 setActiveProxyServer：reducer 会把第一台加入的代理自动选为
+        // active，所以即便持久化的 activeProxyServerID 是 nil，也要显式发一条 nil 把那个
+        // 自动选择清掉，才能忠实还原"有代理但没选中"这个状态。
+        if !proxyServers.isEmpty {
+            actions.append(.setActiveProxyServer(activeProxyServerID.map(Core.ProxyServerID.init)))
         }
 
         if hasCompletedOnboarding {

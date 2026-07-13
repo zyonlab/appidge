@@ -8,4 +8,5 @@ public enum Action: Sendable, Equatable {
     case requestDiagnostic(processID: ProcessID, kinds: [DiagnosticKind])
     case diagnosticResultReceived(processID: ProcessID, kind: DiagnosticKind, passed: Bool, detail: String)
     case onboardingCompleted
+    case appLaunched
 }

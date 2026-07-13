@@ -46,4 +46,28 @@ public enum ExtensionMessageHandling {
         case .envConflict: .envConflict
         }
     }
+
+    /// 反方向：UI dispatch `.requestDiagnostic` 之后，effectHandler 要把 Core.DiagnosticKind
+    /// 翻回 wire-format 才能通过 AppSideTransport 发给扩展。同样是穷举 switch，不带 default。
+    public static func dtoDiagnosticKind(from coreKind: Core.DiagnosticKind) -> IPCContract.DiagnosticKindDTO {
+        switch coreKind {
+        case .ruleHit: .ruleHit
+        case .actuallyProxied: .actuallyProxied
+        case .upstreamReachable: .upstreamReachable
+        case .dnsResolution: .dnsResolution
+        case .udpIPv6QuicLeak: .udpIPv6QuicLeak
+        case .envConflict: .envConflict
+        }
+    }
+
+    public static func diagnosticRequestMessage(
+        processID: Core.ProcessID, kinds: [Core.DiagnosticKind]
+    ) -> IPCContract.AppToExtensionMessage {
+        .requestDiagnostic(
+            IPCContract.DiagnosticRequestDTO(
+                processID: IPCContract.ProcessIdentifierDTO(processID.value),
+                kinds: kinds.map(dtoDiagnosticKind(from:))
+            )
+        )
+    }
 }

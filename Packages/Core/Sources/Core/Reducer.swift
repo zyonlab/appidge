@@ -19,6 +19,8 @@ public enum Reducer {
             return diagnosticResultReceived(processID: processID, kind: kind, passed: passed, detail: detail, state)
         case .onboardingCompleted:
             return onboardingCompleted(state)
+        case .appLaunched:
+            return appLaunched(state)
         }
     }
 
@@ -68,6 +70,11 @@ public enum Reducer {
         var state = state
         for entry in entries {
             state.catalog[entry.id] = entry
+            if state.processes[entry.id] == nil {
+                state.processes[entry.id] = MonitoredProcess(
+                    id: entry.id, displayName: entry.displayName, executablePath: entry.executablePath
+                )
+            }
         }
         return (state, [])
     }
@@ -90,6 +97,10 @@ public enum Reducer {
         var state = state
         state.hasCompletedOnboarding = true
         return (state, [])
+    }
+
+    private static func appLaunched(_ state: AppState) -> (AppState, [Effect]) {
+        (state, [.scanDirectory])
     }
 }
 

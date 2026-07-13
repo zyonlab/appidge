@@ -6,9 +6,16 @@ import IPCContract
 /// 探活上游代理，失败则抛错交给 FlowRouter fail-open。deliver 通过 App Group 共享容器
 /// + Darwin 通知推给 app，不依赖 XPC。与 ``MockTransport`` 共用同一份 ``Transport`` 协议——
 /// 测试只注入 Mock，这个类型本身不在任何测试里被调用（避免真实网络进测试）。
-public final class NEFlowTransport: Transport, Sendable {
+public final class NEFlowTransport: Transport, @unchecked Sendable {
     private let upstreamEndpoint: NWEndpoint
     private let appGroup: String
+    private let lock = NSLock()
+    private var appMessageHandler: (@Sendable (AppToExtensionMessage) -> Void)?
+
+    /// App 侧 `AppGroupAppSideTransport.send` 写入的 key；两边各自持有字面量常量
+    /// （不是共享引用，因为 EngineKit 不能依赖 AppFeature），跟 `latestMessageKey`
+    /// 反方向对称的道理一样。
+    private static let incomingAppMessageKey = "AppGroupAppSideTransport.latestAppToExtensionMessage"
 
     public init(upstreamHost: String, upstreamPort: UInt16, appGroup: String) {
         self.upstreamEndpoint = NWEndpoint.hostPort(
@@ -62,6 +69,37 @@ public final class NEFlowTransport: Transport, Sendable {
     }
 
     public static let latestMessageKey = "EngineKit.latestExtensionToAppMessage"
+
+    /// Extension 侧监听 App 发来的消息（规则下发、诊断请求）。跟
+    /// AppFeature.AppGroupAppSideTransport.startListening 是同一套 C 回调注册手法
+    /// （CFNotificationCenter 的回调必须是不捕获上下文的 C 函数指针，用 Unmanaged
+    /// 把 self 转成 opaque pointer 带过去）。不在自动化测试里跑，理由跟
+    /// probeUpstream/deliver 一样：需要真实 App Group 沙盒。
+    public func startListeningForAppMessages(onMessage: @escaping @Sendable (AppToExtensionMessage) -> Void) {
+        lock.withLock { appMessageHandler = onMessage }
+
+        CFNotificationCenterAddObserver(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            Unmanaged.passUnretained(self).toOpaque(),
+            { _, observer, _, _, _ in
+                guard let observer else { return }
+                Unmanaged<NEFlowTransport>.fromOpaque(observer)
+                    .takeUnretainedValue()
+                    .handleIncomingAppMessage()
+            },
+            "\(appGroup).appToExtension" as CFString,
+            nil,
+            .deliverImmediately
+        )
+    }
+
+    private func handleIncomingAppMessage() {
+        guard let defaults = UserDefaults(suiteName: appGroup),
+              let data = defaults.data(forKey: Self.incomingAppMessageKey),
+              let message = try? JSONDecoder().decode(AppToExtensionMessage.self, from: data) else { return }
+        let handler = lock.withLock { appMessageHandler }
+        handler?(message)
+    }
 }
 
 public enum NEFlowTransportError: Error, Sendable {

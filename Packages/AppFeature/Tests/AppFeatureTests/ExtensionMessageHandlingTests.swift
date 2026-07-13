@@ -83,4 +83,38 @@ struct ExtensionMessageHandlingTests {
 
         #expect(actions == [.engineFailure(reason: "transport down")])
     }
+
+    @Test(
+        "diagnosticRequestMessage kind mapping is exhaustive and 1:1, the reverse of the incoming mapping",
+        arguments: [
+            (Core.DiagnosticKind.ruleHit, DiagnosticKindDTO.ruleHit),
+            (Core.DiagnosticKind.actuallyProxied, DiagnosticKindDTO.actuallyProxied),
+            (Core.DiagnosticKind.upstreamReachable, DiagnosticKindDTO.upstreamReachable),
+            (Core.DiagnosticKind.dnsResolution, DiagnosticKindDTO.dnsResolution),
+            (Core.DiagnosticKind.udpIPv6QuicLeak, DiagnosticKindDTO.udpIPv6QuicLeak),
+            (Core.DiagnosticKind.envConflict, DiagnosticKindDTO.envConflict)
+        ]
+    )
+    func diagnosticRequestKindMappingIsExhaustive(coreKind: Core.DiagnosticKind, expectedDTO: DiagnosticKindDTO) {
+        let message = ExtensionMessageHandling.diagnosticRequestMessage(
+            processID: Core.ProcessID("p"), kinds: [coreKind]
+        )
+        #expect(message == .requestDiagnostic(
+            DiagnosticRequestDTO(processID: ProcessIdentifierDTO("p"), kinds: [expectedDTO])
+        ))
+    }
+
+    @Test("diagnosticRequestMessage preserves kind order and processID")
+    func diagnosticRequestMessagePreservesOrderAndProcessID() {
+        let message = ExtensionMessageHandling.diagnosticRequestMessage(
+            processID: Core.ProcessID("proc-42"),
+            kinds: [.dnsResolution, .ruleHit, .envConflict]
+        )
+        #expect(message == .requestDiagnostic(
+            DiagnosticRequestDTO(
+                processID: ProcessIdentifierDTO("proc-42"),
+                kinds: [.dnsResolution, .ruleHit, .envConflict]
+            )
+        ))
+    }
 }

@@ -29,6 +29,33 @@ struct DirectoryAndDiagnosticsReducerTests {
         #expect(rescanned.catalog.count == 1)
     }
 
+    @Test("directoryScanned also seeds a MonitoredProcess entry so scanned apps are immediately rule-assignable")
+    func directoryScannedSeedsProcessesForRuleAssignment() {
+        let a = ProcessID("a")
+        let (next, _) = Reducer.reduce(
+            AppState(),
+            .directoryScanned([DirectoryEntry(id: a, displayName: "A", executablePath: "/a")])
+        )
+        #expect(next.processes[a]?.displayName == "A")
+        #expect(next.processes[a]?.rule == .direct)
+    }
+
+    @Test("directoryScanned re-scanning an already-known app does not clobber its assigned rule")
+    func directoryScannedRescanPreservesAssignedRule() {
+        let a = ProcessID("a")
+        let (afterFirstScan, _) = Reducer.reduce(
+            AppState(),
+            .directoryScanned([DirectoryEntry(id: a, displayName: "A", executablePath: "/a")])
+        )
+        let (afterAssign, _) = Reducer.reduce(afterFirstScan, .assignRule(processID: a, rule: .proxied))
+        let (afterRescan, _) = Reducer.reduce(
+            afterAssign,
+            .directoryScanned([DirectoryEntry(id: a, displayName: "A renamed", executablePath: "/a")])
+        )
+        #expect(afterRescan.processes[a]?.rule == .proxied)
+        #expect(afterRescan.catalog[a]?.displayName == "A renamed")
+    }
+
     @Test("directoryScanned leaves untouched catalog entries value-equal (incremental, no full recompute)")
     func directoryScannedIsIncremental() {
         let a = ProcessID("a")
@@ -81,5 +108,13 @@ struct DirectoryAndDiagnosticsReducerTests {
         #expect(next.hasCompletedOnboarding == true)
         #expect(next.isGlobalProxyEnabled == true)
         #expect(effects.isEmpty)
+    }
+
+    @Test("appLaunched does not mutate state and emits a scanDirectory effect")
+    func appLaunchedEmitsScanDirectoryEffect() {
+        let state = AppState()
+        let (next, effects) = Reducer.reduce(state, .appLaunched)
+        #expect(next == state)
+        #expect(effects == [.scanDirectory])
     }
 }

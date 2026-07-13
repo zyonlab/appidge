@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import IPCContract
 
 // MARK: - SOCKS5 upstream client (RFC 1928 + RFC 1929)
 //
@@ -254,5 +255,91 @@ public enum SOCKS5Handshake {
         var addr = in6_addr()
         guard host.withCString({ inet_pton(AF_INET6, $0, &addr) }) == 1 else { return nil }
         return withUnsafeBytes(of: addr) { Array($0) }
+    }
+}
+
+// MARK: - ByteStream seam
+
+/// The single, minimal abstraction the connector needs from a transport: write some bytes,
+/// or read *exactly* N bytes (blocking until they arrive or the stream ends). Keeping this
+/// tiny is what lets unit tests inject a scripted double while production plugs in a real
+/// `NWConnection`-backed stream (see `SOCKS5ByteStream.swift`, never touched by tests).
+public protocol ByteStream: Sendable {
+    func write(_ bytes: [UInt8]) async throws
+    func read(exactly count: Int) async throws -> [UInt8]
+}
+
+// MARK: - SOCKS5Connector
+
+/// Drives a full SOCKS5 CONNECT over an injected ``ByteStream``: greeting → optional
+/// username/password auth → CONNECT, reading exactly the bytes each phase needs and throwing a
+/// typed ``SOCKS5Error`` on any protocol failure. Holds only immutable credentials, so it is
+/// trivially `Sendable`; all the wire logic is delegated to the pure ``SOCKS5Handshake``.
+///
+/// The connector deliberately does *not* know the proxy's own host/port — the caller connects
+/// the `ByteStream` to the proxy first, then hands it in. That keeps the handshake fully
+/// mockable and the proxy-dialing concern in the stream implementation.
+public final class SOCKS5Connector: Sendable {
+    private let username: String?
+    private let password: String?
+
+    public init(username: String? = nil, password: String? = nil) {
+        self.username = username
+        self.password = password
+    }
+
+    /// Convenience for the app→extension config path: pulls credentials straight off a
+    /// ``ProxyServerDTO`` (its `host`/`port` belong to whoever opens the ``ByteStream``).
+    public convenience init(proxyServer: ProxyServerDTO) {
+        self.init(username: proxyServer.username, password: proxyServer.password)
+    }
+
+    /// Perform the handshake against `host:port` (the ultimate destination) over `stream`
+    /// (already connected to the proxy). Returns the proxy's reported bound address on success.
+    @discardableResult
+    public func establish(
+        toHost host: String,
+        port: UInt16,
+        over stream: any ByteStream
+    ) async throws -> SOCKS5BoundAddress {
+        try await stream.write(SOCKS5Handshake.greetingBytes(hasCredentials: username != nil))
+        let method = try SOCKS5Handshake.parseMethodSelection(try await stream.read(exactly: 2))
+        try await authenticateIfNeeded(method: method, over: stream)
+
+        try await stream.write(try SOCKS5Handshake.connectRequestBytes(host: host, port: port))
+        return try await readConnectReply(over: stream)
+    }
+
+    private func authenticateIfNeeded(method: SOCKS5Method, over stream: any ByteStream) async throws {
+        guard method == .usernamePassword else { return }
+        guard let username else { throw SOCKS5Error.authenticationRequired }
+        let request = try SOCKS5Handshake.authRequestBytes(username: username, password: password ?? "")
+        try await stream.write(request)
+        try SOCKS5Handshake.parseAuthReply(try await stream.read(exactly: 2))
+    }
+
+    /// Reads the CONNECT reply incrementally — a stream can't know the frame length up front —
+    /// then validates the assembled frame with the pure parser. The BND.ADDR length depends on
+    /// the ATYP byte (and, for domains, a further length byte), so those are read in stages.
+    private func readConnectReply(over stream: any ByteStream) async throws -> SOCKS5BoundAddress {
+        let header = try await stream.read(exactly: 4) // VER REP RSV ATYP
+        var frame = header
+        frame += try await readBoundAddress(atyp: header[3], over: stream)
+        frame += try await stream.read(exactly: 2) // BND.PORT
+        return try SOCKS5Handshake.parseConnectReply(frame)
+    }
+
+    private func readBoundAddress(atyp: UInt8, over stream: any ByteStream) async throws -> [UInt8] {
+        switch atyp {
+        case 0x01: // IPv4
+            return try await stream.read(exactly: 4)
+        case 0x04: // IPv6
+            return try await stream.read(exactly: 16)
+        case 0x03: // domain: 1-byte length prefix, then that many bytes
+            let lengthByte = try await stream.read(exactly: 1)
+            return lengthByte + (try await stream.read(exactly: Int(lengthByte[0])))
+        default:
+            throw SOCKS5Error.unsupportedAddressType(atyp)
+        }
     }
 }

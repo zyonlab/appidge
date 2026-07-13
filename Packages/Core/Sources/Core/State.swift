@@ -5,6 +5,8 @@ public struct AppState: Sendable, Equatable {
     public var catalog: [ProcessID: DirectoryEntry]
     public var diagnostics: [ProcessID: [DiagnosticKind: DiagnosticOutcome]]
     public var hasCompletedOnboarding: Bool
+    public var proxyServers: [ProxyServerID: ProxyServer]
+    public var activeProxyServerID: ProxyServerID?
 
     public init(
         isGlobalProxyEnabled: Bool = false,
@@ -12,7 +14,9 @@ public struct AppState: Sendable, Equatable {
         processes: [ProcessID: MonitoredProcess] = [:],
         catalog: [ProcessID: DirectoryEntry] = [:],
         diagnostics: [ProcessID: [DiagnosticKind: DiagnosticOutcome]] = [:],
-        hasCompletedOnboarding: Bool = false
+        hasCompletedOnboarding: Bool = false,
+        proxyServers: [ProxyServerID: ProxyServer] = [:],
+        activeProxyServerID: ProxyServerID? = nil
     ) {
         self.isGlobalProxyEnabled = isGlobalProxyEnabled
         self.isEngineHealthy = isEngineHealthy
@@ -20,5 +24,7 @@ public struct AppState: Sendable, Equatable {
         self.catalog = catalog
         self.diagnostics = diagnostics
         self.hasCompletedOnboarding = hasCompletedOnboarding
+        self.proxyServers = proxyServers
+        self.activeProxyServerID = activeProxyServerID
     }
 }

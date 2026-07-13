@@ -81,4 +81,41 @@ struct CodableRoundTripTests {
         let failure = ExtensionToAppMessage.engineFailure(reason: "transport crashed")
         #expect(try roundTrip(failure) == failure)
     }
+
+    @Test("ProxyServerDTO round-trips with and without credentials")
+    func proxyServerDTORoundTrip() throws {
+        let noAuth = ProxyServerDTO(id: "a", host: "127.0.0.1", port: 1080, kind: .socks5)
+        #expect(try roundTrip(noAuth) == noAuth)
+
+        let withAuth = ProxyServerDTO(
+            id: "b", host: "10.0.0.1", port: 9050, kind: .socks5, username: "user", password: "secret"
+        )
+        #expect(try roundTrip(withAuth) == withAuth)
+    }
+
+    @Test("ProxyConfigMessage round-trips servers + active selection — 代理配置下发")
+    func proxyConfigMessageRoundTrip() throws {
+        let message = ProxyConfigMessage(
+            servers: [
+                ProxyServerDTO(id: "a", host: "127.0.0.1", port: 1080, kind: .socks5),
+                ProxyServerDTO(id: "b", host: "10.0.0.1", port: 9050, kind: .socks5, username: "u", password: "p")
+            ],
+            activeServerID: "a"
+        )
+        #expect(try roundTrip(message) == message)
+
+        let empty = ProxyConfigMessage(servers: [], activeServerID: nil)
+        #expect(try roundTrip(empty) == empty)
+    }
+
+    @Test("AppToExtensionMessage.applyProxyConfig round-trips through the envelope")
+    func applyProxyConfigEnvelope() throws {
+        let message = AppToExtensionMessage.applyProxyConfig(
+            ProxyConfigMessage(
+                servers: [ProxyServerDTO(id: "a", host: "127.0.0.1", port: 1080, kind: .socks5)],
+                activeServerID: "a"
+            )
+        )
+        #expect(try roundTrip(message) == message)
+    }
 }

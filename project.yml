@@ -1,0 +1,89 @@
+name: appidge
+options:
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+
+configFiles:
+  Debug: Config/Signing.xcconfig
+  Release: Config/Signing.xcconfig
+
+packages:
+  Core:
+    path: Packages/Core
+  IPCContract:
+    path: Packages/IPCContract
+  EngineKit:
+    path: Packages/EngineKit
+  AppFeature:
+    path: Packages/AppFeature
+
+settingGroups:
+  common:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "Developer ID Application"
+    DEVELOPMENT_TEAM: $(DEVELOPMENT_TEAM)
+    GENERATE_INFOPLIST_FILE: NO
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
+    ENABLE_HARDENED_RUNTIME: YES
+
+targets:
+  App:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+    settings:
+      groups: [common]
+      base:
+        PRODUCT_NAME: appidge
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_IDENTIFIER)
+        PRODUCT_MODULE_NAME: appidge
+        INFOPLIST_FILE: App/Info.plist
+        CODE_SIGN_ENTITLEMENTS: App/App.entitlements
+        PROVISIONING_PROFILE_SPECIFIER: $(PROVISIONING_PROFILE_SPECIFIER_APP)
+        LD_RUNPATH_SEARCH_PATHS:
+          - $(inherited)
+          - "@executable_path/../Frameworks"
+    dependencies:
+      - package: Core
+      - package: IPCContract
+      - package: AppFeature
+      - target: ProxyExtension
+        embed: true
+    scheme:
+      testTargets: []
+      gatherCoverageData: false
+
+  ProxyExtension:
+    type: system-extension
+    platform: macOS
+    sources:
+      - path: Extension
+    settings:
+      groups: [common]
+      base:
+        PRODUCT_NAME: ProxyExtension
+        PRODUCT_BUNDLE_IDENTIFIER: $(EXT_BUNDLE_IDENTIFIER)
+        PRODUCT_MODULE_NAME: ProxyExtension
+        INFOPLIST_FILE: Extension/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Extension/Extension.entitlements
+        PROVISIONING_PROFILE_SPECIFIER: $(PROVISIONING_PROFILE_SPECIFIER_EXT)
+        SKIP_INSTALL: NO
+    dependencies:
+      - package: EngineKit
+      - package: IPCContract
+
+schemes:
+  App:
+    build:
+      targets:
+        App: all
+        ProxyExtension: all
+    run:
+      config: Debug
+    archive:
+      config: Release

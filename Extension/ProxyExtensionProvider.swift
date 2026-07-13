@@ -3,6 +3,11 @@ import Network
 @preconcurrency import NetworkExtension
 import EngineKit
 import IPCContract
+import os.log
+
+/// smoke-ne.sh 用 `log stream` 观测这个 subsystem，确认真实流量下
+/// `sourceAppSigningIdentifier` 拿到的是父 app 级还是 CLI 子进程级身份。
+private let flowLogger = Logger(subsystem: "com.appidge.app.ProxyExtension", category: "FlowIdentity")
 
 /// NEAppProxyTCPFlow 是 NetworkExtension 的旧 Obj-C API，早于 Swift 6 并发审计，
 /// 但按文档「Instances of this class are thread safe」，用 `@retroactive @unchecked
@@ -33,6 +38,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
 
         let processID = ProcessIdentifierDTO(flow.metaData.sourceAppSigningIdentifier)
         let remoteEndpoint = tcpFlow.remoteFlowEndpoint
+        flowLogger.log("handleNewFlow sourceAppSigningIdentifier=\(flow.metaData.sourceAppSigningIdentifier, privacy: .public) remote=\(String(describing: remoteEndpoint), privacy: .public)")
 
         tcpFlow.open(withLocalFlowEndpoint: nil) { [weak self] error in
             guard let self, error == nil else {

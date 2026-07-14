@@ -12,6 +12,8 @@ struct ContentView: View {
                 .tabItem { Label("目录", systemImage: "folder") }
             RulesPaneView(store: store)
                 .tabItem { Label("规则", systemImage: "list.bullet") }
+            RulesEditorPaneView(store: store)
+                .tabItem { Label("规则表", systemImage: "list.number") }
             ProxyServersPaneView(store: store)
                 .tabItem { Label("代理服务器", systemImage: "server.rack") }
             ActivityMonitorPaneView(store: store)

@@ -17,6 +17,8 @@ public enum Action: Sendable, Equatable {
     case addMatchRule(ProxyMatchRule)
     case removeMatchRule(RuleID)
     case reorderMatchRules([RuleID])
+    /// 启用/停用一条规则(保留在表里,不删除)。禁用的规则下发前被过滤,永不参与匹配。
+    case setMatchRuleEnabled(id: RuleID, enabled: Bool)
     case connectionEventReceived(ConnectionLogEntry)
     /// 扩展主动检测到疑似转发环(signature = 命中目标)。
     case loopWarningRaised(String)

@@ -35,19 +35,51 @@ struct RulesEditorPaneView: View {
 
     private var rulesTable: some View {
         Table(rules, selection: $selection) {
-            TableColumn("进程") { r in Text(r.appPattern).monospaced().lineLimit(1) }
-            TableColumn("主机") { r in Text(r.hostPattern).monospaced().lineLimit(1) }
-            TableColumn("端口") { r in Text(Self.portText(r.portRange)) }.width(90)
+            TableColumn("启用") { r in enableToggle(for: r) }.width(40)
+            TableColumn("进程") { r in
+                Text(r.appPattern).monospaced().lineLimit(1).opacity(r.isEnabled ? 1 : 0.45)
+            }
+            TableColumn("主机") { r in
+                Text(r.hostPattern).monospaced().lineLimit(1).opacity(r.isEnabled ? 1 : 0.45)
+            }
+            TableColumn("端口") { r in
+                Text(Self.portText(r.portRange)).opacity(r.isEnabled ? 1 : 0.45)
+            }.width(90)
             TableColumn("动作") { r in
-                Text(RuleActionStyle.label(r.action)).foregroundStyle(RuleActionStyle.color(r.action))
+                Text(RuleActionStyle.label(r.action))
+                    .foregroundStyle(RuleActionStyle.color(r.action))
+                    .opacity(r.isEnabled ? 1 : 0.45)
             }.width(70)
         }
         .contextMenu(forSelectionType: ProxyMatchRule.ID.self) { ids in
             if let id = ids.first {
+                enableDisableMenuItem(for: id)
+                Divider()
                 Button("上移") { move(id, by: -1) }
                 Button("下移") { move(id, by: 1) }
                 Divider()
                 Button("删除", role: .destructive) { store.dispatch(.removeMatchRule(id)) }
+            }
+        }
+    }
+
+    /// 每行前置的启用勾选框:点掉即停用(规则保留、不删除),下发前会被过滤,不再参与匹配。
+    private func enableToggle(for rule: ProxyMatchRule) -> some View {
+        Toggle("", isOn: Binding(
+            get: { rule.isEnabled },
+            set: { store.dispatch(.setMatchRuleEnabled(id: rule.id, enabled: $0)) }
+        ))
+        .labelsHidden()
+        .toggleStyle(.checkbox)
+        .help(rule.isEnabled ? "已启用（点掉可停用，规则保留）" : "已停用（保留规则，不参与匹配）")
+    }
+
+    /// 右键菜单里的启用/停用项:按当前状态取反,和前置勾选框走同一条 action。
+    @ViewBuilder
+    private func enableDisableMenuItem(for id: ProxyMatchRule.ID) -> some View {
+        if let rule = rules.first(where: { $0.id == id }) {
+            Button(rule.isEnabled ? "停用" : "启用") {
+                store.dispatch(.setMatchRuleEnabled(id: id, enabled: !rule.isEnabled))
             }
         }
     }

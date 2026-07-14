@@ -18,15 +18,19 @@ public struct ProxyMatchRule: Sendable, Equatable, Codable, Identifiable {
     /// 匹配目标端口的闭区间;nil = 任意端口。单端口用 `443...443`。
     public var portRange: ClosedRange<UInt16>?
     public var action: ProxyRule
+    /// 规则是否启用。禁用的规则**保留在表里**(停用 ≠ 删除),但在下发给扩展前会被过滤掉
+    /// (见 `AppFeature.RuleSetMapping`),从不参与匹配——求值自然落到下一条(或默认)。默认启用。
+    public var isEnabled: Bool
 
     public init(
         id: RuleID, appPattern: String, hostPattern: String,
-        portRange: ClosedRange<UInt16>?, action: ProxyRule
+        portRange: ClosedRange<UInt16>?, action: ProxyRule, isEnabled: Bool = true
     ) {
         self.id = id
         self.appPattern = appPattern
         self.hostPattern = hostPattern
         self.portRange = portRange
         self.action = action
+        self.isEnabled = isEnabled
     }
 }

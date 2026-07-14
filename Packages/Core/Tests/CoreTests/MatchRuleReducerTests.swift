@@ -72,4 +72,41 @@ struct MatchRuleReducerTests {
             matchRules: [rule("r1", host: "*.x")]
         )])
     }
+
+    // MARK: - per-rule enable/disable
+
+    @Test("a rule created without specifying isEnabled defaults to enabled (still participates)")
+    func defaultsToEnabled() {
+        #expect(rule("1").isEnabled)
+        let (state, _) = Reducer.reduce(AppState(), .addMatchRule(rule("1")))
+        #expect(state.rules.first?.isEnabled == true)
+    }
+
+    @Test("setMatchRuleEnabled flips isEnabled on the target rule (leaving others untouched) and pushes the rule set")
+    func setEnabledFlipsAndPushes() {
+        var (state, _) = Reducer.reduce(AppState(), .addMatchRule(rule("1")))
+        (state, _) = Reducer.reduce(state, .addMatchRule(rule("2")))
+        let (next, effects) = Reducer.reduce(state, .setMatchRuleEnabled(id: RuleID("1"), enabled: false))
+        #expect(next.rules.first(where: { $0.id == RuleID("1") })?.isEnabled == false)
+        #expect(next.rules.first(where: { $0.id == RuleID("2") })?.isEnabled == true)
+        #expect(effects == [.applyRuleSet(globalProxyEnabled: false, assignments: [:], matchRules: next.rules)])
+    }
+
+    @Test("disabling keeps the rule in the table (disable is not delete); re-enabling restores it")
+    func disableKeepsRuleThenReEnable() {
+        var (state, _) = Reducer.reduce(AppState(), .addMatchRule(rule("1")))
+        (state, _) = Reducer.reduce(state, .setMatchRuleEnabled(id: RuleID("1"), enabled: false))
+        #expect(state.rules.map(\.id) == [RuleID("1")])
+        #expect(state.rules.first?.isEnabled == false)
+        (state, _) = Reducer.reduce(state, .setMatchRuleEnabled(id: RuleID("1"), enabled: true))
+        #expect(state.rules.first?.isEnabled == true)
+    }
+
+    @Test("setMatchRuleEnabled for an unknown id is a no-op with no push")
+    func setEnabledUnknownIsNoOp() {
+        let (state, _) = Reducer.reduce(AppState(), .addMatchRule(rule("1")))
+        let (next, effects) = Reducer.reduce(state, .setMatchRuleEnabled(id: RuleID("ghost"), enabled: false))
+        #expect(next.rules == state.rules)
+        #expect(effects.isEmpty)
+    }
 }

@@ -37,6 +37,8 @@ public enum Reducer {
             return removeMatchRule(id, state)
         case .reorderMatchRules(let order):
             return reorderMatchRules(order, state)
+        case .setMatchRuleEnabled(let id, let enabled):
+            return setMatchRuleEnabled(id: id, enabled: enabled, state)
         default:
             return nil
         }
@@ -127,6 +129,15 @@ public enum Reducer {
             reordered.append(rule)
         }
         state.rules = reordered
+        return (state, [ruleSetPush(state)])
+    }
+
+    /// 启用/停用指定规则(规则仍留在表里)。命中就翻转 `isEnabled` 并按老路推整表;
+    /// 未知 id 是 no-op、不推送(和 `removeMatchRule` 的守卫一致)。
+    private static func setMatchRuleEnabled(id: RuleID, enabled: Bool, _ state: AppState) -> (AppState, [Effect]) {
+        var state = state
+        guard let index = state.rules.firstIndex(where: { $0.id == id }) else { return (state, []) }
+        state.rules[index].isEnabled = enabled
         return (state, [ruleSetPush(state)])
     }
 

@@ -48,12 +48,10 @@ struct ConnectionsTable: View {
                 Text("\(e.host):\(e.port)").monospaced().lineLimit(1)
             }.width(min: 150, ideal: 230)
 
-            TableColumn("状态") { e in statusCell(e.phase) }.width(52)
+            TableColumn("状态") { e in statusCell(e.phase) }.width(min: 68, ideal: 90)
 
             TableColumn("规则 · 代理") { e in
-                Text(RouteText.label(rule: e.rule, kind: e.proxyKind))
-                    .foregroundStyle(RouteText.color(e.rule))
-                    .lineLimit(1)
+                RouteChip(rule: e.rule, kind: e.proxyKind)
             }.width(min: 110, ideal: 160)
 
             TableColumn("时间", value: \.openedAt) { e in
@@ -76,18 +74,20 @@ struct ConnectionsTable: View {
         }
     }
 
+    /// 状态列:SF Symbol + 语义色 + 文案一起呈现(不靠颜色单独区分,便于无障碍)。
+    /// 活动→绿实心圈、已关闭→灰对勾、失败→红八角叉。
     @ViewBuilder
     private func statusCell(_ phase: ConnectionPhase) -> some View {
         switch phase {
         case .opened:
-            Label("活动", systemImage: "circle.fill").foregroundStyle(.green).labelStyle(.iconOnly)
-                .help("活动")
+            Label("活动", systemImage: "circle.fill")
+                .foregroundStyle(.green).help("活动")
         case .closed:
-            Label("已关闭", systemImage: "circle").foregroundStyle(.secondary).labelStyle(.iconOnly)
-                .help("已关闭")
+            Label("已关闭", systemImage: "checkmark.circle")
+                .foregroundStyle(.secondary).help("已关闭")
         case .failed:
-            Label("失败", systemImage: "xmark.circle.fill").foregroundStyle(.red).labelStyle(.iconOnly)
-                .help("失败 / 被拦截")
+            Label("失败", systemImage: "xmark.octagon")
+                .foregroundStyle(.red).help("失败 / 被拦截")
         }
     }
 
@@ -105,6 +105,35 @@ struct ConnectionsTable: View {
                 action: action
             )))
         }
+    }
+}
+
+/// 「规则·代理」列的语义胶囊:底色 + 描边 + SF Symbol + 文案。颜色随规则(复用 `RouteText.color`),
+/// 形状也编码语义 —— 直连→直行箭头、代理→分支、拦截→禁止手势,不只靠颜色区分,
+/// 对齐 Little Snitch / Proxifier 的一眼可读。保持紧凑以适配表格行高。
+private struct RouteChip: View {
+    let rule: ProxyRule
+    let kind: ProxyKind?
+
+    private var tint: Color { RouteText.color(rule) }
+
+    private var symbol: String {
+        switch rule {
+        case .direct: "arrow.right"
+        case .proxied: "arrow.triangle.branch"
+        case .block: "hand.raised"
+        }
+    }
+
+    var body: some View {
+        Label(RouteText.label(rule: rule, kind: kind), systemImage: symbol)
+            .font(.caption)
+            .lineLimit(1)
+            .foregroundStyle(tint)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(tint.opacity(0.14), in: Capsule())
+            .overlay(Capsule().strokeBorder(tint.opacity(0.30), lineWidth: 0.5))
     }
 }
 

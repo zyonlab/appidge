@@ -12,3 +12,8 @@ xcuserdata/
 *.ipa
 *.dSYM
 .claude/
+# 图标源素材:只纳管 macOS 相关子集(母图 00-source + macOS 交付 01-macos);
+# web 素材(02-web-icons / 03-web-intro)+ 顶层杂项(README/preview/.DS_Store)忽略。
+pigeon_icon_assets/*
+!pigeon_icon_assets/00-source/
+!pigeon_icon_assets/01-macos/

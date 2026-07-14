@@ -41,7 +41,7 @@ struct ConnectionsTable: View {
     private var table: some View {
         Table(rows, selection: $selection, sortOrder: $sortOrder) {
             TableColumn("应用", value: \.processID.value) { e in
-                Label(appName(e.processID), systemImage: "app.dashed").lineLimit(1)
+                AppLabel(name: appName(e.processID), path: store.state.catalog[e.processID]?.executablePath)
             }.width(min: 130, ideal: 190)
 
             TableColumn("目标", value: \.host) { e in

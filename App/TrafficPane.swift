@@ -79,7 +79,7 @@ private struct AppRoutingTable: View {
             )
         } else {
             Table(processes, selection: $selection) {
-                TableColumn("应用") { p in Text(p.displayName).lineLimit(1) }
+                TableColumn("应用") { p in AppLabel(name: p.displayName, path: p.executablePath) }
                 TableColumn("规则") { p in
                     Text(RouteText.label(rule: p.rule, kind: nil)).foregroundStyle(RouteText.color(p.rule))
                 }.width(64)

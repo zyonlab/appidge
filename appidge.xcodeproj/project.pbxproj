@@ -34,6 +34,7 @@
 		BF3C3EA1865EA2811E2CC3B8 /* ProxyServersPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F32B133633BBB992A13D17D /* ProxyServersPaneView.swift */; };
 		CD074F91F9D8E81EF3AF1E9B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 011FA75EB4918608F8A42804 /* Assets.xcassets */; };
 		D81B1C44E7FA0F18207CF8AD /* Core in Frameworks */ = {isa = PBXBuildFile; productRef = 070C87CD751D657AB4653E16 /* Core */; };
+		D8E7DC6893CB84274AEBAC74 /* AppIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEF8C43AA00DC8615A6EF807 /* AppIcon.swift */; };
 		E0A05D3AE2BA60A8E9479E24 /* IPCContract in Frameworks */ = {isa = PBXBuildFile; productRef = A02F4122DB86F776E2D950D8 /* IPCContract */; };
 		FCBF4A432ECB3B5E94F88C26 /* ProfilesPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C2DCBF93F75AB530471B830 /* ProfilesPaneView.swift */; };
 		FE13440EB704BFFA918319FB /* IPCContract in Frameworks */ = {isa = PBXBuildFile; productRef = 096EEA660E596D625A61C6A2 /* IPCContract */; };
@@ -96,6 +97,7 @@
 		AD0EC770164D4561F3BFC0BD /* IPCContract */ = {isa = PBXFileReference; lastKnownFileType = folder; name = IPCContract; path = Packages/IPCContract; sourceTree = SOURCE_ROOT; };
 		AF69302A0C9EBB787D6C4B95 /* SystemExtensionActivator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemExtensionActivator.swift; sourceTree = "<group>"; };
 		B3C329A4A885B31BFA3C7A26 /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BEF8C43AA00DC8615A6EF807 /* AppIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIcon.swift; sourceTree = "<group>"; };
 		C5A9AAC7350E301EB78C0187 /* PacketCaptureWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketCaptureWriter.swift; sourceTree = "<group>"; };
 		EEBD232B5EDEBEEDC598FA44 /* ProfilesModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilesModel.swift; sourceTree = "<group>"; };
 		F3502285178386167CBDC5B8 /* RulesEditorPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesEditorPaneView.swift; sourceTree = "<group>"; };
@@ -166,6 +168,7 @@
 			isa = PBXGroup;
 			children = (
 				3DF70C29327CD2B5EA92DC75 /* App.entitlements */,
+				BEF8C43AA00DC8615A6EF807 /* AppIcon.swift */,
 				7AADB654447DCB49FB372FAE /* AppidgeApp.swift */,
 				011FA75EB4918608F8A42804 /* Assets.xcassets */,
 				257B7D2A3926A604D9A56ED4 /* BandwidthChart.swift */,
@@ -327,6 +330,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D8E7DC6893CB84274AEBAC74 /* AppIcon.swift in Sources */,
 				B419714D1E5E144ED39353BB /* AppidgeApp.swift in Sources */,
 				66F60D2C57CEDD221728DC92 /* BandwidthChart.swift in Sources */,
 				70A50B81E49589C783D3FD3A /* ConnectionsTable.swift in Sources */,

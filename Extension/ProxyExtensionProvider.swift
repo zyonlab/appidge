@@ -135,15 +135,42 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     ) async {
         let rule = await effectiveRule(for: processID, destination: remoteEndpoint)
         await routingHistoryTracker.record(processID: processID, wasProxied: rule == .proxied)
+
+        let (host, port) = Self.hostPort(from: remoteEndpoint) ?? (remoteHostname ?? "?", 0)
+        // 实际所用代理协议:只有 proxied 且真有 active 上游时才是代理,否则(含 fail-open 回落)记 nil。
+        let proxyKind = (rule == .proxied) ? proxyConfig?.activeServer?.kind : nil
+        let context = ConnectionContext(
+            id: UUID().uuidString, processID: processID, host: host, port: port, rule: rule, proxyKind: proxyKind
+        )
+
         do {
             let remote = try await openRemote(to: remoteEndpoint, remoteHostname: remoteHostname, rule: rule)
-            pumpClientToRemote(tcpFlow: tcpFlow, remote: remote, processID: processID, rule: rule, router: router)
-            pumpRemoteToClient(tcpFlow: tcpFlow, remote: remote, processID: processID, rule: rule, router: router)
+            emitConnectionEvent(context, phase: .opened)
+            pumpClientToRemote(tcpFlow: tcpFlow, remote: remote, context: context, router: router)
+            pumpRemoteToClient(tcpFlow: tcpFlow, remote: remote, context: context, router: router)
         } catch {
             flowLogger.error("openRemote failed, closing flow: \(String(describing: error), privacy: .public)")
             tcpFlow.closeReadWithError(error)
             tcpFlow.closeWriteWithError(error)
+            emitClose(context, failed: true)
         }
+    }
+
+    /// 发一条连接生命周期事件给 app(取当前累计字节)。
+    private func emitConnectionEvent(_ context: ConnectionContext, phase: ConnectionPhaseDTO) {
+        guard let transport else { return }
+        let bytes = context.snapshotBytes()
+        let event = ConnectionEventDTO(
+            id: context.id, processID: context.processID, targetHost: context.host, targetPort: context.port,
+            rule: context.rule, proxyKind: context.proxyKind, phase: phase, bytesUp: bytes.up, bytesDown: bytes.down
+        )
+        Task { await transport.deliver(.connectionEvent(event)) }
+    }
+
+    /// 结束事件只发一次(两个 pump 都可能触发 teardown)。
+    private func emitClose(_ context: ConnectionContext, failed: Bool) {
+        guard context.markClosedOnce() else { return }
+        emitConnectionEvent(context, phase: failed ? .failed : .closed)
     }
 
     /// 见类型注释的三层决策。回环 / 命中上游 → 强制直连；否则按进程规则。
@@ -219,24 +246,26 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     private func pumpClientToRemote(
         tcpFlow: NEAppProxyTCPFlow,
         remote: NWConnection,
-        processID: ProcessIdentifierDTO,
-        rule: ProxyRuleDTO,
+        context: ConnectionContext,
         router: FlowRouter
     ) {
         tcpFlow.readData { [weak self] data, error in
             guard let self, let data, error == nil, !data.isEmpty else {
                 remote.cancel()
                 tcpFlow.closeReadWithError(error)
+                self?.emitClose(context, failed: error != nil)
                 return
             }
             remote.send(content: data, completion: .contentProcessed { sendError in
                 guard sendError == nil else {
                     remote.cancel()
                     tcpFlow.closeReadWithError(sendError)
+                    self.emitClose(context, failed: true)
                     return
                 }
-                Task { await router.route(processID: processID, bytesUp: Int64(data.count), bytesDown: 0, rule: rule, now: Date()) }
-                self.pumpClientToRemote(tcpFlow: tcpFlow, remote: remote, processID: processID, rule: rule, router: router)
+                context.addUp(Int64(data.count))
+                Task { await router.route(processID: context.processID, bytesUp: Int64(data.count), bytesDown: 0, rule: context.rule, now: Date()) }
+                self.pumpClientToRemote(tcpFlow: tcpFlow, remote: remote, context: context, router: router)
             })
         }
     }
@@ -244,25 +273,65 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     private func pumpRemoteToClient(
         tcpFlow: NEAppProxyTCPFlow,
         remote: NWConnection,
-        processID: ProcessIdentifierDTO,
-        rule: ProxyRuleDTO,
+        context: ConnectionContext,
         router: FlowRouter
     ) {
         remote.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, isComplete, error in
             guard let self, let data, error == nil, !data.isEmpty else {
                 tcpFlow.closeWriteWithError(error)
                 if isComplete { remote.cancel() }
+                self?.emitClose(context, failed: error != nil)
                 return
             }
             tcpFlow.write(data) { writeError in
                 guard writeError == nil else {
                     remote.cancel()
                     tcpFlow.closeWriteWithError(writeError)
+                    self.emitClose(context, failed: true)
                     return
                 }
-                Task { await router.route(processID: processID, bytesUp: 0, bytesDown: Int64(data.count), rule: rule, now: Date()) }
-                self.pumpRemoteToClient(tcpFlow: tcpFlow, remote: remote, processID: processID, rule: rule, router: router)
+                context.addDown(Int64(data.count))
+                Task { await router.route(processID: context.processID, bytesUp: 0, bytesDown: Int64(data.count), rule: context.rule, now: Date()) }
+                self.pumpRemoteToClient(tcpFlow: tcpFlow, remote: remote, context: context, router: router)
             }
+        }
+    }
+}
+
+/// 单条连接的上下文:身份 + 目标 + 决策(rule/proxyKind)+ 累计字节 + 结束只发一次的闸门。
+/// pump 回调从不同队列并发访问字节计数,用锁保护;`@unchecked Sendable` 显式担这份线程安全。
+private final class ConnectionContext: @unchecked Sendable {
+    let id: String
+    let processID: ProcessIdentifierDTO
+    let host: String
+    let port: UInt16
+    let rule: ProxyRuleDTO
+    let proxyKind: ProxyKindDTO?
+
+    private let lock = NSLock()
+    private var up: Int64 = 0
+    private var down: Int64 = 0
+    private var closed = false
+
+    init(id: String, processID: ProcessIdentifierDTO, host: String, port: UInt16, rule: ProxyRuleDTO, proxyKind: ProxyKindDTO?) {
+        self.id = id
+        self.processID = processID
+        self.host = host
+        self.port = port
+        self.rule = rule
+        self.proxyKind = proxyKind
+    }
+
+    func addUp(_ n: Int64) { lock.withLock { up += n } }
+    func addDown(_ n: Int64) { lock.withLock { down += n } }
+    func snapshotBytes() -> (up: Int64, down: Int64) { lock.withLock { (up, down) } }
+
+    /// 第一次调用返回 true(该发结束事件),之后都返回 false。
+    func markClosedOnce() -> Bool {
+        lock.withLock {
+            if closed { return false }
+            closed = true
+            return true
         }
     }
 }

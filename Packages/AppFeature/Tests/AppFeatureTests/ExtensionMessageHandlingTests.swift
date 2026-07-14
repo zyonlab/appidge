@@ -84,6 +84,54 @@ struct ExtensionMessageHandlingTests {
         #expect(actions == [.engineFailure(reason: "transport down")])
     }
 
+    @Test("connectionEvent maps every field into a connectionEventReceived action")
+    func connectionEventMapsFields() {
+        let dto = ConnectionEventDTO(
+            id: "c1", processID: ProcessIdentifierDTO("com.x"), targetHost: "example.com", targetPort: 443,
+            rule: .proxied, proxyKind: .httpConnect, phase: .closed, bytesUp: 12, bytesDown: 34
+        )
+        let actions = ExtensionMessageHandling.actions(for: .connectionEvent(dto))
+
+        #expect(actions == [.connectionEventReceived(Core.ConnectionLogEntry(
+            id: "c1", processID: Core.ProcessID("com.x"), host: "example.com", port: 443,
+            rule: .proxied, proxyKind: .httpConnect, phase: .closed, bytesUp: 12, bytesDown: 34
+        ))])
+    }
+
+    @Test("a direct connection event maps proxyKind nil")
+    func connectionEventDirectNilKind() {
+        let dto = ConnectionEventDTO(
+            id: "c2", processID: ProcessIdentifierDTO("p"), targetHost: "h", targetPort: 80,
+            rule: .direct, proxyKind: nil, phase: .opened, bytesUp: 0, bytesDown: 0
+        )
+        let actions = ExtensionMessageHandling.actions(for: .connectionEvent(dto))
+        guard case .connectionEventReceived(let entry) = actions.first else {
+            Issue.record("expected connectionEventReceived"); return
+        }
+        #expect(entry.proxyKind == nil)
+        #expect(entry.rule == .direct)
+        #expect(entry.phase == .opened)
+    }
+
+    @Test(
+        "connection phase maps 1:1 across all cases",
+        arguments: [
+            (ConnectionPhaseDTO.opened, Core.ConnectionPhase.opened),
+            (ConnectionPhaseDTO.closed, Core.ConnectionPhase.closed),
+            (ConnectionPhaseDTO.failed, Core.ConnectionPhase.failed)
+        ]
+    )
+    func phaseMapping(dto: ConnectionPhaseDTO, core: Core.ConnectionPhase) {
+        let event = ConnectionEventDTO(
+            id: "c", processID: ProcessIdentifierDTO("p"), targetHost: "h", targetPort: 1,
+            rule: .direct, proxyKind: nil, phase: dto, bytesUp: 0, bytesDown: 0
+        )
+        guard case .connectionEventReceived(let entry) = ExtensionMessageHandling.actions(for: .connectionEvent(event)).first else {
+            Issue.record("expected connectionEventReceived"); return
+        }
+        #expect(entry.phase == core)
+    }
+
     @Test(
         "diagnosticRequestMessage kind mapping is exhaustive and 1:1, the reverse of the incoming mapping",
         arguments: [

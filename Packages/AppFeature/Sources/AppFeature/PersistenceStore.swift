@@ -52,6 +52,7 @@ public struct PersistedConfiguration: Sendable, Equatable, Codable {
     public var catalog: [Core.ProcessID: Core.DirectoryEntry]
     public var proxyServers: [PersistedProxyServer]
     public var activeProxyServerID: String?
+    public var proxyRoutingMode: Core.ProxyRoutingMode
     public var hasCompletedOnboarding: Bool
 
     public init(
@@ -59,12 +60,14 @@ public struct PersistedConfiguration: Sendable, Equatable, Codable {
         catalog: [Core.ProcessID: Core.DirectoryEntry] = [:],
         proxyServers: [PersistedProxyServer] = [],
         activeProxyServerID: String? = nil,
+        proxyRoutingMode: Core.ProxyRoutingMode = .single,
         hasCompletedOnboarding: Bool = false
     ) {
         self.processes = processes
         self.catalog = catalog
         self.proxyServers = proxyServers
         self.activeProxyServerID = activeProxyServerID
+        self.proxyRoutingMode = proxyRoutingMode
         self.hasCompletedOnboarding = hasCompletedOnboarding
     }
 }
@@ -81,6 +84,7 @@ public extension PersistedConfiguration {
                 .sorted { $0.id.value < $1.id.value }
                 .map(PersistedProxyServer.init(stripping:)),
             activeProxyServerID: state.activeProxyServerID?.value,
+            proxyRoutingMode: state.proxyRoutingMode,
             hasCompletedOnboarding: state.hasCompletedOnboarding
         )
     }
@@ -119,6 +123,10 @@ public extension PersistedConfiguration {
         // 自动选择清掉，才能忠实还原"有代理但没选中"这个状态。
         if !proxyServers.isEmpty {
             actions.append(.setActiveProxyServer(activeProxyServerID.map(Core.ProxyServerID.init)))
+        }
+        // 非默认的路由模式才需要还原;默认 .single 就靠 AppState 的默认值,不必发。
+        if proxyRoutingMode != .single {
+            actions.append(.setProxyRoutingMode(proxyRoutingMode))
         }
 
         if hasCompletedOnboarding {

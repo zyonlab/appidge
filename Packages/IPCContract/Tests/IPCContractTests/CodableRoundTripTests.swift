@@ -76,6 +76,16 @@ struct CodableRoundTripTests {
             DiagnosticRequestDTO(processID: ProcessIdentifierDTO("x"), kinds: [.upstreamReachable])
         )
         #expect(try roundTrip(diagnostic) == diagnostic)
+
+        let routing = AppToExtensionMessage.applyRoutingMode(.chain(["a", "b"]))
+        #expect(try roundTrip(routing) == routing)
+    }
+
+    @Test("ProxyRoutingModeDTO round-trips every case")
+    func routingModeRoundTrip() throws {
+        for mode: ProxyRoutingModeDTO in [.single, .chain(["a", "b"]), .failover(["a"]), .loadBalance(["a", "b", "c"])] {
+            #expect(try roundTrip(mode) == mode)
+        }
     }
 
     @Test("ExtensionToAppMessage envelope round-trips all cases including engineFailure")

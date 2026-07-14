@@ -2,6 +2,7 @@ public enum AppToExtensionMessage: Sendable, Equatable, Codable {
     case applyRuleSet(RuleSetMessage)
     case requestDiagnostic(DiagnosticRequestDTO)
     case applyProxyConfig(ProxyConfigMessage)
+    case applyRoutingMode(ProxyRoutingModeDTO)
 }
 
 public enum ExtensionToAppMessage: Sendable, Equatable, Codable {

@@ -60,6 +60,19 @@ struct ProxyConfigMappingTests {
     }
 
     @Test(
+        "routingModeMessage maps every Core.ProxyRoutingMode into applyRoutingMode",
+        arguments: [
+            (Core.ProxyRoutingMode.single, ProxyRoutingModeDTO.single),
+            (Core.ProxyRoutingMode.chain([Core.ProxyServerID("a"), Core.ProxyServerID("b")]), ProxyRoutingModeDTO.chain(["a", "b"])),
+            (Core.ProxyRoutingMode.failover([Core.ProxyServerID("a")]), ProxyRoutingModeDTO.failover(["a"])),
+            (Core.ProxyRoutingMode.loadBalance([Core.ProxyServerID("x"), Core.ProxyServerID("y")]), ProxyRoutingModeDTO.loadBalance(["x", "y"]))
+        ]
+    )
+    func routingModeMapping(core: Core.ProxyRoutingMode, dto: ProxyRoutingModeDTO) {
+        #expect(ProxyConfigMapping.routingModeMessage(core) == .applyRoutingMode(dto))
+    }
+
+    @Test(
         "ProxyKind maps 1:1 to ProxyKindDTO across all cases",
         arguments: [
             (Core.ProxyKind.socks5, ProxyKindDTO.socks5),

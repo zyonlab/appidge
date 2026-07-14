@@ -20,6 +20,21 @@ public enum ProxyConfigMapping {
         )
     }
 
+    /// 把代理路由模式翻成 `applyRoutingMode` 消息。id 列表逐个取 `.value`。
+    public static func routingModeMessage(_ mode: Core.ProxyRoutingMode) -> IPCContract.AppToExtensionMessage {
+        .applyRoutingMode(dtoMode(from: mode))
+    }
+
+    /// 穷举 switch(不带 default):`Core.ProxyRoutingMode` 新增 case 时这里编译报错。
+    private static func dtoMode(from mode: Core.ProxyRoutingMode) -> IPCContract.ProxyRoutingModeDTO {
+        switch mode {
+        case .single: .single
+        case .chain(let ids): .chain(ids.map(\.value))
+        case .failover(let ids): .failover(ids.map(\.value))
+        case .loadBalance(let ids): .loadBalance(ids.map(\.value))
+        }
+    }
+
     private static func dto(from server: Core.ProxyServer) -> IPCContract.ProxyServerDTO {
         IPCContract.ProxyServerDTO(
             id: server.id.value,

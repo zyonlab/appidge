@@ -6,9 +6,10 @@ public struct ProxyServerID: Sendable, Hashable, Codable {
     }
 }
 
-/// 上游代理协议类型。P0 先只做 SOCKS5（最常用、握手最简单），HTTPS/HTTP 留作后续。
+/// 上游代理协议类型。SOCKS5（RFC 1928，默认）与 HTTP CONNECT（RFC 7231 隧道）。
 public enum ProxyKind: String, Sendable, Equatable, Codable, CaseIterable {
     case socks5
+    case httpConnect
 }
 
 /// 一台上游代理服务器的配置。`username`/`password` 用于需要认证的 SOCKS5（RFC 1929）。

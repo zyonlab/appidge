@@ -36,6 +36,7 @@ public enum ProxyConfigMapping {
     private static func dtoKind(from kind: Core.ProxyKind) -> IPCContract.ProxyKindDTO {
         switch kind {
         case .socks5: .socks5
+        case .httpConnect: .httpConnect
         }
     }
 }

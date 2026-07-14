@@ -74,6 +74,14 @@ public enum Reducer {
             return appLaunched(state)
         case .connectionEventReceived(let entry):
             return connectionEventReceived(entry, state)
+        case .loopWarningRaised(let signature):
+            var state = state
+            state.loopWarning = signature
+            return (state, [])
+        case .dismissLoopWarning:
+            var state = state
+            state.loopWarning = nil
+            return (state, [])
         default:
             // 只可能是前面几组已处理的 case，reduce 不会走到这里。
             return (state, [])

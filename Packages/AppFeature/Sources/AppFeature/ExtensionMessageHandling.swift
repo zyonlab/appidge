@@ -44,6 +44,9 @@ public enum ExtensionMessageHandling {
                 bytesUp: event.bytesUp,
                 bytesDown: event.bytesDown
             ))]
+
+        case .loopDetected(let signature):
+            return [.loopWarningRaised(signature)]
         }
     }
 

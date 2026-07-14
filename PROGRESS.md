@@ -364,3 +364,43 @@ codesign 通过。
 - **只有 SOCKS5**：HTTPS/HTTP CONNECT 代理未做。
 - **凭据只在内存 + IPC**：密码不落盘（好），但也还没进 Keychain；重启后需重填密码。
 - 真机端到端（配代理 → 某 app 真走该代理 → 抓到流量）仍需系统扩展被批准，卡在既有的两个人工步骤。
+
+## Phase 4：剩余缺口并行修复（HTTP CONNECT + DNS-over-proxy + Keychain）
+
+接着 Phase 3 的诚实遗留清单继续,worktree + PR + CI 绿才 merge。
+
+**基础 PR #6（我）**：`ProxyKind.httpConnect`（Core）+ `ProxyKindDTO.httpConnect`（IPC）+
+`ProxyConfigMapping.dtoKind` 穷举 switch + 配置 UI 加协议 Picker（SOCKS5 / HTTP CONNECT）+ 每行协议角标。
+
+**三个并行修复**：
+- **PR #8 HTTP CONNECT**（EngineKit）：RFC 7231 CONNECT 客户端,复用 SOCKS5 的 `ByteStream` 接缝,
+  逐字节读响应头到 `\r\n\r\n` 不 over-read,Basic 认证,字节级 TDD（11 测试）。
+- **PR #7 DNS-over-proxy 目标选择**（EngineKit）：`ProxyTargetSelector` 优先把原始主机名交给代理
+  远程解析（堵 DNS 泄漏）,IP 字面量/空则退回 IP,`inet_pton` 严判（7 测试）。
+- **PR #9 Keychain 凭据**（AppFeature）：`CredentialStore` 协议 + `KeychainCredentialStore`（真实,
+  Security 框架,不进单测）+ `InMemoryCredentialStore`（mock）;密码存 Keychain、磁盘 JSON 仍零密码,
+  重启回填（7 测试）。
+
+**集成 PR #10（我）**：`openRemote` 按 `active.kind` 分支走 SOCKS5/HTTP,用 `ProxyTargetSelector`
+从 `flow.remoteHostname` 选目标（DNS-over-proxy）;App 存/取密码接 Keychain。
+
+**过程踩的坑（记下来）**：
+1. **改 enum 是 ABI 布局变更,本地增量构建的依赖包会 SIGSEGV**（signal 11）——加 `ProxyKind.httpConnect`
+   后 EngineKit/AppFeature 的 `.build` 缓存对不上新元数据就崩。`rm -rf .build` 重建即好。CI 干净 checkout 不受影响。
+   诊断方法：`git stash` 后崩溃消失 → 不是代码 bug 是陈旧产物。
+2. **三个并行 agent 同时因 API 连接中断（ECONNRESET）死掉**——不是代码问题,是 API 瞬时不稳。
+   而且 agent 们共用主 checkout 的 git dir,死前互相切换分支,把主 checkout 搞到别的分支上、留下一堆空分支。
+   **应对**：远端 origin/main 始终是权威（没丢东西）,`git reset --hard origin/main` 收拾主 checkout,
+   删掉 agent 留的空分支/worktree;然后**改由我自己顺序实现这三个 PR**（API 不稳时,顺序比并行 subagent 更稳,
+   也避免共享 git dir 的分支打架）。仍然保持每个一 PR、CI 并行跑、绿了逐个 merge,honor 了 PR 模式。
+3. commit 前忘了先跑 lint,推了带 4 个 `optional_data_string_conversion` 违规的版本——本仓库自定义规则要
+   `String(bytes:encoding:)` 而非 `String(decoding:as:)`。`--amend` + `--force-with-lease` 修掉再开 PR。教训：commit 前必 lint。
+
+**最终**：六个 PR（#5-#10）全 CI 绿后 merge,214 个 SPM 测试全绿（Core 31 · IPCContract 8 ·
+EngineKit 106 · AppFeature 58 · ArchitectureTests 11）,`xcodebuild` Debug 零并发警告,swiftlint 零违规,codesign 通过。
+
+**这一轮之后仍在的遗留**：
+- DNS-over-proxy 只在 app 用域名连时生效（NE 能给主机名）;直接用 IP 的 app 仍本地解析。
+- `UpstreamExclusion` 纯文本匹配,主机名上游匹配不到解析后 IP。
+- 无代理链 / 故障转移 / 负载均衡。
+- 真机端到端仍卡在系统扩展批准的两个人工步骤。

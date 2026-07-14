@@ -8,7 +8,7 @@ struct TrafficPane: View {
     var store: Store
     @State private var tab: Tab = .traffic
 
-    enum Tab: String, CaseIterable, Identifiable { case traffic = "流量", stats = "统计"; var id: String { rawValue } }
+    enum Tab: String, CaseIterable, Identifiable { case traffic = "流量", apps = "应用"; var id: String { rawValue } }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -22,7 +22,7 @@ struct TrafficPane: View {
             Divider()
             switch tab {
             case .traffic: TrafficTab(store: store)
-            case .stats: PerProcessStats(store: store)
+            case .apps: AppRoutingTable(store: store)
             }
         }
         .background(.background)
@@ -55,21 +55,50 @@ private struct TrafficTab: View {
     }
 }
 
-private struct PerProcessStats: View {
+/// 「应用」表:目录扫描到的应用,**右键设每进程规则**(走代理 / 直连 / 拦截)——这是「让某个 app
+/// 走代理」的入口。设了之后扩展加载即按此路由(在细粒度 host/port 规则之后、默认直连之前生效)。
+/// 有流量的排前面,其余按名字。
+private struct AppRoutingTable: View {
     var store: Store
+    @State private var selection: Set<MonitoredProcess.ID> = []
 
     private var processes: [MonitoredProcess] {
-        store.state.processes.values.sorted { ($0.stats.bytesUp + $0.stats.bytesDown) > ($1.stats.bytesUp + $1.stats.bytesDown) }
+        store.state.processes.values.sorted {
+            let a = $0.stats.bytesUp &+ $0.stats.bytesDown
+            let b = $1.stats.bytesUp &+ $1.stats.bytesDown
+            return a != b ? a > b : $0.displayName.localizedCompare($1.displayName) == .orderedAscending
+        }
     }
 
     var body: some View {
-        Table(processes) {
-            TableColumn("进程") { p in Text(p.displayName).lineLimit(1) }
-            TableColumn("规则") { p in
-                Text(RouteText.label(rule: p.rule, kind: nil)).foregroundStyle(RouteText.color(p.rule))
-            }.width(90)
-            TableColumn("↑") { p in Text(TrafficFormat.bytes(p.stats.bytesUp)).monospacedDigit() }.width(80)
-            TableColumn("↓") { p in Text(TrafficFormat.bytes(p.stats.bytesDown)).monospacedDigit() }.width(80)
+        if processes.isEmpty {
+            ContentUnavailableView(
+                "还没有扫描到应用",
+                systemImage: "app.badge",
+                description: Text("启动时会扫描已安装的应用；右键某个应用可设它走代理 / 直连 / 拦截。")
+            )
+        } else {
+            Table(processes, selection: $selection) {
+                TableColumn("应用") { p in Text(p.displayName).lineLimit(1) }
+                TableColumn("规则") { p in
+                    Text(RouteText.label(rule: p.rule, kind: nil)).foregroundStyle(RouteText.color(p.rule))
+                }.width(64)
+                TableColumn("↑") { p in Text(TrafficFormat.bytes(p.stats.bytesUp)).monospacedDigit() }.width(78)
+                TableColumn("↓") { p in Text(TrafficFormat.bytes(p.stats.bytesDown)).monospacedDigit() }.width(78)
+            }
+            .contextMenu(forSelectionType: MonitoredProcess.ID.self) { ids in
+                if !ids.isEmpty {
+                    Section("此应用（\(ids.count) 个）") {
+                        Button("走代理") { assign(ids, .proxied) }
+                        Button("直连") { assign(ids, .direct) }
+                        Button("拦截", role: .destructive) { assign(ids, .block) }
+                    }
+                }
+            }
         }
+    }
+
+    private func assign(_ ids: Set<MonitoredProcess.ID>, _ rule: ProxyRule) {
+        for id in ids { store.dispatch(.assignRule(processID: id, rule: rule)) }
     }
 }

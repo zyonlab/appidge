@@ -67,7 +67,7 @@ targets:
     settings:
       groups: [common]
       base:
-        PRODUCT_NAME: ProxyExtension
+        PRODUCT_NAME: $(EXT_BUNDLE_IDENTIFIER)
         PRODUCT_BUNDLE_IDENTIFIER: $(EXT_BUNDLE_IDENTIFIER)
         PRODUCT_MODULE_NAME: ProxyExtension
         INFOPLIST_FILE: Extension/Info.plist

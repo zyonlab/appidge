@@ -74,6 +74,7 @@ struct AppidgeApp: App {
                 SystemExtensionActivator.shared.onStateChange = { activation in
                     store.dispatch(.extensionActivationChanged(activation))
                 }
+                SystemExtensionActivator.shared.diagnose() // 启动即打印 app 看到的扩展目录(排查 not-found)
                 await ipcReceiver.start()
                 await restorePersistedConfiguration()
                 await restoreRecentConnectionLog()

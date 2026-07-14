@@ -24,6 +24,7 @@ final class SystemExtensionActivator: NSObject, OSSystemExtensionRequestDelegate
     /// 真实情况——已批准会立刻回 `.active`，未批准回 `.needsApproval`，缺 entitlement/签名
     /// 不符回 `.failed`。因为激活状态不持久化（和引擎健康度一样是运行时状态）。
     func activate() {
+        diagnose()
         onStateChange?(.activating)
         let request = OSSystemExtensionRequest.activationRequest(
             forExtensionWithIdentifier: extensionBundleID,
@@ -31,7 +32,42 @@ final class SystemExtensionActivator: NSObject, OSSystemExtensionRequestDelegate
         )
         request.delegate = self
         OSSystemExtensionManager.shared.submitRequest(request)
-        activatorLogger.log("submitted activation request for \(self.extensionBundleID, privacy: .public)")
+        emit("submitted activation request for \(extensionBundleID)")
+    }
+
+    /// 诊断:打印 app **自己看到的** bundle 路径 + `Contents/Library/SystemExtensions` 目录里的
+    /// 实际内容(每个 .systemextension 的 id / 版本 / 是否 NE / 包类型)。写 stderr(从终端跑可抓)
+    /// + os.Logger。用来定位 "Extension not found" 到底是「app 看不到自己的扩展」还是别的。
+    func emit(_ s: String) {
+        FileHandle.standardError.write(Data((s + "\n").utf8))
+        activatorLogger.log("\(s, privacy: .public)")
+    }
+
+    func diagnose() {
+        let fm = FileManager.default
+        let b = Bundle.main
+        var s = "=== APPIDGE-SYSEXT-DIAG ===\n"
+        s += "app bundlePath: \(b.bundlePath)\n"
+        s += "app bundleID:   \(b.bundleIdentifier ?? "nil")\n"
+        s += "requested id:   \(extensionBundleID)\n"
+        let dir = b.bundleURL.appendingPathComponent("Contents/Library/SystemExtensions", isDirectory: true)
+        s += "sysext dir:     \(dir.path)  exists=\(fm.fileExists(atPath: dir.path))\n"
+        if let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) {
+            for it in items {
+                s += "  • \(it.lastPathComponent)\n"
+                let info = it.appendingPathComponent("Contents/Info.plist")
+                if let d = NSDictionary(contentsOf: info) {
+                    s += "    id=\(d["CFBundleIdentifier"] ?? "nil") ver=\(d["CFBundleVersion"] ?? "nil")"
+                    s += " NE=\(d["NetworkExtension"] != nil) pkg=\(d["CFBundlePackageType"] ?? "nil")\n"
+                } else {
+                    s += "    (Info.plist unreadable: \(info.path))\n"
+                }
+            }
+        } else {
+            s += "  (contentsOfDirectory failed — app can't list its own SystemExtensions dir)\n"
+        }
+        s += "==========================="
+        emit(s)
     }
 
     /// delegate 回调是 `nonisolated`（但 queue 是 `.main`）；统一跳回 MainActor 再回灌，
@@ -54,9 +90,11 @@ final class SystemExtensionActivator: NSObject, OSSystemExtensionRequestDelegate
     }
 
     nonisolated func request(_ request: OSSystemExtensionRequest, didFailWithError error: Error) {
-        let reason = error.localizedDescription
-        activatorLogger.error("activation failed: \(reason, privacy: .public)")
-        Task { @MainActor in self.report(.failed(reason: reason)) }
+        let ns = error as NSError
+        let detail = "activation FAILED: domain=\(ns.domain) code=\(ns.code) desc=\(ns.localizedDescription) userInfo=\(ns.userInfo)"
+        FileHandle.standardError.write(Data((detail + "\n").utf8))
+        activatorLogger.error("\(detail, privacy: .public)")
+        Task { @MainActor in self.report(.failed(reason: error.localizedDescription)) }
     }
 
     nonisolated func request(_ request: OSSystemExtensionRequest, didFinishWithResult result: OSSystemExtensionRequest.Result) {

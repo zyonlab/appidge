@@ -52,9 +52,16 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     private let configLock = NSLock()
     private var storedProxyConfig: ProxyConfigMessage?
     private var storedRoutingMode: ProxyRoutingModeDTO = .single
+    // 每进程规则的同步快照:UDP 决策在 handleNewFlow 里必须同步返回(读 actor 是 async,来不及),
+    // 所以在 applyRuleSet 时额外维护这份锁保护的快照。TCP 路径仍走 async 的 appliedRuleSetStore。
+    private var storedPerProcessRules: [String: ProxyRuleDTO] = [:]
 
     private var proxyConfig: ProxyConfigMessage? {
         configLock.withLock { storedProxyConfig }
+    }
+
+    private var perProcessRules: [String: ProxyRuleDTO] {
+        configLock.withLock { storedPerProcessRules }
     }
 
     private var routingMode: ProxyRoutingModeDTO {
@@ -72,7 +79,12 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             Task { await self.handleAppMessage(message, transport: transport) }
         }
 
-        completionHandler(nil)
+        // 透明代理网络设置:拦截所有出站 TCP + UDP。此前完全没设置——拦截从未真正生效(也是
+        // 「待人工回填」里 flow metadata 观测被卡住的一环)。UDP 纳入拦截是 A1「拦截 QUIC/UDP
+        // 止漏」的前提。⚠️ 只能在真机 + 系统扩展获批后验证,见 PROGRESS.md 人工自测。
+        setTunnelNetworkSettings(TransparentProxySettings.make()) { error in
+            completionHandler(error)
+        }
     }
 
     override func stopProxy(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
@@ -101,6 +113,12 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         switch message {
         case .applyRuleSet(let ruleSet):
             await appliedRuleSetStore.apply(ruleSet)
+            // 同步快照供 UDP 决策用(见 storedPerProcessRules）。后到的同 id 覆盖先到的。
+            let snapshot = Dictionary(
+                ruleSet.assignments.map { ($0.processID.value, $0.rule) },
+                uniquingKeysWith: { _, latest in latest }
+            )
+            configLock.withLock { storedPerProcessRules = snapshot }
         case .requestDiagnostic(let request):
             guard let diagnosticsRunner else { return }
             let results = await diagnosticsRunner.run(processID: request.processID, kinds: request.kinds)
@@ -119,14 +137,24 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     }
 
     override func handleNewFlow(_ flow: NEAppProxyFlow) -> Bool {
-        guard let router, let tcpFlow = flow as? NEAppProxyTCPFlow else { return false }
+        if let tcpFlow = flow as? NEAppProxyTCPFlow {
+            return handleNewTCPFlow(tcpFlow)
+        }
+        if let udpFlow = flow as? NEAppProxyUDPFlow {
+            return blockOrAllowUDPFlow(udpFlow)
+        }
+        return false
+    }
 
-        let processID = ProcessIdentifierDTO(flow.metaData.sourceAppSigningIdentifier)
+    private func handleNewTCPFlow(_ tcpFlow: NEAppProxyTCPFlow) -> Bool {
+        guard let router else { return false }
+
+        let processID = ProcessIdentifierDTO(tcpFlow.metaData.sourceAppSigningIdentifier)
         let remoteEndpoint = tcpFlow.remoteFlowEndpoint
         // 原始主机名（app 用域名连的话 NE 会保留）——DNS-over-proxy 用它把域名交给代理去解析。
-        let remoteHostname = flow.remoteHostname
+        let remoteHostname = tcpFlow.remoteHostname
         flowLogger.log("""
-        handleNewFlow sourceAppSigningIdentifier=\(flow.metaData.sourceAppSigningIdentifier, privacy: .public) \
+        handleNewTCPFlow sourceAppSigningIdentifier=\(tcpFlow.metaData.sourceAppSigningIdentifier, privacy: .public) \
         remote=\(String(describing: remoteEndpoint), privacy: .public) hostname=\(remoteHostname ?? "-", privacy: .public)
         """)
 
@@ -142,6 +170,28 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
                     processID: processID, router: router
                 )
             }
+        }
+        return true
+    }
+
+    /// UDP/QUIC:被代理(或被 block）的进程,其 UDP 一律**拦截止漏**——接管 flow 后立刻两端关闭把它
+    /// drop 掉,逼 QUIC 回落 TCP 走代理。理由:HTTP CONNECT 天生不能代理 UDP、SOCKS5 UDP ASSOCIATE
+    /// 尚未实现,不拦 proxied 应用的 UDP 就会明文直连泄漏(对齐 Surge/Clash 的 block-QUIC 默认)。
+    /// `.direct` 进程的 UDP 放行直连(返回 false,不接管)。决策必须同步(handleNewFlow 同步返回),
+    /// 故读锁保护的 `perProcessRules` 快照而非 actor;UDP 无固定目的地,不评估 host/port 细粒度规则,
+    /// 只按每进程规则——这条限制已在 PROGRESS 记录。完整 SOCKS5 UDP 代理是后续增强(A1b/开关同理)。
+    private func blockOrAllowUDPFlow(_ flow: NEAppProxyUDPFlow) -> Bool {
+        let sourceID = flow.metaData.sourceAppSigningIdentifier
+        let disposition = UDPFlowPolicy.disposition(
+            sourceIdentifier: sourceID,
+            ownIdentifiers: Self.ownProcessIdentifiers,
+            perProcessRule: perProcessRules[sourceID]
+        )
+        guard disposition == .block else { return false } // allowDirect:不接管,UDP 原生直连。
+        flowLogger.log("blocking UDP flow from \(sourceID, privacy: .public)")
+        flow.open(withLocalFlowEndpoint: nil) { error in
+            flow.closeReadWithError(error)
+            flow.closeWriteWithError(error)
         }
         return true
     }
@@ -245,7 +295,12 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         )
     }
 
-    private func pumpClientToRemote(
+}
+
+/// flow 双向 pump 拆到同文件 extension 里(不占 provider 类体的长度预算,且同文件仍可访问其
+/// private 成员)。读一端、写另一端、按方向计量,任一端出错/结束就关流并发一次结束事件。
+private extension ProxyExtensionProvider {
+    func pumpClientToRemote(
         tcpFlow: NEAppProxyTCPFlow,
         remote: NWConnection,
         context: ConnectionContext,
@@ -272,7 +327,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         }
     }
 
-    private func pumpRemoteToClient(
+    func pumpRemoteToClient(
         tcpFlow: NEAppProxyTCPFlow,
         remote: NWConnection,
         context: ConnectionContext,
@@ -296,44 +351,6 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
                 Task { await router.route(processID: context.processID, bytesUp: 0, bytesDown: Int64(data.count), rule: context.rule, now: Date()) }
                 self.pumpRemoteToClient(tcpFlow: tcpFlow, remote: remote, context: context, router: router)
             }
-        }
-    }
-}
-
-/// 单条连接的上下文:身份 + 目标 + 决策(rule/proxyKind)+ 累计字节 + 结束只发一次的闸门。
-/// pump 回调从不同队列并发访问字节计数,用锁保护;`@unchecked Sendable` 显式担这份线程安全。
-private final class ConnectionContext: @unchecked Sendable {
-    let id: String
-    let processID: ProcessIdentifierDTO
-    let host: String
-    let port: UInt16
-    let rule: ProxyRuleDTO
-    let proxyKind: ProxyKindDTO?
-
-    private let lock = NSLock()
-    private var up: Int64 = 0
-    private var down: Int64 = 0
-    private var closed = false
-
-    init(id: String, processID: ProcessIdentifierDTO, host: String, port: UInt16, rule: ProxyRuleDTO, proxyKind: ProxyKindDTO?) {
-        self.id = id
-        self.processID = processID
-        self.host = host
-        self.port = port
-        self.rule = rule
-        self.proxyKind = proxyKind
-    }
-
-    func addUp(_ n: Int64) { lock.withLock { up += n } }
-    func addDown(_ n: Int64) { lock.withLock { down += n } }
-    func snapshotBytes() -> (up: Int64, down: Int64) { lock.withLock { (up, down) } }
-
-    /// 第一次调用返回 true(该发结束事件),之后都返回 false。
-    func markClosedOnce() -> Bool {
-        lock.withLock {
-            if closed { return false }
-            closed = true
-            return true
         }
     }
 }

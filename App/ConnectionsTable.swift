@@ -150,11 +150,13 @@ enum RouteText {
         }
     }
 
+    /// 路由语义色「词汇表」——连接表 chip 与「应用」表(TrafficPane)共用同一处,保证一致:
+    /// 直连=绿(放行 / 健康) · 代理=蓝(accent,经上游) · 拦截=红。与设计提案的语义色对齐。
     static func color(_ rule: ProxyRule) -> Color {
         switch rule {
+        case .direct: .green
         case .proxied: .accentColor
         case .block: .red
-        case .direct: .secondary
         }
     }
 }

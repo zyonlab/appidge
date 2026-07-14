@@ -103,6 +103,9 @@ struct AppidgeApp: App {
         MenuBarExtra("appidge", systemImage: "network") {
             MenuBarView(store: store)
         }
+        // .window 而非默认 .menu：内容是「仪表盘」(状态行 + Top-5 列表 + 开关),
+        // 需要完整 SwiftUI 排版(语义色 / caption / 对齐),菜单渲染器会把这些收着。
+        .menuBarExtraStyle(.window)
     }
 
     /// 启动时把上次保存的配置（扫描到的目录、分配过规则的进程、是否已完成引导）

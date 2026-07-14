@@ -69,58 +69,77 @@ struct MenuBarView: View {
     }
 
     var body: some View {
-        // 1. 状态:符号 + 语义色 + 文案三者齐备,不只靠颜色。
-        Label(status.text, systemImage: status.symbol)
-            .foregroundStyle(status.tint)
-            .help(status.help ?? "")
+        VStack(alignment: .leading, spacing: 10) {
+            // 1. 状态:符号 + 语义色 + 文案三者齐备,不只靠颜色。
+            Label(status.text, systemImage: status.symbol)
+                .foregroundStyle(status.tint)
+                .font(.body.weight(.medium))
+                .help(status.help ?? "")
 
-        Divider()
+            Divider()
 
-        // 2 + 3. 全局吞吐总量 + 活动连接数。
-        Text("总流量  \(upDown(totals.up, totals.down))")
-            .monospacedDigit()
-        Text("活动连接 \(activeConnectionCount)")
-            .foregroundStyle(.secondary)
+            // 2 + 3. 全局吞吐总量 + 活动连接数(标签左、值右对齐)。
+            statRow("总流量", upDown(totals.up, totals.down))
+            statRow("活动连接", "\(activeConnectionCount)")
 
-        Divider()
+            Divider()
 
-        // 4. 流量占用 Top 5(无流量时给一条克制的占位)。
-        Text("流量占用 Top 5")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        if topProcesses.isEmpty {
-            Text("暂无流量")
+            // 4. 流量占用 Top 5(无流量时给一条克制的占位)。
+            Text("流量占用 Top 5")
+                .font(.caption)
                 .foregroundStyle(.secondary)
-        } else {
-            ForEach(topProcesses) { process in
-                HStack {
-                    Text(process.displayName)
-                        .lineLimit(1)
-                    Spacer(minLength: 12)
-                    Text(upDown(process.stats.bytesUp, process.stats.bytesDown))
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
+            if topProcesses.isEmpty {
+                Text("暂无流量")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(topProcesses) { process in
+                    HStack {
+                        Text(process.displayName)
+                            .lineLimit(1)
+                        Spacer(minLength: 12)
+                        Text(upDown(process.stats.bytesUp, process.stats.bytesDown))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(.callout)
                 }
             }
+
+            Divider()
+
+            // 5. 全局代理总开关(与主窗口 / 设置同一绑定)。
+            Toggle("全局代理", isOn: Binding(
+                get: { store.state.isGlobalProxyEnabled },
+                set: { store.dispatch(.setGlobalProxyEnabled($0)) }
+            ))
+            .toggleStyle(.switch)
+
+            Divider()
+
+            // 6. 页脚:设置 + 退出。
+            HStack {
+                SettingsLink { Label("设置…", systemImage: "gearshape") }
+                Spacer()
+                Button { NSApplication.shared.terminate(nil) } label: {
+                    Label("退出", systemImage: "power")
+                }
+            }
+            .buttonStyle(.borderless)
+            .font(.callout)
         }
+        .padding(12)
+        .frame(width: 280)
+    }
 
-        Divider()
-
-        // 5. 全局代理总开关(与主窗口 / 设置同一绑定)。
-        Toggle("全局代理", isOn: Binding(
-            get: { store.state.isGlobalProxyEnabled },
-            set: { store.dispatch(.setGlobalProxyEnabled($0)) }
-        ))
-
-        Divider()
-
-        // 6. 既有动作:设置 + 退出。
-        SettingsLink {
-            Text("设置…")
+    /// 一行「标签左 · 值右」统计,值用等宽数字。
+    @ViewBuilder private func statRow(_ label: String, _ value: String) -> some View {
+        HStack {
+            Text(label).foregroundStyle(.secondary)
+            Spacer(minLength: 12)
+            Text(value).monospacedDigit()
         }
-        Button("退出") {
-            NSApplication.shared.terminate(nil)
-        }
+        .font(.callout)
     }
 }
 

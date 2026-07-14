@@ -38,7 +38,7 @@ public enum ProxyRule: Sendable, Equatable, Codable {
     case block
 }
 
-public struct MonitoredProcess: Sendable, Equatable, Codable {
+public struct MonitoredProcess: Sendable, Equatable, Codable, Identifiable {
     public let id: ProcessID
     public var displayName: String
     public var executablePath: String

@@ -603,3 +603,45 @@ ArchitectureTests 11),`xcodebuild` Debug 零并发警告,`swiftlint --strict` �
 - C:SOCKS4/4A、HTTPS 的 NTLM/Kerberos 认证;便携版。
 - D:`archive-and-notarize.sh` 补全(需公证凭据)。
 - Proxifier 对齐文档的 P0/P1/P2 + 本轮 C 选项已全部落地;剩下的都是上面这些明确未选项 + 一次性人工步骤(系统扩展批准)。
+
+## Phase 10：A1b(完整 SOCKS5 UDP 代理)+ 打包收尾;其余 C 主动砍掉
+
+用户拍板:**skip 其余 C,只做 A1b + packaging**。其余 C 逐条评估后确实不值得:
+- **SOCKS4/4A**:1996 年就被 SOCKS5 取代,现实里几乎没人用(SSH -D/Tor/Shadowsocks/v2ray/Clash 全是 SOCKS5)。
+  为一个死协议加 `ProxyKind.socks4` 全链路 churn 不划算 → **砍**(已起的 agent 中途 kill,未产 PR)。
+- **NTLM/Kerberos**:NTLM 要手搓 MD4/NTLMv2 重加密、niche;Kerberos 要 GSS.framework、不可单测、更 niche → **砍**。
+- **便携版**:系统扩展必须安装,无安装的便携版**架构上不可能** → **砍**。
+
+**A1b(PR #35)——UDP 从「只拦截」升级成三态 + 真正的 SOCKS5 UDP ASSOCIATE 代理:**
+- 并行 agent 先产出纯 codec:**`SOCKS5UDPDatagram`(EngineKit,18 测试,PR #33)**——RFC 1928 §7 的
+  UDP 头 encode/decode + parseAssociateReply,byte-array 纯逻辑、零 socket。
+- `Core.UDPPolicy {block|direct|proxySOCKS5}`(默认 block)全链路 + `UDPFlowPolicy.disposition` 扩成
+  (每进程规则 × 全局策略 × 上游是否 SOCKS5)→ block/allowDirect/proxy,穷举测试。
+- `SOCKS5Handshake.associateRequestBytes`(CMD=0x03)。
+- **扩展 `SOCKS5UDPRelay`**:保活的 SOCKS5 TCP 控制通道做 ASSOCIATE → 拨 UDP 到 relay → 用 codec 双向
+  泵 `NEAppProxyUDPFlow` 数据报;provider 按 id 持有 relay 到 flow 结束。`目录` 页加 UDP 策略选择器。
+  拆了 `TCPFlowPump.swift`(把双向 pump 挪出主文件压行数,`emitClose` 放宽到 internal)。
+
+**打包(PR #34)**:`archive-and-notarize.sh` 早已端到端实现(archive→exportArchive→notarytool submit
+--wait→stapler staple,两种凭据方式),不是骨架;唯一补的是 `.gitignore` 加 `*.p8`,堵住公证 API 私钥
+被误提交。真跑只差人:公证凭据 + Portal 开 System Extension capability。
+
+### ⚠️ CI 基建故障(记一笔,非代码):macOS Actions 分钟数耗尽
+本会话跑了 ~40+ 个 macOS job;私有仓库 macOS runner 按 10× 计分钟,一个只改 `.gitignore` 的 PR 都
+在 3 秒内 0 步骤失败(job.steps 为空 = runner 没起来)——是**分钟数用尽/spending limit**,不是代码。
+已征得用户同意:**本地全绿即合**(本地 `swift test ×5 包 + swiftlint --strict + xcodebuild + 0 并发
+警告`是 CI 的超集,CI 只跑前两样)。恢复 CI:加 Actions 分钟 / 仓库转 public / 挂 self-hosted runner。
+另修了合并脚本的一个 bug(检测到 FAIL 后 `break` 没阻止后续 merge,导致 #33 在 CI 红时被合——但 #33
+本地已验证绿,无害;此后改成 CI-gated / 本地-gated 显式判断)。
+
+**合并后集成复验**:411 SPM 测试全绿(Core 57 · IPCContract 11 · EngineKit 192 · AppFeature 140 ·
+ArchitectureTests 11),`xcodebuild` Debug 零并发警告,`swiftlint --strict` 零违规(128 文件)。
+
+### A1b 待人工自测(设备限定)
+选「SOCKS5 代理」策略 + 一台**支持 UDP ASSOCIATE 的 SOCKS5 上游**(Shadowsocks/v2ray/Clash;`ssh -D` 不支持)
+→ 确认 proxied 应用的 UDP/QUIC 真经代理出去、不泄漏;非 SOCKS5 上游时自动退回拦截。
+
+### 至此本轮全部收口
+Proxifier 对齐文档 P0/P1/P2 + 选定的 C(环检测/多 profile/右键指定/.dmp)+ A1/A1b(UDP 全套)+ B4/B5/B7
++ 打包脚本,全部落地。剩下的只有:①一次性人工步骤(系统扩展批准 + 各功能真机自测)②被明确砍掉的
+SOCKS4/NTLM/Kerberos/便携版 ③公证需要人的凭据。

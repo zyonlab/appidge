@@ -11,14 +11,20 @@ import AppFeature
 /// 只读 `store.state`、只 `dispatch(action)`,不持任何本地状态(对齐单向数据流)。
 struct MenuBarView: View {
     var store: Store
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// 状态行的呈现要素:SF Symbol + 语义色 + 文案(+ 可选 tooltip)。永不只靠颜色——
+    /// 状态图标的动效:已接管→呼吸(活着的心跳)、安装中→旋转(那枚 refresh 图标)、待批准→脉冲(需留意)。
+    /// 其余静止。`reduce-motion` 下全部静止。
+    private enum StatusMotion { case none, breathe, rotate, pulse }
+
+    /// 状态行的呈现要素:SF Symbol + 语义色 + 文案(+ 可选 tooltip + 动效)。永不只靠颜色——
     /// 符号与文案同时表意,色盲/高对比场景也读得懂。
     private struct StatusPresentation {
         let symbol: String
         let tint: Color
         let text: String
         let help: String?
+        var motion: StatusMotion = .none
     }
 
     /// 先看扩展装没装(未接入/待批准/安装中/未安装都得先说清,否则"引擎正常"会误导),
@@ -29,7 +35,7 @@ struct MenuBarView: View {
         case .active:
             return store.state.isEngineHealthy
                 ? StatusPresentation(symbol: "checkmark.shield.fill", tint: .green,
-                                     text: "已接管", help: nil)
+                                     text: "已接管", help: nil, motion: .breathe)
                 : StatusPresentation(symbol: "exclamationmark.triangle.fill", tint: .red,
                                      text: "引擎异常 · 已回退直连", help: nil)
         case .inactive:
@@ -38,11 +44,12 @@ struct MenuBarView: View {
                                       help: "系统扩展还没装上/批准——去设置里点「启用」并在系统设置里允许后,才会接管流量。")
         case .activating:
             return StatusPresentation(symbol: "arrow.triangle.2.circlepath", tint: .orange,
-                                      text: "扩展安装中…", help: nil)
+                                      text: "扩展安装中…", help: nil, motion: .rotate)
         case .needsApproval:
             return StatusPresentation(symbol: "exclamationmark.circle.fill", tint: .orange,
                                       text: "待批准 · 系统设置里点允许",
-                                      help: "打开「系统设置 → 隐私与安全性」,点「允许」加载 appidge 的系统扩展。")
+                                      help: "打开「系统设置 → 隐私与安全性」,点「允许」加载 appidge 的系统扩展。",
+                                      motion: .pulse)
         case .failed(let reason):
             return StatusPresentation(symbol: "xmark.octagon.fill", tint: .red,
                                       text: "扩展未安装", help: reason)
@@ -74,6 +81,9 @@ struct MenuBarView: View {
             Label(status.text, systemImage: status.symbol)
                 .foregroundStyle(status.tint)
                 .font(.body.weight(.medium))
+                .symbolEffect(.breathe, options: .repeat(.continuous), isActive: status.motion == .breathe && !reduceMotion)
+                .symbolEffect(.rotate, options: .repeat(.continuous), isActive: status.motion == .rotate && !reduceMotion)
+                .symbolEffect(.pulse, options: .repeat(.continuous), isActive: status.motion == .pulse && !reduceMotion)
                 .help(status.help ?? "")
 
             Divider()
@@ -138,6 +148,8 @@ struct MenuBarView: View {
             Text(label).foregroundStyle(.secondary)
             Spacer(minLength: 12)
             Text(value).monospacedDigit()
+                .contentTransition(.numericText())
+                .animation(reduceMotion ? nil : .snappy, value: value)
         }
         .font(.callout)
     }

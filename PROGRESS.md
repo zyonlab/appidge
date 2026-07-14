@@ -699,5 +699,17 @@ SOCKS4/NTLM/Kerberos/便携版 ③公证需要人的凭据。
   右侧 `.inspector` 看选中连接详情(进程/目标/路由/流量 + 就地建规则,复用 `RouteChip`)。配置面板
   从 sheet 平移到侧栏常驻目的地;StatusBar 仍窗底常驻,回环告警仍顶栏。删除 `ConfigSheet`/
   `ConfigSheetContainer`。App-only,`xcodebuild` Debug 零并发警告、`swiftlint --strict` 0。
-- **UI 路线图后续**:P0 余项(连接表实时速率列,需 rate 跟踪)、两个小尾巴(RouteText 语义色抽出共用 /
-  MenuBarExtra 切 `.window` 面板);P2(玻璃、带宽拖选筛列表、Inspector 取证详情、动效系统)。
+- **两个小尾巴已清(6417026)**:① `RouteText.color` 成唯一语义色词汇表——直连=绿/代理=蓝/拦截=红,
+  连接表 chip 与「应用」表同步;② `MenuBarExtra` 切 `.menuBarExtraStyle(.window)`,MenuBarView 重排成
+  留白定宽面板(仪表盘不再被 `.menu` 渲染器压扁)。
+- **P0 实时速率(ded71af)**:关键发现——**连接级速率不可行**(扩展只在 open/close 发事件,单行无中间采样);
+  连续流在**进程级**(flow-stats ~500ms)。故速率落在「应用」表,也正合设计目标「现在谁在吃带宽」。
+  `MonitoredProcess` 加 `rateUpPerSec/rateDownPerSec`(瞬时,`CodingKeys` 排除→不落盘、不破旧 config 解码);
+  `flowStatsDeltaReceived` 带 `intervalSeconds`,reducer 每批把所有进程速率归 0(空闲即 0)再对活跃者算
+  增量÷时间窗;interval 从批次真实 `windowStart/End` 取。「应用」表加「速率」列(活跃高亮/空闲灰,悬停看↓↑),
+  累计列改名「累计↑/↓」。Core +2 测试。
+- **P2 动效系统首批**:StatusBar 状态灯「已接管」呼吸 / 「安装中·待批准」脉冲(引擎心跳),累计↑↓用
+  `.numericText()` 滚动;MenuBar 状态图标按态 呼吸/旋转/脉冲,总数滚动。全程 `@Environment(\.accessibilityReduceMotion)`
+  门控、只动少量聚合值(不动表格每行,守 §12)。
+- **UI 路线图后续**:P2 余项——上玻璃(Xcode 26 SDK 重编译)、带宽图拖选筛列表、Inspector 取证详情
+  (签名/父进程链,需扩展补 flow 元数据)。

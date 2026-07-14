@@ -103,9 +103,11 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
 
         let processID = ProcessIdentifierDTO(flow.metaData.sourceAppSigningIdentifier)
         let remoteEndpoint = tcpFlow.remoteFlowEndpoint
+        // 原始主机名（app 用域名连的话 NE 会保留）——DNS-over-proxy 用它把域名交给代理去解析。
+        let remoteHostname = flow.remoteHostname
         flowLogger.log("""
         handleNewFlow sourceAppSigningIdentifier=\(flow.metaData.sourceAppSigningIdentifier, privacy: .public) \
-        remote=\(String(describing: remoteEndpoint), privacy: .public)
+        remote=\(String(describing: remoteEndpoint), privacy: .public) hostname=\(remoteHostname ?? "-", privacy: .public)
         """)
 
         tcpFlow.open(withLocalFlowEndpoint: nil) { [weak self] error in
@@ -114,7 +116,12 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
                 tcpFlow.closeWriteWithError(error)
                 return
             }
-            Task { await self.beginFlow(tcpFlow: tcpFlow, to: remoteEndpoint, processID: processID, router: router) }
+            Task {
+                await self.beginFlow(
+                    tcpFlow: tcpFlow, to: remoteEndpoint, remoteHostname: remoteHostname,
+                    processID: processID, router: router
+                )
+            }
         }
         return true
     }
@@ -122,13 +129,14 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     private func beginFlow(
         tcpFlow: NEAppProxyTCPFlow,
         to remoteEndpoint: Network.NWEndpoint,
+        remoteHostname: String?,
         processID: ProcessIdentifierDTO,
         router: FlowRouter
     ) async {
         let rule = await effectiveRule(for: processID, destination: remoteEndpoint)
         await routingHistoryTracker.record(processID: processID, wasProxied: rule == .proxied)
         do {
-            let remote = try await openRemote(to: remoteEndpoint, rule: rule)
+            let remote = try await openRemote(to: remoteEndpoint, remoteHostname: remoteHostname, rule: rule)
             pumpClientToRemote(tcpFlow: tcpFlow, remote: remote, processID: processID, rule: rule, router: router)
             pumpRemoteToClient(tcpFlow: tcpFlow, remote: remote, processID: processID, rule: rule, router: router)
         } catch {
@@ -148,18 +156,30 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         return await appliedRuleSetStore.currentRule(for: processID) ?? .direct
     }
 
-    /// `.proxied` 且有 active 上游 → 拨上游、做 SOCKS5 CONNECT，返回已就绪的隧道连接；
-    /// 否则（含 proxied 但没配上游的 fail-open）直连目的地。返回的连接一律"已 ready"，可直接 pump。
-    private func openRemote(to endpoint: Network.NWEndpoint, rule: ProxyRuleDTO) async throws -> NWConnection {
-        if rule == .proxied,
-           let active = proxyConfig?.activeServer,
-           let (destHost, destPort) = Self.hostPort(from: endpoint) {
-            let stream = NWConnectionByteStream(proxyServer: active)
-            try await stream.open()
-            try await SOCKS5Connector(proxyServer: active).establish(toHost: destHost, port: destPort, over: stream)
-            return stream.tunnelConnection
+    /// `.proxied` 且有 active 上游 → 拨上游、按协议（SOCKS5 / HTTP CONNECT）做隧道握手，
+    /// 返回已就绪的隧道连接；否则（含 proxied 但没配上游的 fail-open）直连目的地。
+    /// 目标地址经 ``ProxyTargetSelector`` 优先取原始主机名（DNS-over-proxy，让代理去解析）。
+    /// 返回的连接一律"已 ready"，可直接 pump。
+    private func openRemote(
+        to endpoint: Network.NWEndpoint, remoteHostname: String?, rule: ProxyRuleDTO
+    ) async throws -> NWConnection {
+        guard rule == .proxied,
+              let active = proxyConfig?.activeServer,
+              let (endpointHost, port) = Self.hostPort(from: endpoint) else {
+            return try await Self.openDirect(to: endpoint)
         }
-        return try await Self.openDirect(to: endpoint)
+        let target = ProxyTargetSelector.selectTarget(
+            remoteHostname: remoteHostname, endpointHost: endpointHost, port: port
+        )
+        let stream = NWConnectionByteStream(proxyServer: active)
+        try await stream.open()
+        switch active.kind {
+        case .socks5:
+            try await SOCKS5Connector(proxyServer: active).establish(toHost: target.host, port: target.port, over: stream)
+        case .httpConnect:
+            try await HTTPConnectClient(proxyServer: active).establish(toHost: target.host, port: target.port, over: stream)
+        }
+        return stream.tunnelConnection
     }
 
     /// 直连目的地并挂起到 `.ready`（或失败）。返回时连接已可读写。

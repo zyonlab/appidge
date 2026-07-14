@@ -16,4 +16,5 @@ public enum Action: Sendable, Equatable {
     case addMatchRule(ProxyMatchRule)
     case removeMatchRule(RuleID)
     case reorderMatchRules([RuleID])
+    case connectionEventReceived(ConnectionLogEntry)
 }

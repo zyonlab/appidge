@@ -9,6 +9,11 @@ public struct AppState: Sendable, Equatable {
     public var activeProxyServerID: ProxyServerID?
     /// 细粒度规则表(进程 × 主机 × 端口),从上到下求值、首个命中生效。见 ``RuleMatcher``。
     public var rules: [ProxyMatchRule]
+    /// 每连接日志(按连接 id 去重更新),环形缓冲上限 ``connectionLogCap``。
+    public var connectionLog: [ConnectionLogEntry]
+
+    /// 连接日志保留的最大条数;超出丢最旧。
+    public static let connectionLogCap = 500
 
     public init(
         isGlobalProxyEnabled: Bool = false,
@@ -19,7 +24,8 @@ public struct AppState: Sendable, Equatable {
         hasCompletedOnboarding: Bool = false,
         proxyServers: [ProxyServerID: ProxyServer] = [:],
         activeProxyServerID: ProxyServerID? = nil,
-        rules: [ProxyMatchRule] = []
+        rules: [ProxyMatchRule] = [],
+        connectionLog: [ConnectionLogEntry] = []
     ) {
         self.isGlobalProxyEnabled = isGlobalProxyEnabled
         self.isEngineHealthy = isEngineHealthy
@@ -30,5 +36,6 @@ public struct AppState: Sendable, Equatable {
         self.proxyServers = proxyServers
         self.activeProxyServerID = activeProxyServerID
         self.rules = rules
+        self.connectionLog = connectionLog
     }
 }

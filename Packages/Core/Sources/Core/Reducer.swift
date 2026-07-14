@@ -70,8 +70,10 @@ public enum Reducer {
             return onboardingCompleted(state)
         case .appLaunched:
             return appLaunched(state)
+        case .connectionEventReceived(let entry):
+            return connectionEventReceived(entry, state)
         default:
-            // 只可能是前两组已处理的 case，reduce 不会走到这里。
+            // 只可能是前面几组已处理的 case，reduce 不会走到这里。
             return (state, [])
         }
     }
@@ -196,6 +198,21 @@ public enum Reducer {
 
     private static func appLaunched(_ state: AppState) -> (AppState, [Effect]) {
         (state, [.scanDirectory])
+    }
+
+    /// 按连接 id 去重更新:已有则原地更新那一行(不重排、不占新名额),否则追加;
+    /// 超过 ``AppState/connectionLogCap`` 就丢最旧。
+    private static func connectionEventReceived(_ entry: ConnectionLogEntry, _ state: AppState) -> (AppState, [Effect]) {
+        var state = state
+        if let index = state.connectionLog.firstIndex(where: { $0.id == entry.id }) {
+            state.connectionLog[index] = entry
+        } else {
+            state.connectionLog.append(entry)
+            if state.connectionLog.count > AppState.connectionLogCap {
+                state.connectionLog.removeFirst(state.connectionLog.count - AppState.connectionLogCap)
+            }
+        }
+        return (state, [])
     }
 
     /// 代理配置发生真实变更后，产出"把当前完整配置推给扩展"的 effect。servers 按 id 排序，

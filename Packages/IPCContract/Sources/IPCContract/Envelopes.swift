@@ -8,4 +8,5 @@ public enum ExtensionToAppMessage: Sendable, Equatable, Codable {
     case flowStatsBatch(FlowStatsBatchMessage)
     case diagnosticResult(DiagnosticResultDTO)
     case engineFailure(reason: String)
+    case connectionEvent(ConnectionEventDTO)
 }

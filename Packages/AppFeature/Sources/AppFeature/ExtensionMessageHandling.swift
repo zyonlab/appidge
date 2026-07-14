@@ -31,6 +31,42 @@ public enum ExtensionMessageHandling {
 
         case .engineFailure(let reason):
             return [.engineFailure(reason: reason)]
+
+        case .connectionEvent(let event):
+            return [.connectionEventReceived(Core.ConnectionLogEntry(
+                id: event.id,
+                processID: Core.ProcessID(event.processID.value),
+                host: event.targetHost,
+                port: event.targetPort,
+                rule: coreRule(from: event.rule),
+                proxyKind: event.proxyKind.map(coreKind(from:)),
+                phase: corePhase(from: event.phase),
+                bytesUp: event.bytesUp,
+                bytesDown: event.bytesDown
+            ))]
+        }
+    }
+
+    /// 以下都是穷举 switch（不带 default）：对应 DTO 以后新增 case 时这里编译报错，不会悄悄漏映射。
+    private static func coreRule(from dto: IPCContract.ProxyRuleDTO) -> Core.ProxyRule {
+        switch dto {
+        case .direct: .direct
+        case .proxied: .proxied
+        }
+    }
+
+    private static func coreKind(from dto: IPCContract.ProxyKindDTO) -> Core.ProxyKind {
+        switch dto {
+        case .socks5: .socks5
+        case .httpConnect: .httpConnect
+        }
+    }
+
+    private static func corePhase(from dto: IPCContract.ConnectionPhaseDTO) -> Core.ConnectionPhase {
+        switch dto {
+        case .opened: .opened
+        case .closed: .closed
+        case .failed: .failed
         }
     }
 

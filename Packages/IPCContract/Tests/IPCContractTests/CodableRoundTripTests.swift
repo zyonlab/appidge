@@ -92,6 +92,29 @@ struct CodableRoundTripTests {
 
         let failure = ExtensionToAppMessage.engineFailure(reason: "transport crashed")
         #expect(try roundTrip(failure) == failure)
+
+        let event = ExtensionToAppMessage.connectionEvent(
+            ConnectionEventDTO(
+                id: "c1", processID: ProcessIdentifierDTO("com.x"), targetHost: "example.com",
+                targetPort: 443, rule: .proxied, proxyKind: .socks5, phase: .opened, bytesUp: 0, bytesDown: 0
+            )
+        )
+        #expect(try roundTrip(event) == event)
+    }
+
+    @Test("ConnectionEventDTO round-trips across phases, with and without a proxy kind")
+    func connectionEventRoundTrip() throws {
+        let proxied = ConnectionEventDTO(
+            id: "a", processID: ProcessIdentifierDTO("p"), targetHost: "h", targetPort: 80,
+            rule: .proxied, proxyKind: .httpConnect, phase: .closed, bytesUp: 123, bytesDown: 456
+        )
+        #expect(try roundTrip(proxied) == proxied)
+
+        let direct = ConnectionEventDTO(
+            id: "b", processID: ProcessIdentifierDTO("p"), targetHost: "h", targetPort: 80,
+            rule: .direct, proxyKind: nil, phase: .failed, bytesUp: 0, bytesDown: 0
+        )
+        #expect(try roundTrip(direct) == direct)
     }
 
     @Test("ProxyServerDTO round-trips with and without credentials")

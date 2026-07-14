@@ -9,6 +9,9 @@ struct AppidgeApp: App {
     @State private var ipcReceiver: IPCReceiver
     @Environment(\.scenePhase) private var scenePhase
 
+    // 代理密码存 Keychain，不落 JSON（见 PersistedProxyServer 结构上无 password 字段）。
+    private let credentialStore: any CredentialStore = KeychainCredentialStore()
+
     init() {
         let transport = AppGroupAppSideTransport(appGroup: "group.com.appidge")
         let store = Store(effectHandler: { effect in
@@ -70,7 +73,8 @@ struct AppidgeApp: App {
     @MainActor
     private func restorePersistedConfiguration() async {
         guard let configuration = await FilePersistenceStore().load() else { return }
-        for action in configuration.restorationActions() {
+        // 从 Keychain 回填密码，重启后恢复的代理不用重输。
+        for action in await configuration.restorationActions(rehydratingCredentialsFrom: credentialStore) {
             store.dispatch(action)
         }
     }
@@ -78,8 +82,11 @@ struct AppidgeApp: App {
     @MainActor
     private func persistCurrentConfiguration() {
         let configuration = PersistedConfiguration(from: store.state)
+        let servers = Array(store.state.proxyServers.values)
+        let credentialStore = credentialStore
         Task {
-            await FilePersistenceStore().save(configuration)
+            await FilePersistenceStore().save(configuration)            // 无密码落盘
+            await PersistedConfiguration.saveCredentials(from: servers, to: credentialStore) // 密码进 Keychain
         }
     }
 }

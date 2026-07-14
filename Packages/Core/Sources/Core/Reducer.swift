@@ -82,6 +82,8 @@ public enum Reducer {
             var state = state
             state.loopWarning = nil
             return (state, [])
+        case .resetState:
+            return (AppState(), [])
         default:
             // 只可能是前面几组已处理的 case，reduce 不会走到这里。
             return (state, [])

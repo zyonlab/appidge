@@ -5,6 +5,7 @@ import AppFeature
 /// 三区窗口：目录 / 规则 / 活动监视器。UI 只做两件事：读 store.state、dispatch(Action)。
 struct ContentView: View {
     var store: Store
+    var profiles: ProfilesModel
 
     var body: some View {
         VStack(spacing: 0) {
@@ -20,6 +21,8 @@ struct ContentView: View {
                     .tabItem { Label("规则表", systemImage: "list.number") }
                 ProxyServersPaneView(store: store)
                     .tabItem { Label("代理服务器", systemImage: "server.rack") }
+                ProfilesPaneView(model: profiles)
+                    .tabItem { Label("档案", systemImage: "square.stack.3d.up") }
                 ActivityMonitorPaneView(store: store)
                     .tabItem { Label("活动监视器", systemImage: "waveform.path.ecg") }
                 ConnectionLogPaneView(store: store)

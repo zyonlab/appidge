@@ -13,6 +13,16 @@ struct RulesEditorPaneView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
+            // 内置只读规则:本地/回环强制直连。做成可见信息但**不可关闭**——关掉会让本地开发
+            // (localhost:3000 之类)被代理,且上游若配成回环地址会形成转发环。对齐 Proxifier
+            // 的 Localhost 规则(它也建议别改)。
+            Label(
+                "内置:本地/回环地址(127.0.0.1、::1、localhost)始终直连,不经代理(不可关闭)",
+                systemImage: "lock.fill"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
             if store.state.rules.isEmpty {
                 Text("还没有规则。用下面的表单加一条,比如「主机 *.google.com → 代理」。")
                     .foregroundStyle(.secondary)

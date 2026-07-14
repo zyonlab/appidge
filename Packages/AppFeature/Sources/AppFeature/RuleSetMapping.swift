@@ -35,6 +35,7 @@ public enum RuleSetMapping {
         switch rule {
         case .direct: .direct
         case .proxied: .proxied
+        case .block: .block
         }
     }
 }

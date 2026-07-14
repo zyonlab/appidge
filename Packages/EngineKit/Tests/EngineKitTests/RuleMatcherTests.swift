@@ -65,6 +65,14 @@ struct RuleMatcherTests {
         #expect(!RuleMatcher.matches(r, app: "com.x", host: "git.corp.net", port: 80))
     }
 
+    @Test("firstMatch propagates a .block action just like direct/proxied (matcher is action-agnostic)")
+    func firstMatchBlock() {
+        let rules = [rule("a", host: "ads.example.com", .block), rule("b", .proxied)]
+        // block 规则先命中 → 返回 .block;不命中它的走后面的 proxied。
+        #expect(RuleMatcher.firstMatch(rules, app: "x", host: "ads.example.com", port: 443) == .block)
+        #expect(RuleMatcher.firstMatch(rules, app: "x", host: "other.com", port: 443) == .proxied)
+    }
+
     @Test("firstMatch returns the first matching rule's action, top to bottom")
     func firstMatchWins() {
         let rules = [rule("1", host: "*.internal", .direct), rule("2", host: "*", .proxied)]

@@ -35,7 +35,11 @@ struct RuleSetMappingTests {
 
     @Test(
         "ProxyRule maps 1:1 to ProxyRuleDTO",
-        arguments: [(Core.ProxyRule.direct, ProxyRuleDTO.direct), (Core.ProxyRule.proxied, ProxyRuleDTO.proxied)]
+        arguments: [
+            (Core.ProxyRule.direct, ProxyRuleDTO.direct),
+            (Core.ProxyRule.proxied, ProxyRuleDTO.proxied),
+            (Core.ProxyRule.block, ProxyRuleDTO.block)
+        ]
     )
     func ruleMapping(core: Core.ProxyRule, dto: ProxyRuleDTO) {
         let message = RuleSetMapping.ruleSetMessage(

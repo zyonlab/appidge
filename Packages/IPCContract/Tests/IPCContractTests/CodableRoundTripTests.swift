@@ -32,6 +32,8 @@ struct CodableRoundTripTests {
         #expect(try roundTrip(ranged) == ranged)
         let anyPort = MatchRuleDTO(id: "b", appPattern: "*", hostPattern: "*", portRange: nil, rule: .direct)
         #expect(try roundTrip(anyPort) == anyPort)
+        let blocked = MatchRuleDTO(id: "c", appPattern: "*", hostPattern: "ads.*", portRange: nil, rule: .block)
+        #expect(try roundTrip(blocked) == blocked)
     }
 
     @Test("FlowStatsBatchMessage round-trips — 流量批量上报")

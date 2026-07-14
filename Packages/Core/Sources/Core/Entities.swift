@@ -34,6 +34,8 @@ public struct FlowStatsDelta: Sendable, Equatable, Codable {
 public enum ProxyRule: Sendable, Equatable, Codable {
     case direct
     case proxied
+    /// 拦截:命中的流量直接拒绝、不建立任何连接(对齐 Proxifier 的 Block 动作)。
+    case block
 }
 
 public struct MonitoredProcess: Sendable, Equatable, Codable {

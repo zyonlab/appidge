@@ -58,7 +58,7 @@ private struct ConnectionRow: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(routeLabel)
                     .font(.caption)
-                    .foregroundStyle(entry.rule == .proxied ? Color.accentColor : Color.secondary)
+                    .foregroundStyle(routeColor)
                 Text("↑\(entry.bytesUp)B ↓\(entry.bytesDown)B")
                     .font(.caption2)
                     .monospacedDigit()
@@ -70,9 +70,18 @@ private struct ConnectionRow: View {
     private var routeLabel: String {
         switch (entry.rule, entry.proxyKind) {
         case (.direct, _): "直连"
+        case (.block, _): "拦截(规则拒绝)"
         case (.proxied, .some(.socks5)): "代理 · SOCKS5"
         case (.proxied, .some(.httpConnect)): "代理 · HTTP"
         case (.proxied, .none): "代理(未配上游,回落直连)"
+        }
+    }
+
+    private var routeColor: Color {
+        switch entry.rule {
+        case .proxied: .accentColor
+        case .block: .red
+        case .direct: .secondary
         }
     }
 

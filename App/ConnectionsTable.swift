@@ -9,13 +9,19 @@ struct ConnectionsTable: View {
     var store: Store
     let filter: String
     @Binding var selection: Set<ConnectionLogEntry.ID>
+    @State private var sortOrder: [KeyPathComparator<ConnectionLogEntry>] = [
+        KeyPathComparator(\.openedAt, order: .reverse)
+    ]
 
-    /// 最新在前 + 按过滤词(进程名/主机)筛。
+    /// 过滤(进程名/主机)后按当前列排序;默认按时间倒序(最新在前),点列头切换排序。
     private var rows: [ConnectionLogEntry] {
-        let all = Array(store.state.connectionLog.reversed())
         let key = filter.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !key.isEmpty else { return all }
-        return all.filter { appName($0.processID).lowercased().contains(key) || $0.host.lowercased().contains(key) }
+        let filtered = key.isEmpty
+            ? store.state.connectionLog
+            : store.state.connectionLog.filter {
+                appName($0.processID).lowercased().contains(key) || $0.host.lowercased().contains(key)
+            }
+        return filtered.sorted(using: sortOrder)
     }
 
     var body: some View {
@@ -33,25 +39,30 @@ struct ConnectionsTable: View {
     }
 
     private var table: some View {
-        Table(rows, selection: $selection) {
-            TableColumn("应用") { e in
+        Table(rows, selection: $selection, sortOrder: $sortOrder) {
+            TableColumn("应用", value: \.processID.value) { e in
                 Label(appName(e.processID), systemImage: "app.dashed").lineLimit(1)
-            }.width(min: 140, ideal: 200)
+            }.width(min: 130, ideal: 190)
 
-            TableColumn("目标") { e in
+            TableColumn("目标", value: \.host) { e in
                 Text("\(e.host):\(e.port)").monospaced().lineLimit(1)
-            }.width(min: 160, ideal: 240)
+            }.width(min: 150, ideal: 230)
 
-            TableColumn("状态") { e in statusCell(e.phase) }.width(80)
+            TableColumn("状态") { e in statusCell(e.phase) }.width(52)
 
             TableColumn("规则 · 代理") { e in
                 Text(RouteText.label(rule: e.rule, kind: e.proxyKind))
                     .foregroundStyle(RouteText.color(e.rule))
                     .lineLimit(1)
-            }.width(min: 120, ideal: 170)
+            }.width(min: 110, ideal: 160)
 
-            TableColumn("↑") { e in Text(TrafficFormat.bytes(e.bytesUp)).monospacedDigit() }.width(70)
-            TableColumn("↓") { e in Text(TrafficFormat.bytes(e.bytesDown)).monospacedDigit() }.width(70)
+            TableColumn("时间", value: \.openedAt) { e in
+                Text(e.openedAt.formatted(date: .omitted, time: .standard))
+                    .monospacedDigit().foregroundStyle(.secondary)
+            }.width(92)
+
+            TableColumn("↑", value: \.bytesUp) { e in Text(TrafficFormat.bytes(e.bytesUp)).monospacedDigit() }.width(64)
+            TableColumn("↓", value: \.bytesDown) { e in Text(TrafficFormat.bytes(e.bytesDown)).monospacedDigit() }.width(64)
         }
         .contextMenu(forSelectionType: ConnectionLogEntry.ID.self) { ids in
             let targets = rows.filter { ids.contains($0.id) }

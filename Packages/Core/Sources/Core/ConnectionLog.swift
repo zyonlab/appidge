@@ -1,3 +1,5 @@
+import Foundation
+
 public enum ConnectionPhase: Sendable, Equatable, Codable {
     case opened
     case closed
@@ -16,11 +18,14 @@ public struct ConnectionLogEntry: Sendable, Equatable, Codable, Identifiable {
     public var phase: ConnectionPhase
     public var bytesUp: Int64
     public var bytesDown: Int64
+    /// 连接建立时间(扩展打的时间戳);连接列表按它排序 + 显示时间列。旧持久化条目没有此字段,
+    /// 解码时回落到 epoch 0(ConnectionLogFileStore 会跳过解不了的行,不影响新条目)。
+    public var openedAt: Date
 
     public init(
         id: String, processID: ProcessID, host: String, port: UInt16,
         rule: ProxyRule, proxyKind: ProxyKind?, phase: ConnectionPhase,
-        bytesUp: Int64, bytesDown: Int64
+        bytesUp: Int64, bytesDown: Int64, openedAt: Date = Date(timeIntervalSince1970: 0)
     ) {
         self.id = id
         self.processID = processID
@@ -31,5 +36,6 @@ public struct ConnectionLogEntry: Sendable, Equatable, Codable, Identifiable {
         self.phase = phase
         self.bytesUp = bytesUp
         self.bytesDown = bytesDown
+        self.openedAt = openedAt
     }
 }

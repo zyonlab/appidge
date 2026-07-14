@@ -1,3 +1,5 @@
+import Foundation
+
 public enum ConnectionPhaseDTO: String, Sendable, Equatable, Codable {
     case opened
     case closed
@@ -18,6 +20,8 @@ public struct ConnectionEventDTO: Sendable, Equatable, Codable {
     public let phase: ConnectionPhaseDTO
     public let bytesUp: Int64
     public let bytesDown: Int64
+    /// 连接建立时间(扩展在建立 flow 时打的时间戳,同一连接的后续事件沿用同一值)。
+    public let openedAt: Date
 
     public init(
         id: String,
@@ -28,7 +32,8 @@ public struct ConnectionEventDTO: Sendable, Equatable, Codable {
         proxyKind: ProxyKindDTO?,
         phase: ConnectionPhaseDTO,
         bytesUp: Int64,
-        bytesDown: Int64
+        bytesDown: Int64,
+        openedAt: Date = Date(timeIntervalSince1970: 0)
     ) {
         self.id = id
         self.processID = processID
@@ -39,5 +44,6 @@ public struct ConnectionEventDTO: Sendable, Equatable, Codable {
         self.phase = phase
         self.bytesUp = bytesUp
         self.bytesDown = bytesDown
+        self.openedAt = openedAt
     }
 }

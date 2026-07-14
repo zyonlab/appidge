@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1507CF665D18657ED7BA9801 /* ConnectionLogPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65ADF5DE92F5A1BAEA710F48 /* ConnectionLogPaneView.swift */; };
 		22A3DA6409A39E3419084F11 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FEAB61BFC897307C4C2B00D /* main.swift */; };
 		24C1DBFF4621B52825A1FCCA /* EngineKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9A771AE19C7B394D1000B789 /* EngineKit */; };
 		2B4575AB87D6B0C6AA17B41F /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA34ADCCFFBEA044937D573 /* OnboardingView.swift */; };
@@ -55,6 +56,7 @@
 		3DF70C29327CD2B5EA92DC75 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		5DA34ADCCFFBEA044937D573 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		5F32B133633BBB992A13D17D /* ProxyServersPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyServersPaneView.swift; sourceTree = "<group>"; };
+		65ADF5DE92F5A1BAEA710F48 /* ConnectionLogPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionLogPaneView.swift; sourceTree = "<group>"; };
 		6C1DBE5B022F70217A175D0D /* Core */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Core; path = Packages/Core; sourceTree = SOURCE_ROOT; };
 		7106009A56C24078709224DC /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		7AADB654447DCB49FB372FAE /* AppidgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppidgeApp.swift; sourceTree = "<group>"; };
@@ -130,6 +132,7 @@
 			children = (
 				3DF70C29327CD2B5EA92DC75 /* App.entitlements */,
 				7AADB654447DCB49FB372FAE /* AppidgeApp.swift */,
+				65ADF5DE92F5A1BAEA710F48 /* ConnectionLogPaneView.swift */,
 				7106009A56C24078709224DC /* ContentView.swift */,
 				A3B0E63976E8ACBBACCC8C7B /* Info.plist */,
 				5DA34ADCCFFBEA044937D573 /* OnboardingView.swift */,
@@ -263,6 +266,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B419714D1E5E144ED39353BB /* AppidgeApp.swift in Sources */,
+				1507CF665D18657ED7BA9801 /* ConnectionLogPaneView.swift in Sources */,
 				5DD53B8CA098AAE20D297B7F /* ContentView.swift in Sources */,
 				2B4575AB87D6B0C6AA17B41F /* OnboardingView.swift in Sources */,
 				BF3C3EA1865EA2811E2CC3B8 /* ProxyServersPaneView.swift in Sources */,

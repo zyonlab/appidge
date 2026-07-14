@@ -18,6 +18,8 @@ struct ContentView: View {
                 .tabItem { Label("代理服务器", systemImage: "server.rack") }
             ActivityMonitorPaneView(store: store)
                 .tabItem { Label("活动监视器", systemImage: "waveform.path.ecg") }
+            ConnectionLogPaneView(store: store)
+                .tabItem { Label("连接", systemImage: "point.3.filled.connected.trianglepath.dotted") }
         }
         .frame(minWidth: 640, minHeight: 420)
     }

@@ -17,3 +17,6 @@ xcuserdata/
 pigeon_icon_assets/*
 !pigeon_icon_assets/00-source/
 !pigeon_icon_assets/01-macos/
+
+# 描述文件含 team-identifier 与开发者证书，绝不进 git（同 .env 纪律）——本地保留供构建
+Signing/*.provisionprofile

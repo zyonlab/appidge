@@ -17,7 +17,9 @@ public enum ExtensionMessageHandling {
                     )
                 }
             )
-            return [.flowStatsDeltaReceived(deltas)]
+            // 用批次自带的真实时间窗算速率;扩展按固定节奏(~500ms)聚合,但用真实窗更准、不假设固定值。
+            let intervalSeconds = max(0, batch.windowEnd.timeIntervalSince(batch.windowStart))
+            return [.flowStatsDeltaReceived(deltas, intervalSeconds: intervalSeconds)]
 
         case .diagnosticResult(let result):
             return [

@@ -2,7 +2,9 @@ public enum Action: Sendable, Equatable {
     case setGlobalProxyEnabled(Bool)
     case processDiscovered(id: ProcessID, displayName: String, executablePath: String)
     case assignRule(processID: ProcessID, rule: ProxyRule)
-    case flowStatsDeltaReceived([ProcessID: FlowStatsDelta])
+    /// 一批流量增量 + 这一批覆盖的真实时间窗(秒)。reducer 据此更新累计字节,并算出每进程瞬时速率
+    /// (增量 ÷ 时间窗);`intervalSeconds <= 0` 时只累计、不更新速率。
+    case flowStatsDeltaReceived([ProcessID: FlowStatsDelta], intervalSeconds: Double)
     case engineFailure(reason: String)
     case directoryScanned([DirectoryEntry])
     case requestDiagnostic(processID: ProcessID, kinds: [DiagnosticKind])

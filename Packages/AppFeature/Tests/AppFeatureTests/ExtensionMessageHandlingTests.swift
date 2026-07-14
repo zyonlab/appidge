@@ -16,7 +16,7 @@ struct ExtensionMessageHandlingTests {
         )
         let actions = ExtensionMessageHandling.actions(for: .flowStatsBatch(batch))
 
-        #expect(actions == [.flowStatsDeltaReceived([:])])
+        #expect(actions == [.flowStatsDeltaReceived([:], intervalSeconds: 1)]) // 窗 0→1s
     }
 
     @Test("flowStatsBatch with multiple entries maps each DTO to a ProcessID/FlowStatsDelta pair")
@@ -35,7 +35,7 @@ struct ExtensionMessageHandlingTests {
             Core.ProcessID("a"): Core.FlowStatsDelta(bytesUpDelta: 10, bytesDownDelta: 20),
             Core.ProcessID("b"): Core.FlowStatsDelta(bytesUpDelta: 30, bytesDownDelta: 40)
         ]
-        #expect(actions == [.flowStatsDeltaReceived(expected)])
+        #expect(actions == [.flowStatsDeltaReceived(expected, intervalSeconds: 1)]) // 窗 0→1s
     }
 
     @Test("diagnosticResult maps processID, kind, passed, detail into diagnosticResultReceived")

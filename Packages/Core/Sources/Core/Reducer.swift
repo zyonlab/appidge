@@ -53,8 +53,8 @@ public enum Reducer {
             return processDiscovered(id: id, displayName: displayName, executablePath: executablePath, state)
         case .assignRule(let processID, let rule):
             return assignRule(processID: processID, rule: rule, state)
-        case .flowStatsDeltaReceived(let deltas):
-            return flowStatsDeltaReceived(deltas, state)
+        case .flowStatsDeltaReceived(let deltas, let intervalSeconds):
+            return flowStatsDeltaReceived(deltas, intervalSeconds, state)
         case .engineFailure(let reason):
             return engineFailure(reason: reason, state)
         default:
@@ -158,11 +158,17 @@ public enum Reducer {
     }
 
     private static func flowStatsDeltaReceived(
-        _ deltas: [ProcessID: FlowStatsDelta], _ state: AppState
+        _ deltas: [ProcessID: FlowStatsDelta], _ intervalSeconds: Double, _ state: AppState
     ) -> (AppState, [Effect]) {
         var state = state
+        // 速率是瞬时量:先把所有进程速率归 0(本批没数据 = 当前不活跃 = 0),再对本批有增量的
+        // 进程按「增量 ÷ 时间窗」算出当前速率。累计字节照旧只增不减。
+        for id in state.processes.keys {
+            state.processes[id]?.rateUpPerSec = 0
+            state.processes[id]?.rateDownPerSec = 0
+        }
         for (id, delta) in deltas {
-            state.processes[id]?.apply(delta)
+            state.processes[id]?.apply(delta, intervalSeconds: intervalSeconds)
         }
         return (state, [])
     }
@@ -318,7 +324,12 @@ private extension Reducer {
 }
 
 private extension MonitoredProcess {
-    mutating func apply(_ delta: FlowStatsDelta) {
+    /// 累计字节只增不减;瞬时速率 = 本批增量 ÷ 本批时间窗。时间窗非正时只累计、不动速率
+    /// (调用方已把速率归 0)。
+    mutating func apply(_ delta: FlowStatsDelta, intervalSeconds: Double) {
         stats.apply(delta)
+        guard intervalSeconds > 0 else { return }
+        rateUpPerSec = Double(delta.bytesUpDelta) / intervalSeconds
+        rateDownPerSec = Double(delta.bytesDownDelta) / intervalSeconds
     }
 }

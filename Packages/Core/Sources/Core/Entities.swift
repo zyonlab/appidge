@@ -44,6 +44,17 @@ public struct MonitoredProcess: Sendable, Equatable, Codable, Identifiable {
     public var executablePath: String
     public var rule: ProxyRule
     public var stats: FlowStats
+    /// 瞬时吞吐速率(字节/秒)。每个 flow-stats 批次由 reducer 用「本批增量 ÷ 本批真实时间窗」重算;
+    /// 本批没数据的进程归 0(空闲即 0)。是运行时瞬时量,**不持久化**(见 `CodingKeys` 未列入),
+    /// 每次启动从 0 起、由实时流量回填——与 CLAUDE.md「stats 里的实时流量每次启动重置」一致。
+    public var rateUpPerSec: Double = 0
+    public var rateDownPerSec: Double = 0
+
+    /// 刻意不含 `rateUpPerSec`/`rateDownPerSec`:①它们是瞬时量不该落盘;②省得给已有 `config.json`
+    /// 增字段导致旧数据解码缺键失败(合成 Codable 只认列出的键,未列的用属性默认值 0)。
+    private enum CodingKeys: String, CodingKey {
+        case id, displayName, executablePath, rule, stats
+    }
 
     public init(
         id: ProcessID,

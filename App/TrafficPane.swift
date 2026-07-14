@@ -83,8 +83,17 @@ private struct AppRoutingTable: View {
                 TableColumn("规则") { p in
                     Text(RouteText.label(rule: p.rule, kind: nil)).foregroundStyle(RouteText.color(p.rule))
                 }.width(64)
-                TableColumn("↑") { p in Text(TrafficFormat.bytes(p.stats.bytesUp)).monospacedDigit() }.width(78)
-                TableColumn("↓") { p in Text(TrafficFormat.bytes(p.stats.bytesDown)).monospacedDigit() }.width(78)
+                // 实时速率(本批瞬时,上+下合计):当前在吃带宽的应用一眼可见——活跃(>0)高亮,空闲变灰。
+                // 悬停看上/下分向。答「现在谁在吃带宽」,是 Activity Monitor 只给累计所答不了的。
+                TableColumn("速率") { p in
+                    let total = p.rateDownPerSec + p.rateUpPerSec
+                    Text(TrafficFormat.rate(total))
+                        .monospacedDigit()
+                        .foregroundStyle(total > 0 ? .primary : .secondary)
+                        .help("↓ \(TrafficFormat.rate(p.rateDownPerSec))   ↑ \(TrafficFormat.rate(p.rateUpPerSec))")
+                }.width(92)
+                TableColumn("累计 ↑") { p in Text(TrafficFormat.bytes(p.stats.bytesUp)).monospacedDigit() }.width(80)
+                TableColumn("累计 ↓") { p in Text(TrafficFormat.bytes(p.stats.bytesDown)).monospacedDigit() }.width(80)
             }
             .contextMenu(forSelectionType: MonitoredProcess.ID.self) { ids in
                 if !ids.isEmpty {

@@ -6,7 +6,31 @@ public enum Reducer {
         reduceProxyConfig(state, action)
             ?? reduceMatchRules(state, action)
             ?? reduceProcessAndFlow(state, action)
+            ?? reduceSettings(state, action)
             ?? reduceLifecycle(state, action)
+    }
+
+    /// 若干「设置类」action：环告警、抓包开关、状态重置。都是简单赋值/清空,单独一组让
+    /// reduceLifecycle 的分支数保持在 cyclomatic 阈值内。不匹配返回 nil 交给下一组。
+    private static func reduceSettings(_ state: AppState, _ action: Action) -> (AppState, [Effect])? {
+        switch action {
+        case .loopWarningRaised(let signature):
+            var state = state
+            state.loopWarning = signature
+            return (state, [])
+        case .dismissLoopWarning:
+            var state = state
+            state.loopWarning = nil
+            return (state, [])
+        case .resetState:
+            return (AppState(), [])
+        case .setPacketCaptureEnabled(let enabled):
+            var state = state
+            state.isPacketCaptureEnabled = enabled
+            return (state, [.applyPacketCapture(enabled)])
+        default:
+            return nil
+        }
     }
 
     /// 代理服务器配置这一组 action。
@@ -74,16 +98,6 @@ public enum Reducer {
             return appLaunched(state)
         case .connectionEventReceived(let entry):
             return connectionEventReceived(entry, state)
-        case .loopWarningRaised(let signature):
-            var state = state
-            state.loopWarning = signature
-            return (state, [])
-        case .dismissLoopWarning:
-            var state = state
-            state.loopWarning = nil
-            return (state, [])
-        case .resetState:
-            return (AppState(), [])
         default:
             // 只可能是前面几组已处理的 case，reduce 不会走到这里。
             return (state, [])

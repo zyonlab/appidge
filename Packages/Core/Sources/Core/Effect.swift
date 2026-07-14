@@ -11,4 +11,6 @@ public enum Effect: Sendable, Equatable {
     /// 路由相关状态变了（全局开关 / 每进程规则 / 细粒度规则表），把完整规则集推给扩展。
     /// `assignments` 只含非默认（非 `.direct`）的每进程规则；扩展对未知进程回落 `.direct`。
     case applyRuleSet(globalProxyEnabled: Bool, assignments: [ProcessID: ProxyRule], matchRules: [ProxyMatchRule])
+    /// 抓包开关变了,推给扩展。
+    case applyPacketCapture(Bool)
 }

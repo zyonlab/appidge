@@ -15,6 +15,8 @@ public struct AppState: Sendable, Equatable {
     public var connectionLog: [ConnectionLogEntry]
     /// 主动环检测的当前告警(命中的目标标识);nil = 无告警。UI 据此弹提示,用户可 dismiss。
     public var loopWarning: String?
+    /// 是否逐连接抓包落 `.dmp`(默认关——抓包占磁盘且涉隐私,显式开)。开关下发给扩展。
+    public var isPacketCaptureEnabled: Bool
 
     /// 连接日志保留的最大条数;超出丢最旧。
     public static let connectionLogCap = 500
@@ -31,7 +33,8 @@ public struct AppState: Sendable, Equatable {
         proxyRoutingMode: ProxyRoutingMode = .single,
         rules: [ProxyMatchRule] = [],
         connectionLog: [ConnectionLogEntry] = [],
-        loopWarning: String? = nil
+        loopWarning: String? = nil,
+        isPacketCaptureEnabled: Bool = false
     ) {
         self.isGlobalProxyEnabled = isGlobalProxyEnabled
         self.isEngineHealthy = isEngineHealthy
@@ -45,5 +48,6 @@ public struct AppState: Sendable, Equatable {
         self.rules = rules
         self.connectionLog = connectionLog
         self.loopWarning = loopWarning
+        self.isPacketCaptureEnabled = isPacketCaptureEnabled
     }
 }

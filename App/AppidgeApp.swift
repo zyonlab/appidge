@@ -43,6 +43,9 @@ struct AppidgeApp: App {
             case .applyRoutingMode(let mode):
                 await transport.send(ProxyConfigMapping.routingModeMessage(mode))
                 return nil // 纯下发，扩展据此在单台/链/故障转移/负载均衡之间切换
+            case .applyPacketCapture(let enabled):
+                await transport.send(ProxyConfigMapping.packetCaptureMessage(enabled))
+                return nil // 纯下发，扩展据此开/关逐连接 .dmp 抓包
             }
         })
         _store = State(initialValue: store)

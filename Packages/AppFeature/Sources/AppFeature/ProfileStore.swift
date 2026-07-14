@@ -80,6 +80,13 @@ public struct ProfileCollection: Sendable, Equatable, Codable {
         guard profiles.contains(where: { $0.name == name }) else { return }
         activeName = name
     }
+
+    /// 就地替换某个 profile 的配置（位置、名字、active 指向都不变）。未知名字是 no-op。
+    /// 「把当前状态存回某个已存在的档案」用它——区别于 `add` 的名字冲突 no-op 语义。
+    public mutating func updateConfiguration(named name: String, to configuration: PersistedConfiguration) {
+        guard let index = profiles.firstIndex(where: { $0.name == name }) else { return }
+        profiles[index] = NamedProfile(name: name, configuration: configuration)
+    }
 }
 
 /// app 启动/关闭之间持久化「多 profile 集合」的出口协议。跟 `PersistenceStore` /

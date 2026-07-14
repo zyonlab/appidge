@@ -7,6 +7,7 @@ import AppFeature
 struct AppidgeApp: App {
     @State private var store: Store
     @State private var ipcReceiver: IPCReceiver
+    @State private var profilesModel: ProfilesModel
     @Environment(\.scenePhase) private var scenePhase
 
     // 代理密码存 Keychain，不落 JSON（见 PersistedProxyServer 结构上无 password 字段）。
@@ -48,13 +49,16 @@ struct AppidgeApp: App {
         _ipcReceiver = State(initialValue: IPCReceiver(
             store: store, transport: transport, connectionLogFileStore: connectionLogFileStore
         ))
+        _profilesModel = State(initialValue: ProfilesModel(
+            store: store, profileStore: ProfileStore(), credentialStore: KeychainCredentialStore()
+        ))
     }
 
     var body: some Scene {
         WindowGroup {
             Group {
                 if store.state.hasCompletedOnboarding {
-                    ContentView(store: store)
+                    ContentView(store: store, profiles: profilesModel)
                 } else {
                     OnboardingView(store: store)
                 }
@@ -63,6 +67,7 @@ struct AppidgeApp: App {
                 await ipcReceiver.start()
                 await restorePersistedConfiguration()
                 await restoreRecentConnectionLog()
+                await profilesModel.loadLibrary()
                 store.dispatch(.appLaunched)
             }
         }

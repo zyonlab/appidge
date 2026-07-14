@@ -36,6 +36,17 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     // 负载均衡的游标要跨 flow 存活才能真的轮转,所以 selector 是 provider 级的单例。
     private let roundRobinSelector = RoundRobinSelector()
 
+    /// 我们自己组件(扩展 + 主 app)的进程身份集合,用于按来源做转发环硬化:这些身份发起的
+    /// 连接强制直连,不再被自己抓回来代理(见 ``ProcessOriginExclusion``,与基于地址的
+    /// ``UpstreamExclusion`` 正交)。扩展自己的 bundle id 从 Bundle 取,主 app 是它的父级
+    /// (bundle id 去掉最后一段)。待人工回填:自己 app 的 flow 究竟以 bundle id 还是 team 前缀
+    /// 身份出现在 sourceAppSigningIdentifier——不匹配时只是不排除(fail-open,同今天行为)。
+    private static let ownProcessIdentifiers: Set<String> = {
+        guard let ext = Bundle.main.bundleIdentifier else { return [] }
+        let parent = ext.split(separator: ".").dropLast().joined(separator: ".")
+        return parent.isEmpty ? [ext] : [ext, parent]
+    }()
+
     // App 下发的代理配置。handleAppMessage（写）和 handleNewFlow 的 Task（读）并发访问，
     // 用锁保护——provider 已是 @unchecked Sendable，这里显式担起这份线程安全。
     private let configLock = NSLock()
@@ -195,6 +206,11 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
 
     /// 见类型注释的三层决策。回环 / 命中上游 → 强制直连；否则按进程规则。
     private func effectiveRule(for processID: ProcessIdentifierDTO, destination: Network.NWEndpoint) async -> ProxyRuleDTO {
+        // 转发环硬化(按来源):我们自己组件(app/扩展)发起的连接强制直连,别再代理它——
+        // 无关目的地,先于地址类判定。
+        if ProcessOriginExclusion.shouldBypass(sourceIdentifier: processID.value, ownIdentifiers: Self.ownProcessIdentifiers) {
+            return .direct
+        }
         if let (host, port) = ProxyDialer.hostPort(from: destination) {
             if LoopbackDetector.isLoopback(host: host) { return .direct }
             let upstreams = Set((proxyConfig?.servers ?? []).map { UpstreamEndpoint(host: $0.host, port: $0.port) })

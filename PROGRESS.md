@@ -497,3 +497,37 @@ AppFeature +12、Core +4、IPCContract +1），`xcodebuild` Debug 零并发警�
 4. **负载均衡**：配 ≥2 台，发多条连接，确认在上游间轮转（可在两台上游侧看命中分布）。
 5. **连接日志的 proxyKind 展示**：多台模式下日志里的协议标签取的是"首跳"，负载均衡实际选台逐连接轮转，
    标签是近似展示——真机确认是否需要改成"实际所用那台"（要的话让 ProxyDialer 把选中 kind 回传给事件）。
+
+## Phase 7：对齐文档剩余 backlog · 批次 1（worktree 并行 agent + 我并行作者，4 个 PR）
+
+用户要求把「优化(A)/补全(B)/高级(C)」的剩余项并行 TDD+PR 推进，需人工介入的测试只实现不执行、留作统一人工验证。
+上一轮并行 agent 因**共享同一 checkout** 打架；这轮的优化 = **worktree 隔离** + 每个任务**互不重叠的文件**，
+且 agent 只做 **SPM 包内可编译校验**的基础层（`swift test`+`swiftlint`，CI 正是只跑这两样），App/Extension 接线
+与 `xcodebuild`（worktree 无签名配置）由我合并后集中做。
+
+**并行 agent 产出的三个纯基础层（各自 worktree，只加新文件，零 enum/xcodebuild）：**
+- **A2 · PR #18 `ProcessOriginExclusion`（EngineKit，12 测试）**：与基于地址的 `UpstreamExclusion` 正交的第二重转发环
+  硬化——按**来源进程**判定:若一条 flow 由我们自己组件(app/扩展)发起,强制直连,别再被代理抓回来。纯 String/Set 谓词。
+- **A3 · PR #19 `ConnectionLogFileStore`（AppFeature，7 测试）**：连接日志落盘(rolling JSONL),重启不丢;append/
+  loadRecent/上限轮转/坏行跳过/缺文件→[],仿 `FilePersistenceStore` 的 Application Support + 吞错缓存语义。
+- **C9 · PR #17 `TrafficStatsAggregator`（AppFeature，15 测试）**：全局流量的纯计算(总量 + Top-N + 双向吞吐率),
+  确定性、无时钟读取(elapsed 传入),为将来菜单栏/全局统计 UI 打底。
+
+**我并行作者的一个横切功能：**
+- **B4 · PR #20 Block 拦截动作**：规则动作从 direct/proxied 补到三态,`.block` 命中即拒绝(扩展双向关流、不开远端,
+  发一条 closed 事件让日志能看到「被拦截」;回环/上游排除仍优先,永不拦 localhost)。Core/IPCContract enum + 两处穷举
+  映射 + matcher 透传 + 规则编辑器「拦截」选项 + 规则行/连接日志红色标签。跨 Core→IPC→EngineKit→Extension→UI,
+  但只碰 agent 不碰的文件,故与三个 agent PR 全程无冲突。
+
+**四个 PR 全 CI 绿后依次 merge，合并后集成复验**：324 个 SPM 测试全绿(Core 47 · IPCContract 11 · EngineKit 155 ·
+AppFeature 100 · ArchitectureTests 11),`xcodebuild` Debug 零并发警告,`swiftlint --strict` 零违规(103 文件)。
+
+**注意：A2/A3/C9 目前是「已合并但未接线」的基础层**（沿用本仓库 foundation-PR→wiring-PR 的既有分法）。待接线（我后续做，需 xcodebuild）：
+- A2:扩展 `effectiveRule` 调 `ProcessOriginExclusion`,按 flow 的 `sourceAppSigningIdentifier` vs {APP/EXT bundle id} 强制直连
+  （**依赖那条待人工回填**:自己 app 的 flow 到底以 bundle id 还是 team 前缀身份出现)。
+- A3:App 把每条 connectionEvent 追加进 store、启动时 loadRecent 回灌 connectionLog。
+- C9:菜单栏/统计视图接 `TrafficStatsAggregator`。
+
+**仍未动的 backlog**（下一批次）：A1 UDP/QUIC(最大正确性缺口,需定策略:代理 UDP 还是先拦截止漏)、B5 单代理探活按钮、
+B7 localhost 直连提升为可见设置(是否可关需产品决策——关掉有环/断本地开发风险)、C 高级(主动环检测弹窗/多 profile/
+右键单连接指定代理/SOCKS4·NTLM·Kerberos/.dmp 抓包/便携版)、D 公证脚本补全(需你的公证凭据)。

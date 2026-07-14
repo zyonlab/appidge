@@ -60,9 +60,18 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     private var storedLoopDetector = LoopDetector(threshold: 50, windowSeconds: 1.0)
     // 逐连接抓包开关(默认关)。锁保护;开着时 beginFlow 给每条连接建一个 .dmp 写入器。
     private var storedPacketCaptureEnabled = false
+    // proxied 进程的 UDP 策略(默认 .block 止漏)。锁保护。
+    private var storedUDPPolicy: UDPPolicyDTO = .block
+    // 活跃的 SOCKS5 UDP 中继,按 flow 生命周期持有(否则 relay 被释放、连接被取消)。按生成的
+    // id 存,relay 结束时经 onFinished 拿 id 移除。锁保护。
+    private var storedUDPRelays: [String: SOCKS5UDPRelay] = [:]
 
     private var packetCaptureEnabled: Bool {
         configLock.withLock { storedPacketCaptureEnabled }
+    }
+
+    private var udpPolicy: UDPPolicyDTO {
+        configLock.withLock { storedUDPPolicy }
     }
 
     private var proxyConfig: ProxyConfigMessage? {
@@ -144,6 +153,8 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             configLock.withLock { storedRoutingMode = mode }
         case .setPacketCapture(let enabled):
             configLock.withLock { storedPacketCaptureEnabled = enabled }
+        case .setUDPPolicy(let policy):
+            configLock.withLock { storedUDPPolicy = policy }
         }
     }
 
@@ -181,28 +192,6 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
                     processID: processID, router: router
                 )
             }
-        }
-        return true
-    }
-
-    /// UDP/QUIC:被代理(或被 block）的进程,其 UDP 一律**拦截止漏**——接管 flow 后立刻两端关闭把它
-    /// drop 掉,逼 QUIC 回落 TCP 走代理。理由:HTTP CONNECT 天生不能代理 UDP、SOCKS5 UDP ASSOCIATE
-    /// 尚未实现,不拦 proxied 应用的 UDP 就会明文直连泄漏(对齐 Surge/Clash 的 block-QUIC 默认)。
-    /// `.direct` 进程的 UDP 放行直连(返回 false,不接管)。决策必须同步(handleNewFlow 同步返回),
-    /// 故读锁保护的 `perProcessRules` 快照而非 actor;UDP 无固定目的地,不评估 host/port 细粒度规则,
-    /// 只按每进程规则——这条限制已在 PROGRESS 记录。完整 SOCKS5 UDP 代理是后续增强(A1b/开关同理)。
-    private func blockOrAllowUDPFlow(_ flow: NEAppProxyUDPFlow) -> Bool {
-        let sourceID = flow.metaData.sourceAppSigningIdentifier
-        let disposition = UDPFlowPolicy.disposition(
-            sourceIdentifier: sourceID,
-            ownIdentifiers: Self.ownProcessIdentifiers,
-            perProcessRule: perProcessRules[sourceID]
-        )
-        guard disposition == .block else { return false } // allowDirect:不接管,UDP 原生直连。
-        flowLogger.log("blocking UDP flow from \(sourceID, privacy: .public)")
-        flow.open(withLocalFlowEndpoint: nil) { error in
-            flow.closeReadWithError(error)
-            flow.closeWriteWithError(error)
         }
         return true
     }
@@ -279,7 +268,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     }
 
     /// 结束事件只发一次(两个 pump 都可能触发 teardown)。
-    private func emitClose(_ context: ConnectionContext, failed: Bool) {
+    func emitClose(_ context: ConnectionContext, failed: Bool) {
         guard context.markClosedOnce() else { return }
         context.capture?.close() // 抓包文件随连接结束落盘关闭。
         emitConnectionEvent(context, phase: failed ? .failed : .closed)
@@ -328,62 +317,54 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
 
 }
 
-/// flow 双向 pump 拆到同文件 extension 里(不占 provider 类体的长度预算,且同文件仍可访问其
-/// private 成员)。读一端、写另一端、按方向计量,任一端出错/结束就关流并发一次结束事件。
+/// UDP 处理 + flow 双向 pump 拆到同文件 extension 里(不占 provider 类体的长度预算,且同文件仍可
+/// 访问其 private 成员)。
 private extension ProxyExtensionProvider {
-    func pumpClientToRemote(
-        tcpFlow: NEAppProxyTCPFlow,
-        remote: NWConnection,
-        context: ConnectionContext,
-        router: FlowRouter
-    ) {
-        tcpFlow.readData { [weak self] data, error in
-            guard let self, let data, error == nil, !data.isEmpty else {
-                remote.cancel()
-                tcpFlow.closeReadWithError(error)
-                self?.emitClose(context, failed: error != nil)
-                return
+    /// UDP/QUIC:按 3 态策略处理。allowDirect→不接管(原生直连);block→接管并 drop(止漏);
+    /// proxy→经 SOCKS5 UDP ASSOCIATE 中继。
+    func blockOrAllowUDPFlow(_ flow: NEAppProxyUDPFlow) -> Bool {
+        let sourceID = flow.metaData.sourceAppSigningIdentifier
+        let active = proxyConfig?.activeServer
+        let disposition = UDPFlowPolicy.disposition(
+            sourceIdentifier: sourceID,
+            ownIdentifiers: Self.ownProcessIdentifiers,
+            perProcessRule: perProcessRules[sourceID],
+            udpPolicy: udpPolicy,
+            upstreamIsSOCKS5: active?.kind == .socks5
+        )
+        switch disposition {
+        case .allowDirect:
+            return false // 不接管,UDP 原生直连。
+        case .block:
+            flowLogger.log("blocking UDP flow from \(sourceID, privacy: .public)")
+            flow.open(withLocalFlowEndpoint: nil) { error in
+                flow.closeReadWithError(error)
+                flow.closeWriteWithError(error)
             }
-            remote.send(content: data, completion: .contentProcessed { sendError in
-                guard sendError == nil else {
-                    remote.cancel()
-                    tcpFlow.closeReadWithError(sendError)
-                    self.emitClose(context, failed: true)
-                    return
+            return true
+        case .proxy:
+            // disposition 已保证 active 是 SOCKS5;兜底再判一次。
+            guard let active, active.kind == .socks5 else {
+                flow.open(withLocalFlowEndpoint: nil) { error in
+                    flow.closeReadWithError(error); flow.closeWriteWithError(error)
                 }
-                context.addUp(Int64(data.count))
-                context.capture?.write(outbound: true, data)
-                Task { await router.route(processID: context.processID, bytesUp: Int64(data.count), bytesDown: 0, rule: context.rule, now: Date()) }
-                self.pumpClientToRemote(tcpFlow: tcpFlow, remote: remote, context: context, router: router)
-            })
+                return true
+            }
+            startUDPRelay(flow: flow, proxy: active)
+            return true
         }
     }
 
-    func pumpRemoteToClient(
-        tcpFlow: NEAppProxyTCPFlow,
-        remote: NWConnection,
-        context: ConnectionContext,
-        router: FlowRouter
-    ) {
-        remote.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, isComplete, error in
-            guard let self, let data, error == nil, !data.isEmpty else {
-                tcpFlow.closeWriteWithError(error)
-                if isComplete { remote.cancel() }
-                self?.emitClose(context, failed: error != nil)
-                return
-            }
-            tcpFlow.write(data) { writeError in
-                guard writeError == nil else {
-                    remote.cancel()
-                    tcpFlow.closeWriteWithError(writeError)
-                    self.emitClose(context, failed: true)
-                    return
-                }
-                context.addDown(Int64(data.count))
-                context.capture?.write(outbound: false, data)
-                Task { await router.route(processID: context.processID, bytesUp: 0, bytesDown: Int64(data.count), rule: context.rule, now: Date()) }
-                self.pumpRemoteToClient(tcpFlow: tcpFlow, remote: remote, context: context, router: router)
-            }
+    /// 建一个 SOCKS5 UDP 中继并按 id 持有(结束时经 onFinished 用同一 id 移除)。id 是 let,可安全
+    /// 被 @Sendable 的 onFinished 捕获(不像捕获 relay 变量那样触发并发告警)。
+    func startUDPRelay(flow: NEAppProxyUDPFlow, proxy: ProxyServerDTO) {
+        let id = UUID().uuidString
+        let relay = SOCKS5UDPRelay(flow: flow, proxy: proxy) { [weak self] in
+            guard let self else { return }
+            self.configLock.withLock { _ = self.storedUDPRelays.removeValue(forKey: id) }
         }
+        configLock.withLock { storedUDPRelays[id] = relay }
+        Task { await relay.start() }
     }
+
 }

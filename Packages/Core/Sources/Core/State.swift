@@ -17,6 +17,8 @@ public struct AppState: Sendable, Equatable {
     public var loopWarning: String?
     /// 是否逐连接抓包落 `.dmp`(默认关——抓包占磁盘且涉隐私,显式开)。开关下发给扩展。
     public var isPacketCaptureEnabled: Bool
+    /// proxied 进程的 UDP/QUIC 怎么处理(默认 `.block` 止漏)。下发给扩展。
+    public var udpPolicy: UDPPolicy
 
     /// 连接日志保留的最大条数;超出丢最旧。
     public static let connectionLogCap = 500
@@ -34,7 +36,8 @@ public struct AppState: Sendable, Equatable {
         rules: [ProxyMatchRule] = [],
         connectionLog: [ConnectionLogEntry] = [],
         loopWarning: String? = nil,
-        isPacketCaptureEnabled: Bool = false
+        isPacketCaptureEnabled: Bool = false,
+        udpPolicy: UDPPolicy = .block
     ) {
         self.isGlobalProxyEnabled = isGlobalProxyEnabled
         self.isEngineHealthy = isEngineHealthy
@@ -49,5 +52,6 @@ public struct AppState: Sendable, Equatable {
         self.connectionLog = connectionLog
         self.loopWarning = loopWarning
         self.isPacketCaptureEnabled = isPacketCaptureEnabled
+        self.udpPolicy = udpPolicy
     }
 }

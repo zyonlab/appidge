@@ -14,6 +14,12 @@ struct SOCKS5HandshakeTests {
 
     // MARK: Greeting
 
+    @Test("associateRequestBytes is the fixed UDP ASSOCIATE command with 0.0.0.0:0")
+    func associateRequestBytes() {
+        // VER=05 CMD=03(ASSOCIATE) RSV=00 ATYP=01(IPv4) 0.0.0.0 :0
+        #expect(SOCKS5Handshake.associateRequestBytes() == [0x05, 0x03, 0x00, 0x01, 0, 0, 0, 0, 0, 0])
+    }
+
     @Test("greeting without credentials offers only the no-auth method (0x00)")
     func greetingWithoutCredentials() {
         #expect(SOCKS5Handshake.greetingBytes(hasCredentials: false) == [0x05, 0x01, 0x00])

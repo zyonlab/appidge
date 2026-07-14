@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		04185895FCF3CDC65EB9D064 /* SOCKS5UDPRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A51CC29A0FAEF740DA3E9414 /* SOCKS5UDPRelay.swift */; };
+		04E37C3909CD365DDE5C07E7 /* TCPFlowPump.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98E5B5D192F55B2E76BC681B /* TCPFlowPump.swift */; };
 		13292EF7F746994DDBF9B5FE /* TrafficFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DCF5FB636E2A7088A1D6CDF /* TrafficFormat.swift */; };
 		1507CF665D18657ED7BA9801 /* ConnectionLogPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65ADF5DE92F5A1BAEA710F48 /* ConnectionLogPaneView.swift */; };
 		22A3DA6409A39E3419084F11 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FEAB61BFC897307C4C2B00D /* main.swift */; };
@@ -74,8 +76,10 @@
 		88C15509479EC265EC4FD6F2 /* ProxyExtension.systemextension */ = {isa = PBXFileReference; explicitFileType = "wrapper.system-extension"; includeInIndex = 0; path = ProxyExtension.systemextension; sourceTree = BUILT_PRODUCTS_DIR; };
 		8CAB3B3934E69313D52D6EE2 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		8FEAB61BFC897307C4C2B00D /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		98E5B5D192F55B2E76BC681B /* TCPFlowPump.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TCPFlowPump.swift; sourceTree = "<group>"; };
 		9C2DCBF93F75AB530471B830 /* ProfilesPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilesPaneView.swift; sourceTree = "<group>"; };
 		A3B0E63976E8ACBBACCC8C7B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		A51CC29A0FAEF740DA3E9414 /* SOCKS5UDPRelay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SOCKS5UDPRelay.swift; sourceTree = "<group>"; };
 		A939873201BCD22128098DF5 /* ProxyExtensionProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyExtensionProvider.swift; sourceTree = "<group>"; };
 		AD0EC770164D4561F3BFC0BD /* IPCContract */ = {isa = PBXFileReference; lastKnownFileType = folder; name = IPCContract; path = Packages/IPCContract; sourceTree = SOURCE_ROOT; };
 		AF69302A0C9EBB787D6C4B95 /* SystemExtensionActivator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemExtensionActivator.swift; sourceTree = "<group>"; };
@@ -140,6 +144,8 @@
 				4A5B68425966099A3134F76F /* ProxyDialer.swift */,
 				A939873201BCD22128098DF5 /* ProxyExtensionProvider.swift */,
 				5760DDA63F6D5AB07BEF302C /* ProxyFlowSupport.swift */,
+				A51CC29A0FAEF740DA3E9414 /* SOCKS5UDPRelay.swift */,
+				98E5B5D192F55B2E76BC681B /* TCPFlowPump.swift */,
 			);
 			path = Extension;
 			sourceTree = "<group>";
@@ -281,6 +287,8 @@
 				6E46EA6DED240707302344D8 /* ProxyDialer.swift in Sources */,
 				9BC7BA6ED15CB67313DA620F /* ProxyExtensionProvider.swift in Sources */,
 				6E548D025B438A87B3650958 /* ProxyFlowSupport.swift in Sources */,
+				04185895FCF3CDC65EB9D064 /* SOCKS5UDPRelay.swift in Sources */,
+				04E37C3909CD365DDE5C07E7 /* TCPFlowPump.swift in Sources */,
 				22A3DA6409A39E3419084F11 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

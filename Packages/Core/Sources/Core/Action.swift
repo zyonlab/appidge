@@ -27,4 +27,6 @@ public enum Action: Sendable, Equatable {
     case resetState
     /// 开/关逐连接抓包(.dmp)。下发给扩展。
     case setPacketCaptureEnabled(Bool)
+    /// 设置 proxied 进程的 UDP 处理策略(拦截/直连/SOCKS5 代理)。下发给扩展。
+    case setUDPPolicy(UDPPolicy)
 }

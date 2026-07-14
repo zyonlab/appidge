@@ -13,4 +13,6 @@ public enum Effect: Sendable, Equatable {
     case applyRuleSet(globalProxyEnabled: Bool, assignments: [ProcessID: ProxyRule], matchRules: [ProxyMatchRule])
     /// 抓包开关变了,推给扩展。
     case applyPacketCapture(Bool)
+    /// UDP 策略变了,推给扩展。
+    case applyUDPPolicy(UDPPolicy)
 }

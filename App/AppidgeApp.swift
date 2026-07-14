@@ -46,6 +46,9 @@ struct AppidgeApp: App {
             case .applyPacketCapture(let enabled):
                 await transport.send(ProxyConfigMapping.packetCaptureMessage(enabled))
                 return nil // 纯下发，扩展据此开/关逐连接 .dmp 抓包
+            case .applyUDPPolicy(let policy):
+                await transport.send(ProxyConfigMapping.udpPolicyMessage(policy))
+                return nil // 纯下发，扩展据此在拦截/直连/SOCKS5 代理之间切换 UDP 处理
             }
         })
         _store = State(initialValue: store)

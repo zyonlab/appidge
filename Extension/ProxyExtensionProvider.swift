@@ -38,9 +38,14 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     // 用锁保护——provider 已是 @unchecked Sendable，这里显式担起这份线程安全。
     private let configLock = NSLock()
     private var storedProxyConfig: ProxyConfigMessage?
+    private var storedRoutingMode: ProxyRoutingModeDTO = .single
 
     private var proxyConfig: ProxyConfigMessage? {
         configLock.withLock { storedProxyConfig }
+    }
+
+    private var routingMode: ProxyRoutingModeDTO {
+        configLock.withLock { storedRoutingMode }
     }
 
     override func startProxy(options: [String: Any]?, completionHandler: @escaping (Error?) -> Void) {
@@ -95,6 +100,8 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             if let active = config.activeServer {
                 diagnosticsRunner = makeDiagnosticsRunner(upstreamHost: active.host, upstreamPort: active.port)
             }
+        case .applyRoutingMode(let mode):
+            configLock.withLock { storedRoutingMode = mode }
         }
     }
 

@@ -35,6 +35,9 @@ struct AppidgeApp: App {
                 )
                 await transport.send(message)
                 return nil // 纯下发，扩展据此更新每进程规则 + 细粒度规则表
+            case .applyRoutingMode(let mode):
+                await transport.send(ProxyConfigMapping.routingModeMessage(mode))
+                return nil // 纯下发，扩展据此在单台/链/故障转移/负载均衡之间切换
             }
         })
         _store = State(initialValue: store)

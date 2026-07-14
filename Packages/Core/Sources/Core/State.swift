@@ -7,6 +7,8 @@ public struct AppState: Sendable, Equatable {
     public var hasCompletedOnboarding: Bool
     public var proxyServers: [ProxyServerID: ProxyServer]
     public var activeProxyServerID: ProxyServerID?
+    /// 代理流量如何使用上游(单台 / 链 / 故障转移 / 负载均衡)。默认 `.single`,用 activeProxyServerID。
+    public var proxyRoutingMode: ProxyRoutingMode
     /// 细粒度规则表(进程 × 主机 × 端口),从上到下求值、首个命中生效。见 ``RuleMatcher``。
     public var rules: [ProxyMatchRule]
     /// 每连接日志(按连接 id 去重更新),环形缓冲上限 ``connectionLogCap``。
@@ -24,6 +26,7 @@ public struct AppState: Sendable, Equatable {
         hasCompletedOnboarding: Bool = false,
         proxyServers: [ProxyServerID: ProxyServer] = [:],
         activeProxyServerID: ProxyServerID? = nil,
+        proxyRoutingMode: ProxyRoutingMode = .single,
         rules: [ProxyMatchRule] = [],
         connectionLog: [ConnectionLogEntry] = []
     ) {
@@ -35,6 +38,7 @@ public struct AppState: Sendable, Equatable {
         self.hasCompletedOnboarding = hasCompletedOnboarding
         self.proxyServers = proxyServers
         self.activeProxyServerID = activeProxyServerID
+        self.proxyRoutingMode = proxyRoutingMode
         self.rules = rules
         self.connectionLog = connectionLog
     }

@@ -165,4 +165,21 @@ struct ProxyPersistenceTests {
             }
         }
     }
+
+    @Test("a non-default routing mode is captured from state and restored")
+    func routingModePersistsAndRestores() {
+        var state = Core.AppState()
+        state.proxyRoutingMode = .chain([Core.ProxyServerID("a"), Core.ProxyServerID("b")])
+        let config = PersistedConfiguration(from: state)
+        #expect(config.proxyRoutingMode == .chain([Core.ProxyServerID("a"), Core.ProxyServerID("b")]))
+        #expect(config.restorationActions().contains(.setProxyRoutingMode(.chain([Core.ProxyServerID("a"), Core.ProxyServerID("b")]))))
+    }
+
+    @Test("the default single routing mode is not re-emitted on restore")
+    func defaultModeNotRestored() {
+        let config = PersistedConfiguration() // .single by default
+        for action in config.restorationActions() {
+            if case .setProxyRoutingMode = action { Issue.record("should not emit setProxyRoutingMode for default single") }
+        }
+    }
 }

@@ -20,6 +20,8 @@ public enum Reducer {
             return removeProxyServer(id, state)
         case .setActiveProxyServer(let id):
             return setActiveProxyServer(id, state)
+        case .setProxyRoutingMode(let mode):
+            return setProxyRoutingMode(mode, state)
         default:
             return nil
         }
@@ -251,6 +253,12 @@ public enum Reducer {
             state.activeProxyServerID = nil
         }
         return (state, [proxyConfigPush(state)])
+    }
+
+    private static func setProxyRoutingMode(_ mode: ProxyRoutingMode, _ state: AppState) -> (AppState, [Effect]) {
+        var state = state
+        state.proxyRoutingMode = mode
+        return (state, [.applyRoutingMode(mode)])
     }
 
     private static func setActiveProxyServer(_ id: ProxyServerID?, _ state: AppState) -> (AppState, [Effect]) {

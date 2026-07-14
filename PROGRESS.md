@@ -661,3 +661,17 @@ SOCKS4/NTLM/Kerberos/便携版 ③公证需要人的凭据。
 > 真机现象预期:因为 §0.1 的 `system-extension.install` entitlement 还没进 build,启动后状态栏会
 > 如实显示「扩展未安装」(而不是之前误导的「引擎正常」)。Portal capability 打开 + 重签 entitlement 后,
 > 才会走到「待批准 → 系统设置点允许 → 已接管」。
+
+### 装扩展进度(2026-07-14,与用户实机联调)
+- **§0.1 完成**:用户在 Portal 给 App ID 开了 System Extension capability、重生成 Developer ID profile;
+  我把新 profile 装进系统目录 + 挪走旧的(旧的无 SysExt,会被同名误选)、`.env` 的 `PROFILE_APP_UUID`
+  指到新 UUID、重生成 `Config/Signing.xcconfig`、把 `com.apple.developer.system-extension.install`
+  加回 `App/App.entitlements`。**Developer ID 重签通过,签好的 app 确带该 entitlement**。
+- **下一道门 = 公证**:`spctl -a -t exec /Applications/appidge.app` → `rejected, source=Unnotarized
+  Developer ID`。macOS(SIP 开、开发者模式关)**不加载未公证的 Developer ID 系统扩展**。app 本身能跑
+  (本地构建无 quarantine),但扩展加载被 syspolicy 拦。→ 必须跑 `scripts/archive-and-notarize.sh`,
+  它需要用户在 `.env` 配公证凭证(方式 A:`NOTARY_APPLE_ID` + `NOTARY_APP_SPECIFIC_PASSWORD`;
+  方式 B:App Store Connect API key 三件套)。凭证只从 `.env` 读,loop 不经手明文。
+- **待公证后复验**:装带 entitlement 的 Debug build 后,启动期我们 activator 的日志一条没落
+  (`activate()` 疑似没跑到,或只是 os_log 级别被过滤)。有兜底:设置页「启用」按钮直接调 `activate()`。
+  等有了可加载的**公证** build,再端到端验证 启动→activate→needsApproval→点允许→active,顺带定位这个。

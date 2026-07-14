@@ -152,12 +152,16 @@ private struct RoutingModeSection: View {
     }
 }
 
-/// 单台代理的一行：地址:端口 + 可选用户名，左侧标出是否「使用中」，右侧给切换/删除。
+/// 单台代理的一行：地址:端口 + 可选用户名，左侧标出是否「使用中」，右侧给探活/切换/删除。
 private struct ProxyServerRow: View {
     let server: ProxyServer
     let isActive: Bool
     let onActivate: () -> Void
     let onRemove: () -> Void
+
+    // 「测试」这颗按钮的探活状态,view-local 瞬时态(idle/checking/reachable/unreachable)。
+    // 真实探测走 App 的 NWConnectionProxyProbe，映射逻辑在已测的 ProxyChecker。
+    @State private var checkStatus: ProxyCheckStatus = .idle
 
     var body: some View {
         HStack(spacing: 8) {
@@ -181,6 +185,9 @@ private struct ProxyServerRow: View {
 
             Spacer()
 
+            reachabilityIndicator
+            Button("测试", action: runCheck)
+
             if isActive {
                 Text("使用中")
                     .font(.caption)
@@ -190,6 +197,32 @@ private struct ProxyServerRow: View {
             }
 
             Button("删除", role: .destructive, action: onRemove)
+        }
+    }
+
+    @ViewBuilder
+    private var reachabilityIndicator: some View {
+        switch checkStatus {
+        case .idle:
+            EmptyView()
+        case .checking:
+            ProgressView().controlSize(.small)
+        case .reachable:
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                .help("可达")
+        case .unreachable:
+            Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
+                .help("连不上（超时或被拒）")
+        }
+    }
+
+    private func runCheck() {
+        checkStatus = .checking
+        let host = server.host
+        let port = server.port
+        Task {
+            let status = await ProxyChecker.check(host: host, port: port, using: NWConnectionProxyProbe())
+            await MainActor.run { checkStatus = status }
         }
     }
 

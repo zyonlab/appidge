@@ -108,7 +108,20 @@ ZIP_PATH="$EXPORT_PATH/appidge.app.zip"
 
 mkdir -p build
 
-note "1/5 生成 exportOptions.plist（method=developer-id）"
+# manual 签名的 exportArchive 强制要求把每个 bundle id 显式映射到 provisioning profile 名字，
+# 否则报 "requires a provisioning profile with the Network Extensions and System Extension features"
+# ——即便本地 profile 完全正确，不给这个映射它也不知道该用哪个。名字从 profile 文件里解析
+# （跟 gen-signing-xcconfig.sh 同一套解析）。
+: "${EXT_BUNDLE_ID:?EXT_BUNDLE_ID missing in .env}"
+extract_profile_name() {
+  security cms -D -i "$1" 2>/dev/null | plutil -extract Name xml1 -o - - 2>/dev/null | sed -n 's/.*<string>\(.*\)<\/string>.*/\1/p'
+}
+APP_PROFILE_NAME="$(extract_profile_name "$PROFILE_APP")"
+EXT_PROFILE_NAME="$(extract_profile_name "$PROFILE_EXT")"
+: "${APP_PROFILE_NAME:?无法从 $PROFILE_APP 解析 profile 名}"
+: "${EXT_PROFILE_NAME:?无法从 $PROFILE_EXT 解析 profile 名}"
+
+note "1/5 生成 exportOptions.plist（method=developer-id，显式映射 provisioningProfiles）"
 cat > "$EXPORT_PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -120,6 +133,13 @@ cat > "$EXPORT_PLIST" <<PLIST
 	<string>${TEAM_ID}</string>
 	<key>signingStyle</key>
 	<string>manual</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>${APP_BUNDLE_ID}</key>
+		<string>${APP_PROFILE_NAME}</string>
+		<key>${EXT_BUNDLE_ID}</key>
+		<string>${EXT_PROFILE_NAME}</string>
+	</dict>
 </dict>
 </plist>
 PLIST

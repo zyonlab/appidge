@@ -21,7 +21,7 @@ struct TrafficPane: View {
             .padding(6)
             Divider()
             switch tab {
-            case .traffic: TrafficReadout(store: store)
+            case .traffic: TrafficTab(store: store)
             case .stats: PerProcessStats(store: store)
             }
         }
@@ -29,57 +29,28 @@ struct TrafficPane: View {
     }
 }
 
-private struct TrafficReadout: View {
+/// 「流量」标签:带宽曲线(主) + 底部一行累计总量。实时速率看曲线本身。
+private struct TrafficTab: View {
     var store: Store
-    @State private var rate = TrafficStatsAggregator.ThroughputRate(bytesUpPerSecond: 0, bytesDownPerSecond: 0)
-    @State private var previous: (up: Int64, down: Int64) = (0, 0)
-    @State private var previousAt = Date()
-
-    private var processes: [MonitoredProcess] { Array(store.state.processes.values) }
-    private var totals: (up: Int64, down: Int64) { TrafficStatsAggregator.totals(processes) }
-    private var top: [MonitoredProcess] { TrafficStatsAggregator.topByThroughput(processes, limit: 3) }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 28) {
-                metric("累计上行", TrafficFormat.bytes(totals.up), "arrow.up")
-                metric("累计下行", TrafficFormat.bytes(totals.down), "arrow.down")
-                metric("上行速率", TrafficFormat.rate(rate.bytesUpPerSecond), "arrow.up.circle")
-                metric("下行速率", TrafficFormat.rate(rate.bytesDownPerSecond), "arrow.down.circle")
-            }
-            if !top.contains(where: { $0.stats.bytesUp &+ $0.stats.bytesDown > 0 }) {
-                Text("暂无流量").font(.caption).foregroundStyle(.secondary)
-            } else {
-                Text("最活跃").font(.caption).foregroundStyle(.secondary)
-                ForEach(top, id: \.id) { p in
-                    if p.stats.bytesUp &+ p.stats.bytesDown > 0 {
-                        HStack {
-                            Text(p.displayName).lineLimit(1)
-                            Spacer()
-                            Text("↑\(TrafficFormat.bytes(p.stats.bytesUp))  ↓\(TrafficFormat.bytes(p.stats.bytesDown))")
-                                .monospacedDigit().foregroundStyle(.secondary)
-                        }.font(.caption)
-                    }
-                }
-            }
-            Spacer()
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .onChange(of: totals.up &+ totals.down) { _, _ in
-            let now = Date()
-            rate = TrafficStatsAggregator.rate(
-                previous: previous, current: totals, elapsedSeconds: now.timeIntervalSince(previousAt)
-            )
-            previous = totals
-            previousAt = now
-        }
+    private var totals: (up: Int64, down: Int64) {
+        TrafficStatsAggregator.totals(Array(store.state.processes.values))
     }
 
-    private func metric(_ title: String, _ value: String, _ icon: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Label(title, systemImage: icon).font(.caption2).foregroundStyle(.secondary)
-            Text(value).font(.title3).monospacedDigit()
+    var body: some View {
+        VStack(spacing: 4) {
+            BandwidthChart(store: store)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.horizontal, 10)
+                .padding(.top, 6)
+            HStack(spacing: 20) {
+                Text("累计 ↑ \(TrafficFormat.bytes(totals.up))").foregroundStyle(.green)
+                Text("累计 ↓ \(TrafficFormat.bytes(totals.down))").foregroundStyle(.blue)
+                Spacer()
+            }
+            .font(.caption)
+            .monospacedDigit()
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
         }
     }
 }

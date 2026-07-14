@@ -1,5 +1,7 @@
 .env
 Config/Signing.xcconfig
+# 公证用的 App Store Connect API 私钥(AuthKey_*.p8)绝不进 git——同 .env 的纪律。
+*.p8
 .build/
 .swiftpm/
 DerivedData/

@@ -645,3 +645,19 @@ ArchitectureTests 11),`xcodebuild` Debug 零并发警告,`swiftlint --strict` �
 Proxifier 对齐文档 P0/P1/P2 + 选定的 C(环检测/多 profile/右键指定/.dmp)+ A1/A1b(UDP 全套)+ B4/B5/B7
 + 打包脚本,全部落地。剩下的只有:①一次性人工步骤(系统扩展批准 + 各功能真机自测)②被明确砍掉的
 SOCKS4/NTLM/Kerberos/便携版 ③公证需要人的凭据。
+
+### UI 复盘修的两个逻辑问题(用户真机跑 UI 时发现,#41 / #42)
+- **#41 每进程路由回归**:Console 改版把每进程规则选择器删了,导致没法「让某个 app 走代理」。
+  底部「统计」标签改成 **「应用」** 表:右键一个/多个应用 → 走代理/直连/拦截(dispatch `.assignRule`,
+  扩展在 host/port 细粒度规则之后、默认之前生效)。和连接表右键一致。
+- **#42 状态栏假「引擎正常」**:状态只看 `isEngineHealthy`(默认 true,只有 engineFailure 才翻红),
+  于是扩展没装/没批准时也显示「引擎正常」,而实际没拦截——这正是「并没有拦截」困惑的根源。
+  新增 `Core.ExtensionActivation`(运行时不持久化,和 isEngineHealthy 同类),`SystemExtensionActivator`
+  的 delegate 回调经 `onStateChange` → `.extensionActivationChanged` 回灌;启动幂等重提激活请求校准状态。
+  状态栏如实显示 未接入/安装中/待批准/未安装(带原因);设置页加「系统扩展」行 + 「启用」按钮。
+- 复验:Core 61 · IPCContract 11 · EngineKit 192 · AppFeature 140 · ArchitectureTests 11 全绿,
+  `xcodebuild` Debug 零并发警告,`swiftlint --strict` 零违规(135 文件)。已重装 /Applications。
+
+> 真机现象预期:因为 §0.1 的 `system-extension.install` entitlement 还没进 build,启动后状态栏会
+> 如实显示「扩展未安装」(而不是之前误导的「引擎正常」)。Portal capability 打开 + 重签 entitlement 后,
+> 才会走到「待批准 → 系统设置点允许 → 已接管」。

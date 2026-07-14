@@ -7,24 +7,28 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		02BEB1FC0CB43D222CCE48DB /* StatusBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 199BAC5919441EDC3576E476 /* StatusBar.swift */; };
 		04185895FCF3CDC65EB9D064 /* SOCKS5UDPRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A51CC29A0FAEF740DA3E9414 /* SOCKS5UDPRelay.swift */; };
 		04E37C3909CD365DDE5C07E7 /* TCPFlowPump.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98E5B5D192F55B2E76BC681B /* TCPFlowPump.swift */; };
 		13292EF7F746994DDBF9B5FE /* TrafficFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DCF5FB636E2A7088A1D6CDF /* TrafficFormat.swift */; };
-		1507CF665D18657ED7BA9801 /* ConnectionLogPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65ADF5DE92F5A1BAEA710F48 /* ConnectionLogPaneView.swift */; };
 		22A3DA6409A39E3419084F11 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FEAB61BFC897307C4C2B00D /* main.swift */; };
 		24C1DBFF4621B52825A1FCCA /* EngineKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9A771AE19C7B394D1000B789 /* EngineKit */; };
 		2B4575AB87D6B0C6AA17B41F /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA34ADCCFFBEA044937D573 /* OnboardingView.swift */; };
 		439F0E52A0F140E10314798A /* RulesEditorPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3502285178386167CBDC5B8 /* RulesEditorPaneView.swift */; };
+		53994341147E0E7B6A3F55AE /* TrafficPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06FF2EED709EE367FEA4A9A7 /* TrafficPane.swift */; };
+		552D5797BCE134EF6D6EE560 /* MainWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82D18B41BB8F2680C6E5F6B9 /* MainWindow.swift */; };
 		5DD53B8CA098AAE20D297B7F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7106009A56C24078709224DC /* ContentView.swift */; };
 		62F04AAF57F01ECD1256C923 /* ProxyExtension.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = 88C15509479EC265EC4FD6F2 /* ProxyExtension.systemextension */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		6E46EA6DED240707302344D8 /* ProxyDialer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A5B68425966099A3134F76F /* ProxyDialer.swift */; };
 		6E548D025B438A87B3650958 /* ProxyFlowSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5760DDA63F6D5AB07BEF302C /* ProxyFlowSupport.swift */; };
+		70A50B81E49589C783D3FD3A /* ConnectionsTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F7A7B0EB0032EB32E342AC4 /* ConnectionsTable.swift */; };
 		711D141A26AF974CB274C155 /* AppFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 9CA290E7910714860681AC10 /* AppFeature */; };
 		91C491BFD9E3DCBF3A3A4743 /* NWConnectionProxyProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DA718340F1304A9F6ECF582 /* NWConnectionProxyProbe.swift */; };
 		96FF8A395FD13D05AD826E54 /* ProfilesModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEBD232B5EDEBEEDC598FA44 /* ProfilesModel.swift */; };
 		98D1829068AA9598B8F08A3B /* SystemExtensionActivator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF69302A0C9EBB787D6C4B95 /* SystemExtensionActivator.swift */; };
 		9BC7BA6ED15CB67313DA620F /* ProxyExtensionProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A939873201BCD22128098DF5 /* ProxyExtensionProvider.swift */; };
 		AB6CB382A5B383A530062CCA /* PacketCaptureWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A9AAC7350E301EB78C0187 /* PacketCaptureWriter.swift */; };
+		AD71F038E2B6324B5D280B7C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 956D1B4004113B63335A7518 /* SettingsView.swift */; };
 		B419714D1E5E144ED39353BB /* AppidgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AADB654447DCB49FB372FAE /* AppidgeApp.swift */; };
 		BF3C3EA1865EA2811E2CC3B8 /* ProxyServersPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F32B133633BBB992A13D17D /* ProxyServersPaneView.swift */; };
 		CD074F91F9D8E81EF3AF1E9B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 011FA75EB4918608F8A42804 /* Assets.xcassets */; };
@@ -61,7 +65,9 @@
 /* Begin PBXFileReference section */
 		011FA75EB4918608F8A42804 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		013DDA0D0CAD661B46265150 /* Extension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Extension.entitlements; sourceTree = "<group>"; };
+		06FF2EED709EE367FEA4A9A7 /* TrafficPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrafficPane.swift; sourceTree = "<group>"; };
 		163B07BB0DEAE3E528ECBC13 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		199BAC5919441EDC3576E476 /* StatusBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBar.swift; sourceTree = "<group>"; };
 		1DA718340F1304A9F6ECF582 /* NWConnectionProxyProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NWConnectionProxyProbe.swift; sourceTree = "<group>"; };
 		30697183A781221EDE913CB6 /* EngineKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = EngineKit; path = Packages/EngineKit; sourceTree = SOURCE_ROOT; };
 		321F6F00E5ACB2B23E7602E0 /* AppFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AppFeature; path = Packages/AppFeature; sourceTree = SOURCE_ROOT; };
@@ -70,16 +76,18 @@
 		5760DDA63F6D5AB07BEF302C /* ProxyFlowSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyFlowSupport.swift; sourceTree = "<group>"; };
 		5DA34ADCCFFBEA044937D573 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		5F32B133633BBB992A13D17D /* ProxyServersPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyServersPaneView.swift; sourceTree = "<group>"; };
-		65ADF5DE92F5A1BAEA710F48 /* ConnectionLogPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionLogPaneView.swift; sourceTree = "<group>"; };
 		6C1DBE5B022F70217A175D0D /* Core */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Core; path = Packages/Core; sourceTree = SOURCE_ROOT; };
 		6DCF5FB636E2A7088A1D6CDF /* TrafficFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrafficFormat.swift; sourceTree = "<group>"; };
 		7106009A56C24078709224DC /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		7AADB654447DCB49FB372FAE /* AppidgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppidgeApp.swift; sourceTree = "<group>"; };
+		82D18B41BB8F2680C6E5F6B9 /* MainWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindow.swift; sourceTree = "<group>"; };
 		88C15509479EC265EC4FD6F2 /* ProxyExtension.systemextension */ = {isa = PBXFileReference; explicitFileType = "wrapper.system-extension"; includeInIndex = 0; path = ProxyExtension.systemextension; sourceTree = BUILT_PRODUCTS_DIR; };
 		8CAB3B3934E69313D52D6EE2 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		8FEAB61BFC897307C4C2B00D /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		956D1B4004113B63335A7518 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		98E5B5D192F55B2E76BC681B /* TCPFlowPump.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TCPFlowPump.swift; sourceTree = "<group>"; };
 		9C2DCBF93F75AB530471B830 /* ProfilesPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilesPaneView.swift; sourceTree = "<group>"; };
+		9F7A7B0EB0032EB32E342AC4 /* ConnectionsTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionsTable.swift; sourceTree = "<group>"; };
 		A3B0E63976E8ACBBACCC8C7B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		A51CC29A0FAEF740DA3E9414 /* SOCKS5UDPRelay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SOCKS5UDPRelay.swift; sourceTree = "<group>"; };
 		A939873201BCD22128098DF5 /* ProxyExtensionProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyExtensionProvider.swift; sourceTree = "<group>"; };
@@ -158,17 +166,21 @@
 				3DF70C29327CD2B5EA92DC75 /* App.entitlements */,
 				7AADB654447DCB49FB372FAE /* AppidgeApp.swift */,
 				011FA75EB4918608F8A42804 /* Assets.xcassets */,
-				65ADF5DE92F5A1BAEA710F48 /* ConnectionLogPaneView.swift */,
+				9F7A7B0EB0032EB32E342AC4 /* ConnectionsTable.swift */,
 				7106009A56C24078709224DC /* ContentView.swift */,
 				A3B0E63976E8ACBBACCC8C7B /* Info.plist */,
+				82D18B41BB8F2680C6E5F6B9 /* MainWindow.swift */,
 				1DA718340F1304A9F6ECF582 /* NWConnectionProxyProbe.swift */,
 				5DA34ADCCFFBEA044937D573 /* OnboardingView.swift */,
 				EEBD232B5EDEBEEDC598FA44 /* ProfilesModel.swift */,
 				9C2DCBF93F75AB530471B830 /* ProfilesPaneView.swift */,
 				5F32B133633BBB992A13D17D /* ProxyServersPaneView.swift */,
 				F3502285178386167CBDC5B8 /* RulesEditorPaneView.swift */,
+				956D1B4004113B63335A7518 /* SettingsView.swift */,
+				199BAC5919441EDC3576E476 /* StatusBar.swift */,
 				AF69302A0C9EBB787D6C4B95 /* SystemExtensionActivator.swift */,
 				6DCF5FB636E2A7088A1D6CDF /* TrafficFormat.swift */,
+				06FF2EED709EE367FEA4A9A7 /* TrafficPane.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -313,16 +325,20 @@
 			buildActionMask = 2147483647;
 			files = (
 				B419714D1E5E144ED39353BB /* AppidgeApp.swift in Sources */,
-				1507CF665D18657ED7BA9801 /* ConnectionLogPaneView.swift in Sources */,
+				70A50B81E49589C783D3FD3A /* ConnectionsTable.swift in Sources */,
 				5DD53B8CA098AAE20D297B7F /* ContentView.swift in Sources */,
+				552D5797BCE134EF6D6EE560 /* MainWindow.swift in Sources */,
 				91C491BFD9E3DCBF3A3A4743 /* NWConnectionProxyProbe.swift in Sources */,
 				2B4575AB87D6B0C6AA17B41F /* OnboardingView.swift in Sources */,
 				96FF8A395FD13D05AD826E54 /* ProfilesModel.swift in Sources */,
 				FCBF4A432ECB3B5E94F88C26 /* ProfilesPaneView.swift in Sources */,
 				BF3C3EA1865EA2811E2CC3B8 /* ProxyServersPaneView.swift in Sources */,
 				439F0E52A0F140E10314798A /* RulesEditorPaneView.swift in Sources */,
+				AD71F038E2B6324B5D280B7C /* SettingsView.swift in Sources */,
+				02BEB1FC0CB43D222CCE48DB /* StatusBar.swift in Sources */,
 				98D1829068AA9598B8F08A3B /* SystemExtensionActivator.swift in Sources */,
 				13292EF7F746994DDBF9B5FE /* TrafficFormat.swift in Sources */,
+				53994341147E0E7B6A3F55AE /* TrafficPane.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -64,7 +64,7 @@ struct AppidgeApp: App {
         WindowGroup {
             Group {
                 if store.state.hasCompletedOnboarding {
-                    ContentView(store: store, profiles: profilesModel)
+                    MainWindow(store: store, profiles: profilesModel)
                 } else {
                     OnboardingView(store: store)
                 }
@@ -85,6 +85,10 @@ struct AppidgeApp: App {
             if newPhase != .active {
                 persistCurrentConfiguration()
             }
+        }
+
+        Settings {
+            SettingsView(store: store)
         }
 
         MenuBarExtra("appidge", systemImage: "network") {

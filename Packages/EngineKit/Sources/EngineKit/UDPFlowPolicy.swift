@@ -12,25 +12,41 @@ public enum UDPFlowPolicy {
         case block
         /// 放行直连:不接管,UDP 原生直连。
         case allowDirect
+        /// 经 SOCKS5 UDP ASSOCIATE 代理出去。
+        case proxy
     }
 
     /// - Parameters:
     ///   - sourceIdentifier: flow 的来源进程身份(`sourceAppSigningIdentifier`)。
     ///   - ownIdentifiers: 我们自己组件的身份集合;命中则放行(转发环硬化,同 TCP)。
     ///   - perProcessRule: 该进程的每进程规则(nil = 无显式规则,按 direct)。
-    /// - Returns: `.block` 当且仅当来源不是我们自己、且每进程规则是 `.proxied` 或 `.block`;否则 `.allowDirect`。
+    ///   - udpPolicy: 全局 UDP 策略(仅对 `.proxied` 进程生效)。
+    ///   - upstreamIsSOCKS5: 当前 active 上游是否 SOCKS5(只有 SOCKS5 能代理 UDP)。
+    /// - Returns:
+    ///   - 我们自己组件 / `.direct` / 无规则 → `.allowDirect`;
+    ///   - 每进程 `.block` → 永远 `.block`;
+    ///   - 每进程 `.proxied` → 按 `udpPolicy`:block→`.block`,direct→`.allowDirect`,
+    ///     proxySOCKS5→上游是 SOCKS5 则 `.proxy`,否则 `.block`(没法代理就止漏)。
     ///   UDP 无固定目的地,这里**不**评估 host/port 细粒度规则,只按每进程规则。
     public static func disposition(
         sourceIdentifier: String,
         ownIdentifiers: Set<String>,
-        perProcessRule: ProxyRuleDTO?
+        perProcessRule: ProxyRuleDTO?,
+        udpPolicy: UDPPolicyDTO,
+        upstreamIsSOCKS5: Bool
     ) -> Disposition {
         if ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourceIdentifier, ownIdentifiers: ownIdentifiers) {
             return .allowDirect
         }
         switch perProcessRule {
-        case .some(.proxied), .some(.block):
+        case .some(.block):
             return .block
+        case .some(.proxied):
+            switch udpPolicy {
+            case .block: return .block
+            case .direct: return .allowDirect
+            case .proxySOCKS5: return upstreamIsSOCKS5 ? .proxy : .block
+            }
         case .some(.direct), .none:
             return .allowDirect
         }

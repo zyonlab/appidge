@@ -78,6 +78,18 @@ struct ProxyConfigMappingTests {
     }
 
     @Test(
+        "udpPolicyMessage maps every Core.UDPPolicy into setUDPPolicy",
+        arguments: [
+            (Core.UDPPolicy.block, UDPPolicyDTO.block),
+            (Core.UDPPolicy.direct, UDPPolicyDTO.direct),
+            (Core.UDPPolicy.proxySOCKS5, UDPPolicyDTO.proxySOCKS5)
+        ]
+    )
+    func udpPolicyMapping(core: Core.UDPPolicy, dto: UDPPolicyDTO) {
+        #expect(ProxyConfigMapping.udpPolicyMessage(core) == .setUDPPolicy(dto))
+    }
+
+    @Test(
         "ProxyKind maps 1:1 to ProxyKindDTO across all cases",
         arguments: [
             (Core.ProxyKind.socks5, ProxyKindDTO.socks5),

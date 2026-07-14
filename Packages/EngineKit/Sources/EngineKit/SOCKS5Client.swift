@@ -104,6 +104,7 @@ public enum SOCKS5Handshake {
     private static let version: UInt8 = 0x05
     private static let authVersion: UInt8 = 0x01
     private static let commandConnect: UInt8 = 0x01
+    private static let commandUDPAssociate: UInt8 = 0x03
     private static let reserved: UInt8 = 0x00
 
     private static let methodNoAuth: UInt8 = 0x00
@@ -175,6 +176,12 @@ public enum SOCKS5Handshake {
         out.append(UInt8(port >> 8))
         out.append(UInt8(port & 0xFF))
         return out
+    }
+
+    /// UDP ASSOCIATE 请求(CMD=0x03)。DST 用 `0.0.0.0:0`——RFC 1928 允许客户端事先不知道自己的
+    /// UDP 源地址时这样填,代理据此在回复里给出 relay 的 BND.ADDR:BND.PORT。此后 UDP 数据报发到那里。
+    public static func associateRequestBytes() -> [UInt8] {
+        [version, commandUDPAssociate, reserved, atypIPv4, 0, 0, 0, 0, 0, 0]
     }
 
     /// ATYP + address bytes for a target host string.

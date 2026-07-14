@@ -5,6 +5,8 @@ public enum AppToExtensionMessage: Sendable, Equatable, Codable {
     case applyRoutingMode(ProxyRoutingModeDTO)
     /// 开/关逐连接抓包(.dmp)。
     case setPacketCapture(Bool)
+    /// 设置 proxied 进程的 UDP 处理策略。
+    case setUDPPolicy(UDPPolicyDTO)
 }
 
 public enum ExtensionToAppMessage: Sendable, Equatable, Codable {

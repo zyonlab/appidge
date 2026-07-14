@@ -84,6 +84,11 @@ struct CodableRoundTripTests {
 
         let capture = AppToExtensionMessage.setPacketCapture(true)
         #expect(try roundTrip(capture) == capture)
+
+        for policy in [UDPPolicyDTO.block, .direct, .proxySOCKS5] {
+            let msg = AppToExtensionMessage.setUDPPolicy(policy)
+            #expect(try roundTrip(msg) == msg)
+        }
     }
 
     @Test("ProxyRoutingModeDTO round-trips every case")

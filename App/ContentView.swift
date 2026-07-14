@@ -63,8 +63,29 @@ struct DirectoryPaneView: View {
             ))
             Text(store.state.isEngineHealthy ? "引擎正常" : "引擎异常，已回退直连")
                 .foregroundStyle(store.state.isEngineHealthy ? Color.primary : Color.red)
+
+            Picker("代理进程的 UDP/QUIC", selection: Binding(
+                get: { store.state.udpPolicy },
+                set: { store.dispatch(.setUDPPolicy($0)) }
+            )) {
+                Text("拦截止漏").tag(UDPPolicy.block)
+                Text("直连放行").tag(UDPPolicy.direct)
+                Text("SOCKS5 代理").tag(UDPPolicy.proxySOCKS5)
+            }
+            Text(Self.udpPolicyHint(store.state.udpPolicy))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding()
+    }
+
+    private static func udpPolicyHint(_ policy: UDPPolicy) -> String {
+        switch policy {
+        case .block: "默认：代理进程的 UDP/QUIC 一律拦截，逼 QUIC 回落 TCP 走代理，不泄漏。"
+        case .direct: "放行直连：UDP 可用，但绕过代理、可能暴露访问目标（游戏/VoIP 需要 UDP 时用）。"
+        case .proxySOCKS5: "上游是 SOCKS5 时经 UDP ASSOCIATE 真正代理；上游非 SOCKS5 则退回拦截。"
+        }
     }
 }
 

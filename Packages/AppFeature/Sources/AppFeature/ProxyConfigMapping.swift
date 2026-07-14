@@ -30,6 +30,20 @@ public enum ProxyConfigMapping {
         .setPacketCapture(enabled)
     }
 
+    /// 把 UDP 策略翻成 `setUDPPolicy` 消息。
+    public static func udpPolicyMessage(_ policy: Core.UDPPolicy) -> IPCContract.AppToExtensionMessage {
+        .setUDPPolicy(dtoUDPPolicy(from: policy))
+    }
+
+    /// 穷举 switch(不带 default):`Core.UDPPolicy` 新增 case 时这里编译报错。
+    private static func dtoUDPPolicy(from policy: Core.UDPPolicy) -> IPCContract.UDPPolicyDTO {
+        switch policy {
+        case .block: .block
+        case .direct: .direct
+        case .proxySOCKS5: .proxySOCKS5
+        }
+    }
+
     /// 穷举 switch(不带 default):`Core.ProxyRoutingMode` 新增 case 时这里编译报错。
     private static func dtoMode(from mode: Core.ProxyRoutingMode) -> IPCContract.ProxyRoutingModeDTO {
         switch mode {

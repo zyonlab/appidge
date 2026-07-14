@@ -10,29 +10,6 @@ public enum Reducer {
             ?? reduceLifecycle(state, action)
     }
 
-    /// 若干「设置类」action：环告警、抓包开关、状态重置。都是简单赋值/清空,单独一组让
-    /// reduceLifecycle 的分支数保持在 cyclomatic 阈值内。不匹配返回 nil 交给下一组。
-    private static func reduceSettings(_ state: AppState, _ action: Action) -> (AppState, [Effect])? {
-        switch action {
-        case .loopWarningRaised(let signature):
-            var state = state
-            state.loopWarning = signature
-            return (state, [])
-        case .dismissLoopWarning:
-            var state = state
-            state.loopWarning = nil
-            return (state, [])
-        case .resetState:
-            return (AppState(), [])
-        case .setPacketCaptureEnabled(let enabled):
-            var state = state
-            state.isPacketCaptureEnabled = enabled
-            return (state, [.applyPacketCapture(enabled)])
-        default:
-            return nil
-        }
-    }
-
     /// 代理服务器配置这一组 action。
     private static func reduceProxyConfig(_ state: AppState, _ action: Action) -> (AppState, [Effect])? {
         switch action {
@@ -293,6 +270,35 @@ public enum Reducer {
         }
         state.activeProxyServerID = id
         return (state, [proxyConfigPush(state)])
+    }
+}
+
+/// 「设置类」action 的 reduce 放 Reducer 的同文件 extension 里,不占主 enum 的长度预算
+/// (SwiftLint type_body_length 分别统计 enum 与 extension)。同文件仍可访问 private 成员。
+private extension Reducer {
+    static func reduceSettings(_ state: AppState, _ action: Action) -> (AppState, [Effect])? {
+        switch action {
+        case .loopWarningRaised(let signature):
+            var state = state
+            state.loopWarning = signature
+            return (state, [])
+        case .dismissLoopWarning:
+            var state = state
+            state.loopWarning = nil
+            return (state, [])
+        case .resetState:
+            return (AppState(), [])
+        case .setPacketCaptureEnabled(let enabled):
+            var state = state
+            state.isPacketCaptureEnabled = enabled
+            return (state, [.applyPacketCapture(enabled)])
+        case .setUDPPolicy(let policy):
+            var state = state
+            state.udpPolicy = policy
+            return (state, [.applyUDPPolicy(policy)])
+        default:
+            return nil
+        }
     }
 }
 

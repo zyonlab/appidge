@@ -28,7 +28,16 @@ struct ConnectionLogPaneView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(entries) { entry in
-                    ConnectionRow(entry: entry, appName: appName(for: entry.processID))
+                    ConnectionRow(entry: entry, appName: appName(for: entry.processID)) { action in
+                        // 右键单连接指定动作:从这条连接现拼一条精确 match 规则(进程 × 主机 × 端口)。
+                        store.dispatch(.addMatchRule(ProxyMatchRule(
+                            id: RuleID(UUID().uuidString),
+                            appPattern: entry.processID.value,
+                            hostPattern: entry.host,
+                            portRange: entry.port...entry.port,
+                            action: action
+                        )))
+                    }
                 }
             }
         }
@@ -43,6 +52,8 @@ struct ConnectionLogPaneView: View {
 private struct ConnectionRow: View {
     let entry: ConnectionLogEntry
     let appName: String
+    /// 右键菜单选中的动作(代理/直连/拦截)——由父视图据此为这条连接建一条精确规则。
+    let onCreateRule: (ProxyRule) -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -63,6 +74,13 @@ private struct ConnectionRow: View {
                     .font(.caption2)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
+            }
+        }
+        .contextMenu {
+            Section("为 \(entry.host):\(entry.port) 建规则") {
+                Button("走代理") { onCreateRule(.proxied) }
+                Button("直连") { onCreateRule(.direct) }
+                Button("拦截", role: .destructive) { onCreateRule(.block) }
             }
         }
     }

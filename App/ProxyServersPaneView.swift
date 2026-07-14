@@ -2,64 +2,125 @@ import SwiftUI
 import Core
 import AppFeature
 
-/// 「代理服务器」配置面板：概念上对标 Proxifier 的「Proxy Servers」对话框——一个能
-/// 增/删的上游代理列表，外加挑出当前「使用中」的那台。
-///
-/// 跟其它面板一样，UI 只做两件事：读 `store.state`、`dispatch(Action)`。视图里的
-/// `@State` 只用于「添加」表单的输入草稿（本地 UI 状态），从不直接改 app state。
-/// 故意做得朴素（用户明确说这轮 UI 先简单、以后精修），只用系统默认控件。
-///
-/// 编辑既有代理走「删除 + 重新添加」这一简化路径（本轮不做原地编辑表单）。
+/// 「代理服务器」配置(对标 Proxifier 的 Proxy Servers 对话框)。原生 `Table` + 底部工具栏
+/// (＋添加 / −删除 / 设为使用中 / 测试)+ 路由模式区。选中一行,工具栏与右键菜单对它操作。
+/// UI 只读 `store.state`、只 `dispatch(Action)`;探活状态(`checks`)是 view-local 瞬时态。
 struct ProxyServersPaneView: View {
     var store: Store
+
+    @State private var selection: ProxyServer.ID?
+    @State private var checks: [ProxyServerID: ProxyCheckStatus] = [:]
+    @State private var showingAdd = false
 
     private var sortedServers: [ProxyServer] {
         store.state.proxyServers.values.sorted { $0.id.value < $1.id.value }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("代理服务器")
-                .font(.headline)
-
-            serverList
-
+        VStack(spacing: 0) {
+            if sortedServers.isEmpty {
+                ContentUnavailableView(
+                    "还没有代理服务器",
+                    systemImage: "server.rack",
+                    description: Text("点下面的「＋」添加一台上游代理。")
+                )
+                .frame(maxHeight: .infinity)
+            } else {
+                serverTable
+            }
             Divider()
-
+            toolbar
+            Divider()
             RoutingModeSection(store: store, servers: sortedServers)
-
-            Divider()
-
-            AddProxyServerForm(store: store)
+                .padding()
         }
-        .padding()
+        .sheet(isPresented: $showingAdd) {
+            AddProxyServerSheet(store: store)
+        }
+    }
+
+    private var serverTable: some View {
+        Table(sortedServers, selection: $selection) {
+            TableColumn("") { s in
+                Image(systemName: store.state.activeProxyServerID == s.id ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(store.state.activeProxyServerID == s.id ? Color.accentColor : Color.secondary)
+            }
+            .width(26)
+
+            TableColumn("地址:端口") { s in Text("\(s.host):\(s.port)").monospaced() }
+            TableColumn("协议") { s in Text(Self.kindLabel(s.kind)) }.width(80)
+            TableColumn("用户名") { s in
+                Text((s.username?.isEmpty == false) ? s.username! : "—").foregroundStyle(.secondary)
+            }
+            TableColumn("探活") { s in checkCell(checks[s.id] ?? .idle) }.width(56)
+        }
+        .contextMenu(forSelectionType: ProxyServer.ID.self) { ids in
+            if let id = ids.first {
+                Button("设为使用中") { store.dispatch(.setActiveProxyServer(id)) }
+                Button("测试") { runCheck(id) }
+                Divider()
+                Button("删除", role: .destructive) { store.dispatch(.removeProxyServer(id)) }
+            }
+        }
+    }
+
+    private var toolbar: some View {
+        HStack(spacing: 6) {
+            Button { showingAdd = true } label: { Image(systemName: "plus") }
+                .help("添加代理服务器")
+            Button { removeSelected() } label: { Image(systemName: "minus") }
+                .disabled(selection == nil)
+                .help("删除选中")
+            Divider().frame(height: 14)
+            Button("设为使用中") { if let id = selection { store.dispatch(.setActiveProxyServer(id)) } }
+                .disabled(selection == nil)
+            Button("测试") { if let id = selection { runCheck(id) } }
+                .disabled(selection == nil)
+            Spacer()
+        }
+        .buttonStyle(.borderless)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
     }
 
     @ViewBuilder
-    private var serverList: some View {
-        if sortedServers.isEmpty {
-            Text("还没有配置代理服务器，用下面的表单添加一台。")
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        } else {
-            List(sortedServers, id: \.id) { server in
-                ProxyServerRow(
-                    server: server,
-                    isActive: store.state.activeProxyServerID == server.id,
-                    onActivate: { store.dispatch(.setActiveProxyServer(server.id)) },
-                    onRemove: { store.dispatch(.removeProxyServer(server.id)) }
-                )
-            }
+    private func checkCell(_ status: ProxyCheckStatus) -> some View {
+        switch status {
+        case .idle: Text("—").foregroundStyle(.tertiary)
+        case .checking: ProgressView().controlSize(.small)
+        case .reachable: Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).help("可达")
+        case .unreachable: Image(systemName: "xmark.circle.fill").foregroundStyle(.red).help("连不上（超时或被拒）")
+        }
+    }
+
+    private func removeSelected() {
+        guard let id = selection else { return }
+        store.dispatch(.removeProxyServer(id))
+        selection = nil
+    }
+
+    private func runCheck(_ id: ProxyServerID) {
+        guard let server = store.state.proxyServers[id] else { return }
+        checks[id] = .checking
+        let host = server.host
+        let port = server.port
+        Task {
+            let status = await ProxyChecker.check(host: host, port: port, using: NWConnectionProxyProbe())
+            await MainActor.run { checks[id] = status }
+        }
+    }
+
+    private static func kindLabel(_ kind: ProxyKind) -> String {
+        switch kind {
+        case .socks5: "SOCKS5"
+        case .httpConnect: "HTTP"
         }
     }
 }
 
 /// 「路由模式」区：对标 Proxifier 的 Proxy Chains + 冗余/均衡策略。选一种模式；非 single
-/// 时勾选参与的上游（勾选顺序即链的跳序 / 故障转移的尝试序，显示为编号）。
-///
-/// UI 只读 `store.state.proxyRoutingMode`、只 `dispatch(.setProxyRoutingMode(...))`；模式↔种类
-/// 的拍平与顺序保留逻辑都在 AppFeature 的 `RoutingModeKind` / `togglingMember`（已单测），
-/// 视图不含业务判断。故意做得朴素（这轮 UI 先简单），排序沿用 id 升序。
+/// 时勾选参与的上游（勾选顺序即链的跳序 / 故障转移的尝试序，显示为编号）。模式↔种类的拍平与
+/// 顺序保留逻辑在 AppFeature 的 `RoutingModeKind` / `togglingMember`（已单测）。
 private struct RoutingModeSection: View {
     var store: Store
     let servers: [ProxyServer]
@@ -70,8 +131,7 @@ private struct RoutingModeSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("路由模式")
-                .font(.subheadline)
+            Text("路由模式").font(.subheadline)
 
             Picker("路由模式", selection: kindBinding) {
                 Text("单台").tag(RoutingModeKind.single)
@@ -91,7 +151,7 @@ private struct RoutingModeSection: View {
                 memberPicker
             }
         }
-        .frame(maxWidth: 360, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -102,19 +162,14 @@ private struct RoutingModeSection: View {
                 .foregroundStyle(.secondary)
         } else {
             VStack(alignment: .leading, spacing: 4) {
-                ForEach(servers, id: \.id) { server in
+                ForEach(servers) { server in
                     let position = selectedIDs.firstIndex(of: server.id).map { $0 + 1 }
                     Toggle(isOn: memberBinding(server.id)) {
                         HStack(spacing: 6) {
                             if let position {
-                                Text("\(position).")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .monospacedDigit()
+                                Text("\(position).").font(.caption).foregroundStyle(.secondary).monospacedDigit()
                             }
-                            Text("\(server.host):\(server.port)")
-                                .font(.caption)
-                                .monospacedDigit()
+                            Text("\(server.host):\(server.port)").font(.caption).monospacedDigit()
                         }
                     }
                     .toggleStyle(.checkbox)
@@ -126,7 +181,6 @@ private struct RoutingModeSection: View {
     private var kindBinding: Binding<RoutingModeKind> {
         Binding(
             get: { kind },
-            // 切种类时把已选 id 顺序带过去，不因 single↔chain↔… 丢选择。
             set: { store.dispatch(.setProxyRoutingMode($0.mode(carrying: selectedIDs))) }
         )
     }
@@ -140,104 +194,18 @@ private struct RoutingModeSection: View {
 
     private static func explanation(_ kind: RoutingModeKind) -> String {
         switch kind {
-        case .single:
-            "所有走代理的连接都用「使用中」的那台上游。"
-        case .chain:
-            "连接依次穿过选中的多台上游（client → 上游1 → 上游2 → … → 目标），顺序即下面的编号。"
-        case .failover:
-            "按编号顺序尝试，第一台连不上就换下一台，直到某台成功。"
-        case .loadBalance:
-            "每条新连接在选中的上游之间轮流，分摊流量。"
+        case .single: "所有走代理的连接都用「使用中」的那台上游。"
+        case .chain: "连接依次穿过选中的多台上游（client → 上游1 → 上游2 → … → 目标），顺序即下面的编号。"
+        case .failover: "按编号顺序尝试，第一台连不上就换下一台，直到某台成功。"
+        case .loadBalance: "每条新连接在选中的上游之间轮流，分摊流量。"
         }
     }
 }
 
-/// 单台代理的一行：地址:端口 + 可选用户名，左侧标出是否「使用中」，右侧给探活/切换/删除。
-private struct ProxyServerRow: View {
-    let server: ProxyServer
-    let isActive: Bool
-    let onActivate: () -> Void
-    let onRemove: () -> Void
-
-    // 「测试」这颗按钮的探活状态,view-local 瞬时态(idle/checking/reachable/unreachable)。
-    // 真实探测走 App 的 NWConnectionProxyProbe，映射逻辑在已测的 ProxyChecker。
-    @State private var checkStatus: ProxyCheckStatus = .idle
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text("\(server.host):\(server.port)")
-                        .monospacedDigit()
-                    Text(Self.kindLabel(server.kind))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                if let username = server.username, !username.isEmpty {
-                    Text(username)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Spacer()
-
-            reachabilityIndicator
-            Button("测试", action: runCheck)
-
-            if isActive {
-                Text("使用中")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                Button("设为使用中", action: onActivate)
-            }
-
-            Button("删除", role: .destructive, action: onRemove)
-        }
-    }
-
-    @ViewBuilder
-    private var reachabilityIndicator: some View {
-        switch checkStatus {
-        case .idle:
-            EmptyView()
-        case .checking:
-            ProgressView().controlSize(.small)
-        case .reachable:
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                .help("可达")
-        case .unreachable:
-            Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
-                .help("连不上（超时或被拒）")
-        }
-    }
-
-    private func runCheck() {
-        checkStatus = .checking
-        let host = server.host
-        let port = server.port
-        Task {
-            let status = await ProxyChecker.check(host: host, port: port, using: NWConnectionProxyProbe())
-            await MainActor.run { checkStatus = status }
-        }
-    }
-
-    private static func kindLabel(_ kind: ProxyKind) -> String {
-        switch kind {
-        case .socks5: "SOCKS5"
-        case .httpConnect: "HTTP"
-        }
-    }
-}
-
-/// 「添加代理服务器」表单。`@State` 是本地输入草稿，不是 app state；点「添加」时组装一台
-/// `ProxyServer`（id 用 UUID 保证唯一，允许同一 host:port 存多台）并 dispatch。
-private struct AddProxyServerForm: View {
+/// 「添加代理服务器」sheet(协议 / 地址 / 端口 / 认证)。添加成功后自动关闭。
+private struct AddProxyServerSheet: View {
     var store: Store
+    @Environment(\.dismiss) private var dismiss
 
     @State private var host = ""
     @State private var portText = ""
@@ -245,56 +213,51 @@ private struct AddProxyServerForm: View {
     @State private var password = ""
     @State private var kind: ProxyKind = .socks5
 
-    private var parsedPort: UInt16? {
-        UInt16(portText.trimmingCharacters(in: .whitespaces))
-    }
-
-    private var trimmedHost: String {
-        host.trimmingCharacters(in: .whitespaces)
-    }
-
-    private var canAdd: Bool {
-        !trimmedHost.isEmpty && parsedPort != nil
-    }
+    private var parsedPort: UInt16? { UInt16(portText.trimmingCharacters(in: .whitespaces)) }
+    private var trimmedHost: String { host.trimmingCharacters(in: .whitespaces) }
+    private var canAdd: Bool { !trimmedHost.isEmpty && parsedPort != nil }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("添加代理服务器")
-                .font(.subheadline)
-
-            Picker("协议", selection: $kind) {
-                Text("SOCKS5").tag(ProxyKind.socks5)
-                Text("HTTP CONNECT").tag(ProxyKind.httpConnect)
+        VStack(spacing: 0) {
+            HStack {
+                Text("添加代理服务器").font(.headline)
+                Spacer()
+                Button("取消") { dismiss() }
             }
-            .pickerStyle(.segmented)
-
-            TextField("地址，如 127.0.0.1", text: $host)
-            TextField("端口，如 1080", text: $portText)
-            TextField("用户名（可选）", text: $username)
-            SecureField("密码（可选）", text: $password)
-
-            Button("添加", action: add)
-                .disabled(!canAdd)
+            .padding()
+            Divider()
+            Form {
+                Picker("协议", selection: $kind) {
+                    Text("SOCKS5").tag(ProxyKind.socks5)
+                    Text("HTTP CONNECT").tag(ProxyKind.httpConnect)
+                }
+                .pickerStyle(.segmented)
+                TextField("地址", text: $host, prompt: Text("127.0.0.1"))
+                TextField("端口", text: $portText, prompt: Text("1080"))
+                TextField("用户名（可选）", text: $username)
+                SecureField("密码（可选）", text: $password)
+            }
+            .formStyle(.grouped)
+            Divider()
+            HStack {
+                Spacer()
+                Button("添加", action: add)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!canAdd)
+            }
+            .padding()
         }
-        .textFieldStyle(.roundedBorder)
-        .frame(maxWidth: 360, alignment: .leading)
+        .frame(width: 380)
     }
 
     private func add() {
         guard let port = parsedPort else { return }
-        let server = ProxyServer(
+        store.dispatch(.addProxyServer(ProxyServer(
             id: ProxyServerID(UUID().uuidString),
-            host: trimmedHost,
-            port: port,
-            kind: kind,
+            host: trimmedHost, port: port, kind: kind,
             username: username.isEmpty ? nil : username,
             password: password.isEmpty ? nil : password
-        )
-        store.dispatch(.addProxyServer(server))
-        host = ""
-        portText = ""
-        username = ""
-        password = ""
-        kind = .socks5
+        )))
+        dismiss()
     }
 }

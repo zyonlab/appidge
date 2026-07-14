@@ -33,6 +33,8 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     private let appGroup = "group.com.appidge"
     private let appliedRuleSetStore = AppliedRuleSetStore()
     private let routingHistoryTracker = RoutingHistoryTracker()
+    // 负载均衡的游标要跨 flow 存活才能真的轮转,所以 selector 是 provider 级的单例。
+    private let roundRobinSelector = RoundRobinSelector()
 
     // App 下发的代理配置。handleAppMessage（写）和 handleNewFlow 的 Task（读）并发访问，
     // 用锁保护——provider 已是 @unchecked Sendable，这里显式担起这份线程安全。
@@ -143,9 +145,10 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         let rule = await effectiveRule(for: processID, destination: remoteEndpoint)
         await routingHistoryTracker.record(processID: processID, wasProxied: rule == .proxied)
 
-        let (host, port) = Self.hostPort(from: remoteEndpoint) ?? (remoteHostname ?? "?", 0)
-        // 实际所用代理协议:只有 proxied 且真有 active 上游时才是代理,否则(含 fail-open 回落)记 nil。
-        let proxyKind = (rule == .proxied) ? proxyConfig?.activeServer?.kind : nil
+        let (host, port) = ProxyDialer.hostPort(from: remoteEndpoint) ?? (remoteHostname ?? "?", 0)
+        // 实际所用代理协议:按解析后的路由取第一跳的 kind——proxied 但降级成直连时记 nil,
+        // 让连接日志里"到底走没走代理"如实。
+        let proxyKind = ProxyDialer.representativeKind(rule: rule, config: proxyConfig, mode: routingMode)
         let context = ConnectionContext(
             id: UUID().uuidString, processID: processID, host: host, port: port, rule: rule, proxyKind: proxyKind
         )
@@ -182,7 +185,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
 
     /// 见类型注释的三层决策。回环 / 命中上游 → 强制直连；否则按进程规则。
     private func effectiveRule(for processID: ProcessIdentifierDTO, destination: Network.NWEndpoint) async -> ProxyRuleDTO {
-        if let (host, port) = Self.hostPort(from: destination) {
+        if let (host, port) = ProxyDialer.hostPort(from: destination) {
             if LoopbackDetector.isLoopback(host: host) { return .direct }
             let upstreams = Set((proxyConfig?.servers ?? []).map { UpstreamEndpoint(host: $0.host, port: $0.port) })
             if UpstreamExclusion.isUpstream(host: host, port: port, upstreams: upstreams) { return .direct }
@@ -194,60 +197,26 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         return await appliedRuleSetStore.currentRule(for: processID) ?? .direct
     }
 
-    /// `.proxied` 且有 active 上游 → 拨上游、按协议（SOCKS5 / HTTP CONNECT）做隧道握手，
-    /// 返回已就绪的隧道连接；否则（含 proxied 但没配上游的 fail-open）直连目的地。
-    /// 目标地址经 ``ProxyTargetSelector`` 优先取原始主机名（DNS-over-proxy，让代理去解析）。
-    /// 返回的连接一律"已 ready"，可直接 pump。
+    /// `.proxied` → 按 ``ProxyRouteResolver`` 解析出的路由拨上游、做隧道握手,返回已就绪、可直接
+    /// pump 的连接;解析为 `.direct`(含 proxied 但没配上游的 fail-open)则直连目的地。实际拨号
+    /// 交给无状态的 ``ProxyDialer``。目标地址经 ``ProxyTargetSelector`` 优先取原始主机名
+    /// (DNS-over-proxy,让代理去解析)。
     private func openRemote(
         to endpoint: Network.NWEndpoint, remoteHostname: String?, rule: ProxyRuleDTO
     ) async throws -> NWConnection {
-        guard rule == .proxied,
-              let active = proxyConfig?.activeServer,
-              let (endpointHost, port) = Self.hostPort(from: endpoint) else {
-            return try await Self.openDirect(to: endpoint)
+        guard rule == .proxied, let (endpointHost, port) = ProxyDialer.hostPort(from: endpoint) else {
+            return try await ProxyDialer.openDirect(to: endpoint)
         }
+        let config = proxyConfig
+        let route = ProxyRouteResolver.resolve(
+            mode: routingMode, servers: config?.servers ?? [], activeServerID: config?.activeServerID
+        )
         let target = ProxyTargetSelector.selectTarget(
             remoteHostname: remoteHostname, endpointHost: endpointHost, port: port
         )
-        let stream = NWConnectionByteStream(proxyServer: active)
-        try await stream.open()
-        switch active.kind {
-        case .socks5:
-            try await SOCKS5Connector(proxyServer: active).establish(toHost: target.host, port: target.port, over: stream)
-        case .httpConnect:
-            try await HTTPConnectClient(proxyServer: active).establish(toHost: target.host, port: target.port, over: stream)
-        }
-        return stream.tunnelConnection
-    }
-
-    /// 直连目的地并挂起到 `.ready`（或失败）。返回时连接已可读写。
-    private static func openDirect(to endpoint: Network.NWEndpoint) async throws -> NWConnection {
-        let connection = NWConnection(to: endpoint, using: .tcp)
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            let box = ResumeOnceBox(continuation)
-            connection.stateUpdateHandler = { state in
-                switch state {
-                case .ready: box.resume(.success(()))
-                case .failed(let error): box.resume(.failure(error))
-                case .cancelled: box.resume(.failure(OpenRemoteError.cancelled))
-                default: break
-                }
-            }
-            connection.start(queue: .global(qos: .utility))
-        }
-        return connection
-    }
-
-    private static func hostPort(from endpoint: Network.NWEndpoint) -> (host: String, port: UInt16)? {
-        guard case .hostPort(let host, let port) = endpoint else { return nil }
-        let hostString: String
-        switch host {
-        case .name(let name, _): hostString = name
-        case .ipv4(let address): hostString = "\(address)"
-        case .ipv6(let address): hostString = "\(address)"
-        @unknown default: return nil
-        }
-        return (hostString, port.rawValue)
+        return try await ProxyDialer.open(
+            route: route, to: target, directEndpoint: endpoint, roundRobin: roundRobinSelector
+        )
     }
 
     private func pumpClientToRemote(
@@ -340,28 +309,5 @@ private final class ConnectionContext: @unchecked Sendable {
             closed = true
             return true
         }
-    }
-}
-
-private enum OpenRemoteError: Error, Sendable {
-    case cancelled
-}
-
-/// CheckedContinuation 只能 resume 一次；NWConnection 的 stateUpdateHandler 可能在 ready 之后
-/// 还回调 cancelled，用锁保护避免二次 resume 崩溃。同 NEFlowTransport 的 ContinuationBox。
-private final class ResumeOnceBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var continuation: CheckedContinuation<Void, Error>?
-
-    init(_ continuation: CheckedContinuation<Void, Error>) {
-        self.continuation = continuation
-    }
-
-    func resume(_ result: Result<Void, Error>) {
-        lock.lock()
-        defer { lock.unlock() }
-        guard let continuation else { return }
-        self.continuation = nil
-        continuation.resume(with: result)
     }
 }

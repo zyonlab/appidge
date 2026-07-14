@@ -404,3 +404,41 @@ EngineKit 106 · AppFeature 58 · ArchitectureTests 11）,`xcodebuild` Debug 零
 - `UpstreamExclusion` 纯文本匹配,主机名上游匹配不到解析后 IP。
 - 无代理链 / 故障转移 / 负载均衡。
 - 真机端到端仍卡在系统扩展批准的两个人工步骤。
+
+## Phase 5：两个 P1 功能（细粒度规则 + 每连接日志），顺序 PR
+
+对齐文档里两个"更贴近日常、能被真人感知"的 P1:主机/端口规则 + 每连接日志。API 上轮不稳,
+这轮**自己顺序作者每个 PR**(可靠),CI 仍逐个把关、绿了 merge。
+
+**Feature A — 细粒度规则(进程 × 主机 × 端口)**
+- **PR #11 引擎(端到端,无 UI)**:`Core.ProxyMatchRule` 模型 + `AppState.rules` + add/remove/reorder
+  action + `Effect.applyRuleSet`;`IPCContract.MatchRuleDTO`;`EngineKit.RuleMatcher` + 零依赖 `Glob`
+  (贪心 `*` 通配,`*.x` 只子域、`*x` 含 apex)对 DTO 求值(20 测试);`AppliedRuleSetStore` 全量替换
+  + 评估;`AppFeature.RuleSetMapping`;App 发 applyRuleSet;扩展 effectiveRule 评估规则表。
+  **顺带修了个既存真 bug**:每进程规则改动和全局开关此前根本没下发到扩展(没人 emit/send
+  applyRuleSet),"设为代理"其实端到端不生效——现在真生效了。
+- **PR #12 规则编辑 UI**:「规则表」tab,拖动排序 + 删除 + 添加表单(进程/主机 glob、端口空/单/区间、动作)。
+
+**Feature B — 每连接日志**
+- **PR #13 数据通路(端到端,无 UI)**:`IPCContract.ConnectionEventDTO` + `ExtensionToAppMessage.connectionEvent`;
+  扩展每连接一个 `ConnectionContext`(锁保护字节 + 只发一次结束闸门),flow 建立发 opened、teardown 发
+  closed/failed;`Core.ConnectionLogEntry` + `AppState.connectionLog`(上限 500)+ reducer 按 id upsert
+  (opened→closed 原地更新);`AppFeature.ExtensionMessageHandling` 翻译。
+- **PR #14 连接列表 UI**:「连接」tab,每条连接一行(进程 / 目标 host:port / 走向 / 状态点 / 字节),最新在前。
+
+**架构决策记一笔**:规则**匹配器**放在 EngineKit 对 `MatchRuleDTO` 求值,而不是 Core——因为真正按
+规则路由的是扩展,它经 EngineKit 工作,而 EngineKit 不能依赖 Core(不变量 B2)。Core 只放规则的**数据模型**
+(给 AppState/UI 用),匹配逻辑在 EngineKit 重点测试。ConnectionLog 同理:Core 有 `ConnectionLogEntry`
+数据模型,DTO 在 IPCContract,边界层 `ExtensionMessageHandling` 负责 DTO→Core 的穷举映射。
+
+**过程**:又遇到几次"改 IPCContract enum → EngineKit `.build` 陈旧 → SIGSEGV",`rm -rf .build` 即好;
+一次 commit 前忘 lint,推了带自定义规则(`optional_data_string_conversion`,要 `String(bytes:encoding:)`
+而非 `String(decoding:as:)`)违规的版本,`--amend + --force-with-lease` 修掉。
+
+**最终**:六个 PR(#11-#14 + 前面 #6-#10)全 CI 绿后 merge,247 个 SPM 测试全绿(Core 43 · IPCContract 10 ·
+EngineKit 118 · AppFeature 65 · ArchitectureTests 11),`xcodebuild` Debug 零并发警告,swiftlint 零违规,codesign 通过。
+
+**至此 Proxifier 对齐文档的 P0 + P1 全部清完**。仍在的遗留都是 P2 高级功能(代理链/故障转移/负载均衡——
+已和用户确认:进程代理不必需,先不做)或需要人工的一次性步骤(系统扩展批准的两步),以及若干诚实小限制
+(DNS-over-proxy 只在 app 用域名连时生效、UpstreamExclusion 纯文本不解析主机名、凭据未进 Keychain 前需重填——
+已在 Keychain PR 解决、连接日志未持久化只在内存)。

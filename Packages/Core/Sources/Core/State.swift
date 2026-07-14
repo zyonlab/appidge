@@ -13,6 +13,8 @@ public struct AppState: Sendable, Equatable {
     public var rules: [ProxyMatchRule]
     /// 每连接日志(按连接 id 去重更新),环形缓冲上限 ``connectionLogCap``。
     public var connectionLog: [ConnectionLogEntry]
+    /// 主动环检测的当前告警(命中的目标标识);nil = 无告警。UI 据此弹提示,用户可 dismiss。
+    public var loopWarning: String?
 
     /// 连接日志保留的最大条数;超出丢最旧。
     public static let connectionLogCap = 500
@@ -28,7 +30,8 @@ public struct AppState: Sendable, Equatable {
         activeProxyServerID: ProxyServerID? = nil,
         proxyRoutingMode: ProxyRoutingMode = .single,
         rules: [ProxyMatchRule] = [],
-        connectionLog: [ConnectionLogEntry] = []
+        connectionLog: [ConnectionLogEntry] = [],
+        loopWarning: String? = nil
     ) {
         self.isGlobalProxyEnabled = isGlobalProxyEnabled
         self.isEngineHealthy = isEngineHealthy
@@ -41,5 +44,6 @@ public struct AppState: Sendable, Equatable {
         self.proxyRoutingMode = proxyRoutingMode
         self.rules = rules
         self.connectionLog = connectionLog
+        self.loopWarning = loopWarning
     }
 }

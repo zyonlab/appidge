@@ -55,6 +55,9 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     // 每进程规则的同步快照:UDP 决策在 handleNewFlow 里必须同步返回(读 actor 是 async,来不及),
     // 所以在 applyRuleSet 时额外维护这份锁保护的快照。TCP 路径仍走 async 的 appliedRuleSetStore。
     private var storedPerProcessRules: [String: ProxyRuleDTO] = [:]
+    // 主动环检测(兜底安全网):同一目标在极短窗口内被反复捕获即疑似转发环。阈值刻意调高——真实
+    // 环会以每秒上千次的速度重捕,远超正常并发连接;精确阈值需真机微调(见 PROGRESS)。锁保护。
+    private var storedLoopDetector = LoopDetector(threshold: 50, windowSeconds: 1.0)
 
     private var proxyConfig: ProxyConfigMessage? {
         configLock.withLock { storedProxyConfig }
@@ -207,6 +210,17 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         await routingHistoryTracker.record(processID: processID, wasProxied: rule == .proxied)
 
         let (host, port) = ProxyDialer.hostPort(from: remoteEndpoint) ?? (remoteHostname ?? "?", 0)
+
+        // 主动环检测:把这次捕获喂给检测器,命中(同目标短窗口内反复捕获)就提示 app——
+        // 兜底 passive 的回环/上游/来源排除漏网的情况。
+        let loopSignature = "\(host):\(port)"
+        let looped = configLock.withLock {
+            storedLoopDetector.record(signature: loopSignature, now: Date().timeIntervalSince1970)
+        }
+        if looped, let transport {
+            Task { await transport.deliver(.loopDetected(signature: loopSignature)) }
+        }
+
         // 实际所用代理协议:按解析后的路由取第一跳的 kind——proxied 但降级成直连时记 nil,
         // 让连接日志里"到底走没走代理"如实。
         let proxyKind = ProxyDialer.representativeKind(rule: rule, config: proxyConfig, mode: routingMode)

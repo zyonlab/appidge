@@ -18,4 +18,8 @@ public enum Action: Sendable, Equatable {
     case removeMatchRule(RuleID)
     case reorderMatchRules([RuleID])
     case connectionEventReceived(ConnectionLogEntry)
+    /// 扩展主动检测到疑似转发环(signature = 命中目标)。
+    case loopWarningRaised(String)
+    /// 用户关闭环告警。
+    case dismissLoopWarning
 }

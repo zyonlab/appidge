@@ -7,21 +7,45 @@ struct ContentView: View {
     var store: Store
 
     var body: some View {
-        TabView {
-            DirectoryPaneView(store: store)
-                .tabItem { Label("目录", systemImage: "folder") }
-            RulesPaneView(store: store)
-                .tabItem { Label("规则", systemImage: "list.bullet") }
-            RulesEditorPaneView(store: store)
-                .tabItem { Label("规则表", systemImage: "list.number") }
-            ProxyServersPaneView(store: store)
-                .tabItem { Label("代理服务器", systemImage: "server.rack") }
-            ActivityMonitorPaneView(store: store)
-                .tabItem { Label("活动监视器", systemImage: "waveform.path.ecg") }
-            ConnectionLogPaneView(store: store)
-                .tabItem { Label("连接", systemImage: "point.3.filled.connected.trianglepath.dotted") }
+        VStack(spacing: 0) {
+            if let warning = store.state.loopWarning {
+                LoopWarningBanner(signature: warning) { store.dispatch(.dismissLoopWarning) }
+            }
+            TabView {
+                DirectoryPaneView(store: store)
+                    .tabItem { Label("目录", systemImage: "folder") }
+                RulesPaneView(store: store)
+                    .tabItem { Label("规则", systemImage: "list.bullet") }
+                RulesEditorPaneView(store: store)
+                    .tabItem { Label("规则表", systemImage: "list.number") }
+                ProxyServersPaneView(store: store)
+                    .tabItem { Label("代理服务器", systemImage: "server.rack") }
+                ActivityMonitorPaneView(store: store)
+                    .tabItem { Label("活动监视器", systemImage: "waveform.path.ecg") }
+                ConnectionLogPaneView(store: store)
+                    .tabItem { Label("连接", systemImage: "point.3.filled.connected.trianglepath.dotted") }
+            }
         }
         .frame(minWidth: 640, minHeight: 420)
+    }
+}
+
+/// 主动环检测告警条:passive 排除都挡不住、同一目标还在被反复捕获时,红条提示用户查上游/规则配置。
+private struct LoopWarningBanner: View {
+    let signature: String
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+            Text("检测到疑似转发环：\(signature) 被反复捕获。请检查上游/规则是否形成回路。")
+                .font(.callout)
+            Spacer()
+            Button("忽略", action: onDismiss)
+        }
+        .foregroundStyle(.white)
+        .padding(8)
+        .background(Color.red)
     }
 }
 

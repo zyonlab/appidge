@@ -694,4 +694,10 @@ SOCKS4/NTLM/Kerberos/便携版 ③公证需要人的凭据。
   - 合并后组合复验:SPM 421 测试全绿 · `swiftlint --strict` 0 · `xcodebuild` Debug 零并发警告。已装新 UI Debug build。
 - **已知小尾巴(下轮收)**:① `RouteText.color` 被 TrafficPane 也用,「直连」还是中性灰非绿——把语义色抽出两处共用;
   ② `MenuBarExtra` 是默认 `.menu` 样式,复杂样式被收着,要完整面板得切 `.menuBarExtraStyle(.window)`。
-- **UI 路线图(见 artifact)**:P1 结构大件 `NavigationSplitView + .inspector` 取代 `VSplitView` 未动,是下一步最划算的一改。
+- **P1 结构大件已落地**:`MainWindow` 从 `VSplitView` + 三个配置 sheet 改成
+  `NavigationSplitView`(侧栏:活动 / 规则 / 代理 / 档案)→ detail;「活动」= 连接表 + 底部流量 +
+  右侧 `.inspector` 看选中连接详情(进程/目标/路由/流量 + 就地建规则,复用 `RouteChip`)。配置面板
+  从 sheet 平移到侧栏常驻目的地;StatusBar 仍窗底常驻,回环告警仍顶栏。删除 `ConfigSheet`/
+  `ConfigSheetContainer`。App-only,`xcodebuild` Debug 零并发警告、`swiftlint --strict` 0。
+- **UI 路线图后续**:P0 余项(连接表实时速率列,需 rate 跟踪)、两个小尾巴(RouteText 语义色抽出共用 /
+  MenuBarExtra 切 `.window` 面板);P2(玻璃、带宽拖选筛列表、Inspector 取证详情、动效系统)。

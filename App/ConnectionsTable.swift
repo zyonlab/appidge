@@ -111,7 +111,8 @@ struct ConnectionsTable: View {
 /// 「规则·代理」列的语义胶囊:底色 + 描边 + SF Symbol + 文案。颜色随规则(复用 `RouteText.color`),
 /// 形状也编码语义 —— 直连→直行箭头、代理→分支、拦截→禁止手势,不只靠颜色区分,
 /// 对齐 Little Snitch / Proxifier 的一眼可读。保持紧凑以适配表格行高。
-private struct RouteChip: View {
+/// 非 private:连接表与右侧 Inspector 详情共用同一枚胶囊,保证路由呈现一致。
+struct RouteChip: View {
     let rule: ProxyRule
     let kind: ProxyKind?
 

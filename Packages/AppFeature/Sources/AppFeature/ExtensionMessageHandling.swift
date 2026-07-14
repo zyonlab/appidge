@@ -52,6 +52,7 @@ public enum ExtensionMessageHandling {
         switch dto {
         case .direct: .direct
         case .proxied: .proxied
+        case .block: .block
         }
     }
 

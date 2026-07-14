@@ -50,9 +50,9 @@ private struct MatchRuleRow: View {
                 Text("\(rule.appPattern)  ·  \(rule.hostPattern)\(Self.portSuffix(rule.portRange))")
                     .monospaced()
                     .font(.callout)
-                Text(rule.action == .proxied ? "代理" : "直连")
+                Text(RuleActionStyle.label(rule.action))
                     .font(.caption)
-                    .foregroundStyle(rule.action == .proxied ? Color.accentColor : Color.secondary)
+                    .foregroundStyle(RuleActionStyle.color(rule.action))
             }
             Spacer()
             Button("删除", role: .destructive, action: onRemove)
@@ -100,9 +100,10 @@ private struct AddMatchRuleForm: View {
             Picker("动作", selection: $action) {
                 Text("代理").tag(ProxyRule.proxied)
                 Text("直连").tag(ProxyRule.direct)
+                Text("拦截").tag(ProxyRule.block)
             }
             .pickerStyle(.segmented)
-            .frame(width: 200)
+            .frame(width: 260)
             Button("添加", action: add).disabled(!canAdd)
         }
         .textFieldStyle(.roundedBorder)
@@ -122,5 +123,24 @@ private struct AddMatchRuleForm: View {
         hostPattern = "*"
         portText = ""
         action = .proxied
+    }
+}
+
+/// 规则动作在列表里的展示样式(标签 + 颜色),三态共用一处,避免各处二元判断漏掉 block。
+private enum RuleActionStyle {
+    static func label(_ action: ProxyRule) -> String {
+        switch action {
+        case .proxied: "代理"
+        case .direct: "直连"
+        case .block: "拦截"
+        }
+    }
+
+    static func color(_ action: ProxyRule) -> Color {
+        switch action {
+        case .proxied: .accentColor
+        case .direct: .secondary
+        case .block: .red
+        }
     }
 }

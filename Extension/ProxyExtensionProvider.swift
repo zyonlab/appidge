@@ -153,6 +153,16 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             id: UUID().uuidString, processID: processID, host: host, port: port, rule: rule, proxyKind: proxyKind
         )
 
+        // 命中 Block 规则:直接拒绝这条 flow,不建立任何远端连接。记一条 closed 事件
+        // (rule=block、0 字节)让连接日志里能看到"这条被拦截了",然后返回。
+        if rule == .block {
+            flowLogger.log("flow blocked by rule: \(processID.value, privacy: .public) -> \(host, privacy: .public):\(port)")
+            tcpFlow.closeReadWithError(nil)
+            tcpFlow.closeWriteWithError(nil)
+            emitClose(context, failed: false)
+            return
+        }
+
         do {
             let remote = try await openRemote(to: remoteEndpoint, remoteHostname: remoteHostname, rule: rule)
             emitConnectionEvent(context, phase: .opened)

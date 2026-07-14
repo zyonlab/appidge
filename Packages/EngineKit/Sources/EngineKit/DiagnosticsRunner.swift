@@ -137,6 +137,8 @@ public struct DiagnosticsRunner: Sendable {
             return (true, "\(processID.value) 命中规则：direct（直连）。")
         case .proxied:
             return (true, "\(processID.value) 命中规则：proxied（代理）。")
+        case .block:
+            return (true, "\(processID.value) 命中规则：block（拦截，拒绝连接）。")
         }
     }
 

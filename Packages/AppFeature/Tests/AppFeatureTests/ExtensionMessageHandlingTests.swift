@@ -98,6 +98,20 @@ struct ExtensionMessageHandlingTests {
         ))])
     }
 
+    @Test("a blocked connection event maps rule .block through to Core (proxyKind nil)")
+    func connectionEventBlockedMapsRule() {
+        let dto = ConnectionEventDTO(
+            id: "c3", processID: ProcessIdentifierDTO("com.ads"), targetHost: "ads.example.com", targetPort: 443,
+            rule: .block, proxyKind: nil, phase: .closed, bytesUp: 0, bytesDown: 0
+        )
+        let actions = ExtensionMessageHandling.actions(for: .connectionEvent(dto))
+        guard case .connectionEventReceived(let entry) = actions.first else {
+            Issue.record("expected connectionEventReceived"); return
+        }
+        #expect(entry.rule == .block)
+        #expect(entry.proxyKind == nil)
+    }
+
     @Test("a direct connection event maps proxyKind nil")
     func connectionEventDirectNilKind() {
         let dto = ConnectionEventDTO(

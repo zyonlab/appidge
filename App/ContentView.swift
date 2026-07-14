@@ -75,6 +75,14 @@ struct ActivityMonitorPaneView: View {
     }
 
     var body: some View {
+        VStack(spacing: 0) {
+            GlobalTrafficHeader(store: store)
+            Divider()
+            processList
+        }
+    }
+
+    private var processList: some View {
         List(sortedProcesses, id: \.id) { process in
             HStack {
                 Text(process.displayName)
@@ -99,10 +107,61 @@ struct ActivityMonitorPaneView: View {
     }
 }
 
+/// 活动监视器顶部的全局流量条:累计上下行 + 实时速率 + 最活跃进程。速率不靠定时器——
+/// 每当流量批量到达(store 更新、总量变化)就用两次快照的真实间隔算一次(elapsed 传入
+/// `TrafficStatsAggregator.rate`),纯响应式刷新。
+private struct GlobalTrafficHeader: View {
+    var store: Store
+    @State private var rate = TrafficStatsAggregator.ThroughputRate(bytesUpPerSecond: 0, bytesDownPerSecond: 0)
+    @State private var previousTotals: (up: Int64, down: Int64) = (0, 0)
+    @State private var previousAt = Date()
+
+    private var processes: [MonitoredProcess] { Array(store.state.processes.values) }
+    private var totals: (up: Int64, down: Int64) { TrafficStatsAggregator.totals(processes) }
+    private var topTalker: MonitoredProcess? {
+        TrafficStatsAggregator.topByThroughput(processes, limit: 1).first
+    }
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("全局  ↑ \(TrafficFormat.bytes(totals.up))   ↓ \(TrafficFormat.bytes(totals.down))")
+                    .monospacedDigit()
+                Text("速率  ↑ \(TrafficFormat.rate(rate.bytesUpPerSecond))   ↓ \(TrafficFormat.rate(rate.bytesDownPerSecond))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            Spacer()
+            if let top = topTalker, top.stats.bytesUp &+ top.stats.bytesDown > 0 {
+                Text("最活跃：\(top.displayName)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 6)
+        .onChange(of: totals.up &+ totals.down) { _, _ in
+            let now = Date()
+            rate = TrafficStatsAggregator.rate(
+                previous: previousTotals, current: totals, elapsedSeconds: now.timeIntervalSince(previousAt)
+            )
+            previousTotals = totals
+            previousAt = now
+        }
+    }
+}
+
 struct MenuBarView: View {
     var store: Store
 
+    private var totals: (up: Int64, down: Int64) {
+        TrafficStatsAggregator.totals(Array(store.state.processes.values))
+    }
+
     var body: some View {
+        Text("↑ \(TrafficFormat.bytes(totals.up))   ↓ \(TrafficFormat.bytes(totals.down))")
+        Divider()
         Toggle("全局代理", isOn: Binding(
             get: { store.state.isGlobalProxyEnabled },
             set: { store.dispatch(.setGlobalProxyEnabled($0)) }

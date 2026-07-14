@@ -4,6 +4,7 @@ public enum Reducer {
         // cyclomatic_complexity 阈值内——不是真有分支逻辑，只是 Action 的 case 多。
         // 前两组不匹配就返回 nil 交给下一组，最后一组兜底非可选。
         reduceProxyConfig(state, action)
+            ?? reduceMatchRules(state, action)
             ?? reduceProcessAndFlow(state, action)
             ?? reduceLifecycle(state, action)
     }
@@ -19,6 +20,20 @@ public enum Reducer {
             return removeProxyServer(id, state)
         case .setActiveProxyServer(let id):
             return setActiveProxyServer(id, state)
+        default:
+            return nil
+        }
+    }
+
+    /// 细粒度规则表这一组 action。
+    private static func reduceMatchRules(_ state: AppState, _ action: Action) -> (AppState, [Effect])? {
+        switch action {
+        case .addMatchRule(let rule):
+            return addMatchRule(rule, state)
+        case .removeMatchRule(let id):
+            return removeMatchRule(id, state)
+        case .reorderMatchRules(let order):
+            return reorderMatchRules(order, state)
         default:
             return nil
         }
@@ -61,10 +76,53 @@ public enum Reducer {
         }
     }
 
+    /// 路由相关状态变了就产出"把完整规则集推给扩展"的 effect：全局开关 + 非默认的每进程规则
+    /// + 细粒度规则表。app 侧 effectHandler 翻成 RuleSetMessage 发出。
+    private static func ruleSetPush(_ state: AppState) -> Effect {
+        let assignments = state.processes.compactMapValues { $0.rule == .direct ? nil : $0.rule }
+        return .applyRuleSet(
+            globalProxyEnabled: state.isGlobalProxyEnabled,
+            assignments: assignments,
+            matchRules: state.rules
+        )
+    }
+
     private static func setGlobalProxyEnabled(_ enabled: Bool, _ state: AppState) -> (AppState, [Effect]) {
         var state = state
         state.isGlobalProxyEnabled = enabled
-        return (state, [])
+        return (state, [ruleSetPush(state)])
+    }
+
+    private static func addMatchRule(_ rule: ProxyMatchRule, _ state: AppState) -> (AppState, [Effect]) {
+        var state = state
+        state.rules.append(rule)
+        return (state, [ruleSetPush(state)])
+    }
+
+    private static func removeMatchRule(_ id: RuleID, _ state: AppState) -> (AppState, [Effect]) {
+        var state = state
+        guard state.rules.contains(where: { $0.id == id }) else { return (state, []) }
+        state.rules.removeAll { $0.id == id }
+        return (state, [ruleSetPush(state)])
+    }
+
+    /// 按给定 id 顺序重排；未提及的规则保持原相对顺序、追加在后；未知 id 忽略。
+    private static func reorderMatchRules(_ order: [RuleID], _ state: AppState) -> (AppState, [Effect]) {
+        var state = state
+        let byID = Dictionary(state.rules.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var reordered: [ProxyMatchRule] = []
+        var used = Set<RuleID>()
+        for id in order where !used.contains(id) {
+            if let rule = byID[id] {
+                reordered.append(rule)
+                used.insert(id)
+            }
+        }
+        for rule in state.rules where !used.contains(rule.id) {
+            reordered.append(rule)
+        }
+        state.rules = reordered
+        return (state, [ruleSetPush(state)])
     }
 
     private static func processDiscovered(
@@ -80,7 +138,7 @@ public enum Reducer {
     private static func assignRule(processID: ProcessID, rule: ProxyRule, _ state: AppState) -> (AppState, [Effect]) {
         var state = state
         state.processes[processID]?.rule = rule
-        return (state, [])
+        return (state, [ruleSetPush(state)])
     }
 
     private static func flowStatsDeltaReceived(

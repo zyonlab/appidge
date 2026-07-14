@@ -6,4 +6,7 @@ public enum Effect: Sendable, Equatable {
     /// 翻成 IPCContract 消息经 AppSideTransport 发出）。`servers` 按 id 排序、确定，
     /// 便于测试断言，也让重复推送幂等。
     case applyProxyConfig(servers: [ProxyServer], activeID: ProxyServerID?)
+    /// 路由相关状态变了（全局开关 / 每进程规则 / 细粒度规则表），把完整规则集推给扩展。
+    /// `assignments` 只含非默认（非 `.direct`）的每进程规则；扩展对未知进程回落 `.direct`。
+    case applyRuleSet(globalProxyEnabled: Bool, assignments: [ProcessID: ProxyRule], matchRules: [ProxyMatchRule])
 }

@@ -13,4 +13,7 @@ public enum Action: Sendable, Equatable {
     case updateProxyServer(ProxyServer)
     case removeProxyServer(ProxyServerID)
     case setActiveProxyServer(ProxyServerID?)
+    case addMatchRule(ProxyMatchRule)
+    case removeMatchRule(RuleID)
+    case reorderMatchRules([RuleID])
 }

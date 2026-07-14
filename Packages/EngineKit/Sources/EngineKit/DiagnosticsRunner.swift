@@ -226,17 +226,28 @@ public struct DiagnosticsRunner: Sendable {
 /// (see the integration note in the task report).
 public actor AppliedRuleSetStore: CurrentRuleLookup {
     private var assignments: [ProcessIdentifierDTO: ProxyRuleDTO] = [:]
+    private var matchRules: [MatchRuleDTO] = []
 
     public init() {}
 
+    /// 全量替换:app 每次下发的都是当前完整规则集,所以把 assignments 整个换掉
+    /// (被改回默认的进程规则会因此被丢弃,而不是残留),match 规则表也整份替换。
     public func apply(_ ruleSet: RuleSetMessage) {
+        var next: [ProcessIdentifierDTO: ProxyRuleDTO] = [:]
         for assignment in ruleSet.assignments {
-            assignments[assignment.processID] = assignment.rule
+            next[assignment.processID] = assignment.rule
         }
+        assignments = next
+        matchRules = ruleSet.matchRules
     }
 
     public func currentRule(for processID: ProcessIdentifierDTO) async -> ProxyRuleDTO? {
         assignments[processID]
+    }
+
+    /// 细粒度规则表匹配:`app` 是进程签名标识,`host`/`port` 是目标。命中返回动作,否则 nil。
+    public func matchRule(app: String, host: String, port: UInt16) async -> ProxyRuleDTO? {
+        RuleMatcher.firstMatch(matchRules, app: app, host: host, port: port)
     }
 }
 

@@ -29,6 +29,12 @@ struct AppidgeApp: App {
                 let message = ProxyConfigMapping.proxyConfigMessage(servers: servers, activeID: activeID)
                 await transport.send(message)
                 return nil // 纯下发，扩展据此更新 active 上游 + 上游排除集合
+            case .applyRuleSet(let globalProxyEnabled, let assignments, let matchRules):
+                let message = RuleSetMapping.ruleSetMessage(
+                    globalProxyEnabled: globalProxyEnabled, assignments: assignments, matchRules: matchRules
+                )
+                await transport.send(message)
+                return nil // 纯下发，扩展据此更新每进程规则 + 细粒度规则表
             }
         })
         _store = State(initialValue: store)

@@ -332,6 +332,33 @@ struct AppliedRuleSetStoreTests {
         let rule = await store.currentRule(for: target)
         #expect(rule == .proxied)
     }
+
+    @Test("apply stores the match-rule table; matchRule evaluates it first-match")
+    func matchRuleEvaluation() async {
+        let store = AppliedRuleSetStore()
+        await store.apply(RuleSetMessage(
+            assignments: [],
+            matchRules: [
+                MatchRuleDTO(id: "1", appPattern: "*", hostPattern: "*.internal", portRange: nil, rule: .direct),
+                MatchRuleDTO(id: "2", appPattern: "*", hostPattern: "*", portRange: nil, rule: .proxied)
+            ],
+            globalProxyEnabled: true
+        ))
+        #expect(await store.matchRule(app: "x", host: "wiki.internal", port: 443) == .direct)
+        #expect(await store.matchRule(app: "x", host: "example.com", port: 443) == .proxied)
+    }
+
+    @Test("a later apply replaces the match-rule table too (no stale rules)")
+    func matchRuleReplaced() async {
+        let store = AppliedRuleSetStore()
+        await store.apply(RuleSetMessage(
+            assignments: [],
+            matchRules: [MatchRuleDTO(id: "old", appPattern: "*", hostPattern: "*", portRange: nil, rule: .proxied)],
+            globalProxyEnabled: true
+        ))
+        await store.apply(RuleSetMessage(assignments: [], matchRules: [], globalProxyEnabled: true))
+        #expect(await store.matchRule(app: "x", host: "example.com", port: 443) == nil)
+    }
 }
 
 // MARK: - RoutingHistoryTracker (real RecentRoutingLookup)

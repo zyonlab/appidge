@@ -152,6 +152,10 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             if LoopbackDetector.isLoopback(host: host) { return .direct }
             let upstreams = Set((proxyConfig?.servers ?? []).map { UpstreamEndpoint(host: $0.host, port: $0.port) })
             if UpstreamExclusion.isUpstream(host: host, port: port, upstreams: upstreams) { return .direct }
+            // 细粒度规则表(进程 × 主机 × 端口)优先于每进程粗粒度规则;命中即用其动作。
+            if let matched = await appliedRuleSetStore.matchRule(app: processID.value, host: host, port: port) {
+                return matched
+            }
         }
         return await appliedRuleSetStore.currentRule(for: processID) ?? .direct
     }

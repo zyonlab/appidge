@@ -531,3 +531,44 @@ AppFeature 100 · ArchitectureTests 11),`xcodebuild` Debug 零并发警告,`swif
 **仍未动的 backlog**（下一批次）：A1 UDP/QUIC(最大正确性缺口,需定策略:代理 UDP 还是先拦截止漏)、B5 单代理探活按钮、
 B7 localhost 直连提升为可见设置(是否可关需产品决策——关掉有环/断本地开发风险)、C 高级(主动环检测弹窗/多 profile/
 右键单连接指定代理/SOCKS4·NTLM·Kerberos/.dmp 抓包/便携版)、D 公证脚本补全(需你的公证凭据)。
+
+## Phase 8：接线激活 + A1 止漏（批次 2，串行自作者,4 个 PR）
+
+批次 1 的三个基础层是「已合并未接线」;这一批把它们接线激活,并做掉 B7 与最大正确性缺口 A1。
+这些多是 App/Extension + xcodebuild(worktree agent 跑不了签名),故我串行自己写,更稳。
+
+- **PR #21 A2 接线 + B7**:扩展 `effectiveRule` 调 `ProcessOriginExclusion`,我们自己组件(app/扩展,
+  bundle id 从 `Bundle.main` 取父级)发起的流量在任何地址判定前强制直连——转发环硬化真正生效。
+  B7:规则页顶部一条只读信息行,展示内置的 localhost/回环→直连(不可关闭,关掉有环/断本地开发风险)。
+- **PR #22 A3 接线**:`IPCReceiver` 加可选 `ConnectionLogFileStore`,每条 connectionEvent 顺带落盘
+  (rolling JSONL);App 启动时 `loadRecent(200)` 回放进 connectionLog——连接日志重启不丢。加了一条
+  经 IPCReceiver 端到端的测试(事件既进 state 又进文件)。
+- **PR #23 C9 接线**:菜单栏显示累计 ↑/↓;活动监视器表头显示累计 + **实时速率**(不用定时器——每次流量
+  批量到达就用两次快照的真实间隔算一次)+ 最活跃进程。新增 `TrafficFormat`(ByteCountFormatter)。
+- **PR #24 A1 拦截 UDP/QUIC 止漏**(最大正确性缺口):
+  - 发现 provider **此前完全没应用 `NETransparentProxyNetworkSettings`**——拦截从未真正配置。现在
+    `startProxy` 应用它,拦截所有出站 TCP+UDP(`.any`);Apple 的 nil/nil 规则匹配除回环外的一切,正好
+    与 LoopbackDetector 一致。
+  - `handleNewFlow` 拆成 TCP(不变)+ UDP。UDP 决策必须同步,而规则存储是 actor,故额外维护锁保护的
+    每进程规则快照。
+  - 新增 EngineKit **`UDPFlowPolicy`(纯,6 测试)**:proxied/blocked 进程的 UDP → 拦截(open-then-close
+    drop,逼 QUIC 回落 TCP 走代理,对齐 Surge/Clash 的 block-QUIC);direct/自己组件 → 放行直连。
+  - **调研过 Proxifier/Surge/Clash/proxychains**:只有 SOCKS5 能载 UDP(UDP ASSOCIATE),HTTP CONNECT
+    天生不行;主流对泄漏的默认答案就是 block-QUIC。完整 SOCKS5 UDP 代理 + 用户开关列为后续(A1b)。
+
+**合并后集成复验**:331 个 SPM 测试全绿(Core 47 · IPCContract 11 · EngineKit 161 · AppFeature 101 ·
+ArchitectureTests 11),`xcodebuild` Debug 零并发警告,`swiftlint --strict` 零违规(107 文件)。
+
+### 本批新增的「待人工自测」(设备限定,系统扩展获批后一起验)
+- **A1 是重点**:①网络设置生效、拦截真的发生(这是「拦截从未配置过」第一次被真机检验)②proxied 应用的
+  QUIC 被拦、回落 TCP 走代理 ③direct 应用的 UDP 不受影响。
+- A3:产生连接 → 退出重开 → 连接列表仍有历史。
+- C9:菜单栏总量、活动监视器速率随真流量跳动。
+- A2:自己 app/扩展发起的连接被记为 direct(结合 `sourceAppSigningIdentifier` 的实际粒度)。
+
+### 仍未动的 backlog（下一批可续）
+- **A1b**:UDP 拦截做成用户开关 + 完整 SOCKS5 UDP ASSOCIATE 代理。
+- **B5**:单代理探活按钮(Proxy Checker)。
+- **小尾巴**:活动监视器/规则页的每进程规则选择器还只有 直连/代理,缺「拦截」(B4 的 UI 尾巴)。
+- **C 高级**:主动无限环检测弹窗 / 多 profile / 右键单连接指定代理 / SOCKS4·NTLM·Kerberos / .dmp 抓包 / 便携版。
+- **D**:`archive-and-notarize.sh` 补全(需你的公证凭据)。

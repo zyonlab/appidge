@@ -42,7 +42,8 @@ public enum ExtensionMessageHandling {
                 proxyKind: event.proxyKind.map(coreKind(from:)),
                 phase: corePhase(from: event.phase),
                 bytesUp: event.bytesUp,
-                bytesDown: event.bytesDown
+                bytesDown: event.bytesDown,
+                openedAt: event.openedAt
             ))]
 
         case .loopDetected(let signature):

@@ -129,9 +129,10 @@ struct CodableRoundTripTests {
     func connectionEventRoundTrip() throws {
         let proxied = ConnectionEventDTO(
             id: "a", processID: ProcessIdentifierDTO("p"), targetHost: "h", targetPort: 80,
-            rule: .proxied, proxyKind: .httpConnect, phase: .closed, bytesUp: 123, bytesDown: 456
+            rule: .proxied, proxyKind: .httpConnect, phase: .closed, bytesUp: 123, bytesDown: 456,
+            openedAt: Date(timeIntervalSince1970: 1_700_000_000)
         )
-        #expect(try roundTrip(proxied) == proxied)
+        #expect(try roundTrip(proxied) == proxied) // 含 openedAt 时间戳一并 round-trip
 
         let direct = ConnectionEventDTO(
             id: "b", processID: ProcessIdentifierDTO("p"), targetHost: "h", targetPort: 80,

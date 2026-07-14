@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 import Core
 import IPCContract
 @testable import AppFeature
@@ -86,15 +87,18 @@ struct ExtensionMessageHandlingTests {
 
     @Test("connectionEvent maps every field into a connectionEventReceived action")
     func connectionEventMapsFields() {
+        let openedAt = Date(timeIntervalSince1970: 1_700_000_000)
         let dto = ConnectionEventDTO(
             id: "c1", processID: ProcessIdentifierDTO("com.x"), targetHost: "example.com", targetPort: 443,
-            rule: .proxied, proxyKind: .httpConnect, phase: .closed, bytesUp: 12, bytesDown: 34
+            rule: .proxied, proxyKind: .httpConnect, phase: .closed, bytesUp: 12, bytesDown: 34,
+            openedAt: openedAt
         )
         let actions = ExtensionMessageHandling.actions(for: .connectionEvent(dto))
 
         #expect(actions == [.connectionEventReceived(Core.ConnectionLogEntry(
             id: "c1", processID: Core.ProcessID("com.x"), host: "example.com", port: 443,
-            rule: .proxied, proxyKind: .httpConnect, phase: .closed, bytesUp: 12, bytesDown: 34
+            rule: .proxied, proxyKind: .httpConnect, phase: .closed, bytesUp: 12, bytesDown: 34,
+            openedAt: openedAt
         ))])
     }
 

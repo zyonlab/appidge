@@ -230,7 +230,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             : nil
         let context = ConnectionContext(
             id: UUID().uuidString, processID: processID, host: host, port: port,
-            rule: rule, proxyKind: proxyKind, capture: capture
+            rule: rule, proxyKind: proxyKind, openedAt: Date(), capture: capture
         )
 
         // 命中 Block 规则:直接拒绝这条 flow,不建立任何远端连接。记一条 closed 事件
@@ -262,7 +262,8 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         let bytes = context.snapshotBytes()
         let event = ConnectionEventDTO(
             id: context.id, processID: context.processID, targetHost: context.host, targetPort: context.port,
-            rule: context.rule, proxyKind: context.proxyKind, phase: phase, bytesUp: bytes.up, bytesDown: bytes.down
+            rule: context.rule, proxyKind: context.proxyKind, phase: phase, bytesUp: bytes.up, bytesDown: bytes.down,
+            openedAt: context.openedAt
         )
         Task { await transport.deliver(.connectionEvent(event)) }
     }

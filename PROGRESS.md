@@ -572,3 +572,34 @@ ArchitectureTests 11),`xcodebuild` Debug 零并发警告,`swiftlint --strict` �
 - **小尾巴**:活动监视器/规则页的每进程规则选择器还只有 直连/代理,缺「拦截」(B4 的 UI 尾巴)。
 - **C 高级**:主动无限环检测弹窗 / 多 profile / 右键单连接指定代理 / SOCKS4·NTLM·Kerberos / .dmp 抓包 / 便携版。
 - **D**:`archive-and-notarize.sh` 补全(需你的公证凭据)。
+
+## Phase 9：backlog 批次 2 —— B5 + 每进程拦截尾巴 + 四个 C 高级项(worktree agent 基础层 + 我串行接线)
+
+用户挑定 C 只做:主动环检测弹窗、多 profile、右键单连接指定代理、.dmp 抓包;外加两个快尾巴(每进程拦截选择器、B5 探活)。
+
+**并行 agent 产出的三个纯基础层(worktree 隔离,只加新文件、SPM 可测):**
+- **LoopDetector（EngineKit，11 测试，PR #27）**:滑窗计数的转发环检测器,时间戳外部传入、确定性。命中一次就清该 signature 窗口(每爆发只报一次)。
+- **ProfileStore / ProfileCollection（AppFeature,26 测试,PR #25）**:多命名档案模型 + JSON 持久化 + Mock。add/remove/rename/setActive 带「active 永远指向存在的档案或 nil」不变量。
+- **ProxyReachability（AppFeature,8 测试,PR #26）**:探活接缝 —— `ProxyReachabilityProbe` 协议 + Mock + `ProxyChecker` 编排(结果→终态),零 Network 依赖。
+
+**⚠️ worktree 隔离踩坑记一笔**:一个 agent 起手 `cd /Users/admin/appidge`(共享 checkout)而非留在自己 worktree,`git checkout -b` 把主 checkout 的分支切走了,又用 reflog「还原」时把我一条未推的小 commit 弄丢。教训写进 CLAUDE 心得:**agent 必须留在自己 worktree、绝不 cd 主 repo;主 checkout 在 agent 跑 git 期间不做 commit/branch**。丢的只是 2 行 picker 改动,已重做。三个 agent 全绿后串行 merge,没再出问题。
+
+**我串行接线的六个 PR(App/Extension + xcodebuild,worktree 跑不了签名):**
+- **#28 每进程「拦截」选择器 + B5 探活按钮**:规则页/活动监视器的每进程选择器补「拦截」;代理行加「测试」跑真实 `NWConnectionProxyProbe`(新 App target,拨 host:port,ready/失败/3s 超时),显示绿勾/红叉/转圈。
+- **#29 右键单连接指定代理**:连接行右键「走代理/直连/拦截」→ 从这条连接现拼精确 match 规则(进程×主机×端口)。
+- **#30 主动环检测告警**:`ExtensionToAppMessage.loopDetected` + `AppState.loopWarning` + reducer + 映射;扩展持锁保护 LoopDetector(阈值 50/1s,真实环每秒重捕上千次),命中 deliver;App 顶部红条可忽略。
+- **#31 多 profile 库**:`Core.resetState`(切档案时先 reset 再灌,干净替换)+ `ProfileCollection.updateConfiguration`;App `ProfilesModel`(@Observable)管库 + 「档案」tab(存为新档案/载入/删除,active 打勾)。做成附加式命名快照,不动工作配置 autosave。
+- **#32 .dmp 逐连接抓包**:`isPacketCaptureEnabled` 开关(默认关)全链路;扩展 `PacketCaptureWriter` 把每条连接上下行写 `<appgroup>/captures/*.dmp`(块格式 [方向1B][长度4B][字节]),ConnectionContext 持可选 writer、pump 喂、teardown 关。连接页头部开关。
+
+**合并后集成复验**:388 个 SPM 测试全绿(Core 55 · IPCContract 11 · EngineKit 172 · AppFeature 139 · ArchitectureTests 11),`xcodebuild` Debug 零并发警告,`swiftlint --strict` 零违规(121 文件)。
+
+### 本批「待人工自测」(设备限定)
+- 环检测:配一个回环上游制造环 → 确认红条出现(阈值需真机微调)。
+- .dmp:开开关、发流量 → 确认 `captures/*.dmp` 出现且内容可解。
+- B5 探活/多 profile 载入/右键建规则:配活代理后走一遍。
+
+### 仍未动(用户未选,留档)
+- A1b:UDP 拦截做成开关 + 完整 SOCKS5 UDP ASSOCIATE 代理。
+- C:SOCKS4/4A、HTTPS 的 NTLM/Kerberos 认证;便携版。
+- D:`archive-and-notarize.sh` 补全(需公证凭据)。
+- Proxifier 对齐文档的 P0/P1/P2 + 本轮 C 选项已全部落地;剩下的都是上面这些明确未选项 + 一次性人工步骤(系统扩展批准)。

@@ -6,22 +6,118 @@ import AppFeature
 /// 配置弹 sheet、全局设置进 `Settings` 场景。这里只保留仍被复用的两个小件:菜单栏内容 + 环告警条。
 /// (旧的七 tab —— 目录/规则/规则表/活动监视器/连接 —— 的职责已合进主窗口 + sheets + Settings。)
 
-/// 菜单栏下拉:一眼看流量总量 + 全局开关 + 退出。
+/// 菜单栏下拉:一眼看状态的迷你仪表盘(对齐 iStat Menus / Little Snitch 的状态菜单)——
+/// 引擎/扩展健康 · 全局吞吐 · 活动连接数 · 流量占用 Top 5 · 全局开关 · 设置/退出。
+/// 只读 `store.state`、只 `dispatch(action)`,不持任何本地状态(对齐单向数据流)。
 struct MenuBarView: View {
     var store: Store
 
+    /// 状态行的呈现要素:SF Symbol + 语义色 + 文案(+ 可选 tooltip)。永不只靠颜色——
+    /// 符号与文案同时表意,色盲/高对比场景也读得懂。
+    private struct StatusPresentation {
+        let symbol: String
+        let tint: Color
+        let text: String
+        let help: String?
+    }
+
+    /// 先看扩展装没装(未接入/待批准/安装中/未安装都得先说清,否则"引擎正常"会误导),
+    /// 装上了(`.active`)再看引擎健康度。与底部状态栏(`StatusBar`)同一套判定,换成菜单里
+    /// 更直观的符号呈现。绿=已接管,橙=待批准/安装中,红=未安装/异常,次要灰=未接入。
+    private var status: StatusPresentation {
+        switch store.state.extensionActivation {
+        case .active:
+            return store.state.isEngineHealthy
+                ? StatusPresentation(symbol: "checkmark.shield.fill", tint: .green,
+                                     text: "已接管", help: nil)
+                : StatusPresentation(symbol: "exclamationmark.triangle.fill", tint: .red,
+                                     text: "引擎异常 · 已回退直连", help: nil)
+        case .inactive:
+            return StatusPresentation(symbol: "bolt.horizontal.circle", tint: .secondary,
+                                      text: "扩展未接入",
+                                      help: "系统扩展还没装上/批准——去设置里点「启用」并在系统设置里允许后,才会接管流量。")
+        case .activating:
+            return StatusPresentation(symbol: "arrow.triangle.2.circlepath", tint: .orange,
+                                      text: "扩展安装中…", help: nil)
+        case .needsApproval:
+            return StatusPresentation(symbol: "exclamationmark.circle.fill", tint: .orange,
+                                      text: "待批准 · 系统设置里点允许",
+                                      help: "打开「系统设置 → 隐私与安全性」,点「允许」加载 appidge 的系统扩展。")
+        case .failed(let reason):
+            return StatusPresentation(symbol: "xmark.octagon.fill", tint: .red,
+                                      text: "扩展未安装", help: reason)
+        }
+    }
+
+    /// 全局累计上/下行,复用纯计算 `TrafficStatsAggregator`。
     private var totals: (up: Int64, down: Int64) {
         TrafficStatsAggregator.totals(Array(store.state.processes.values))
     }
 
+    /// 活动连接 = 连接日志里仍处于 `.opened` 的条数(与 `StatusBar` 同口径)。
+    private var activeConnectionCount: Int {
+        store.state.connectionLog.reduce(into: 0) { if $1.phase == .opened { $0 += 1 } }
+    }
+
+    /// 吞吐(上+下)最高的前 5 个进程,复用纯计算 `TrafficStatsAggregator.topByThroughput`。
+    private var topProcesses: [MonitoredProcess] {
+        TrafficStatsAggregator.topByThroughput(Array(store.state.processes.values), limit: 5)
+    }
+
+    private func upDown(_ up: Int64, _ down: Int64) -> String {
+        "↑ \(TrafficFormat.bytes(up))  ↓ \(TrafficFormat.bytes(down))"
+    }
+
     var body: some View {
-        Text("↑ \(TrafficFormat.bytes(totals.up))   ↓ \(TrafficFormat.bytes(totals.down))")
+        // 1. 状态:符号 + 语义色 + 文案三者齐备,不只靠颜色。
+        Label(status.text, systemImage: status.symbol)
+            .foregroundStyle(status.tint)
+            .help(status.help ?? "")
+
         Divider()
+
+        // 2 + 3. 全局吞吐总量 + 活动连接数。
+        Text("总流量  \(upDown(totals.up, totals.down))")
+            .monospacedDigit()
+        Text("活动连接 \(activeConnectionCount)")
+            .foregroundStyle(.secondary)
+
+        Divider()
+
+        // 4. 流量占用 Top 5(无流量时给一条克制的占位)。
+        Text("流量占用 Top 5")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        if topProcesses.isEmpty {
+            Text("暂无流量")
+                .foregroundStyle(.secondary)
+        } else {
+            ForEach(topProcesses) { process in
+                HStack {
+                    Text(process.displayName)
+                        .lineLimit(1)
+                    Spacer(minLength: 12)
+                    Text(upDown(process.stats.bytesUp, process.stats.bytesDown))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+
+        Divider()
+
+        // 5. 全局代理总开关(与主窗口 / 设置同一绑定)。
         Toggle("全局代理", isOn: Binding(
             get: { store.state.isGlobalProxyEnabled },
             set: { store.dispatch(.setGlobalProxyEnabled($0)) }
         ))
+
         Divider()
+
+        // 6. 既有动作:设置 + 退出。
+        SettingsLink {
+            Text("设置…")
+        }
         Button("退出") {
             NSApplication.shared.terminate(nil)
         }

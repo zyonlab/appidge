@@ -20,6 +20,13 @@ struct ConnectionLogPaneView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
+                Toggle("抓包(.dmp)", isOn: Binding(
+                    get: { store.state.isPacketCaptureEnabled },
+                    set: { store.dispatch(.setPacketCaptureEnabled($0)) }
+                ))
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .help("开启后逐连接把原始字节写进 App Group 容器的 captures/*.dmp（占磁盘、涉隐私，按需开）")
             }
 
             if entries.isEmpty {

@@ -72,6 +72,11 @@ struct ProxyConfigMappingTests {
         #expect(ProxyConfigMapping.routingModeMessage(core) == .applyRoutingMode(dto))
     }
 
+    @Test("packetCaptureMessage maps the bool into setPacketCapture", arguments: [true, false])
+    func packetCaptureMapping(enabled: Bool) {
+        #expect(ProxyConfigMapping.packetCaptureMessage(enabled) == .setPacketCapture(enabled))
+    }
+
     @Test(
         "ProxyKind maps 1:1 to ProxyKindDTO across all cases",
         arguments: [

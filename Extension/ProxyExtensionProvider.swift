@@ -58,6 +58,12 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     // 主动环检测(兜底安全网):同一目标在极短窗口内被反复捕获即疑似转发环。阈值刻意调高——真实
     // 环会以每秒上千次的速度重捕,远超正常并发连接;精确阈值需真机微调(见 PROGRESS)。锁保护。
     private var storedLoopDetector = LoopDetector(threshold: 50, windowSeconds: 1.0)
+    // 逐连接抓包开关(默认关)。锁保护;开着时 beginFlow 给每条连接建一个 .dmp 写入器。
+    private var storedPacketCaptureEnabled = false
+
+    private var packetCaptureEnabled: Bool {
+        configLock.withLock { storedPacketCaptureEnabled }
+    }
 
     private var proxyConfig: ProxyConfigMessage? {
         configLock.withLock { storedProxyConfig }
@@ -136,6 +142,8 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             }
         case .applyRoutingMode(let mode):
             configLock.withLock { storedRoutingMode = mode }
+        case .setPacketCapture(let enabled):
+            configLock.withLock { storedPacketCaptureEnabled = enabled }
         }
     }
 
@@ -224,8 +232,16 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         // 实际所用代理协议:按解析后的路由取第一跳的 kind——proxied 但降级成直连时记 nil,
         // 让连接日志里"到底走没走代理"如实。
         let proxyKind = ProxyDialer.representativeKind(rule: rule, config: proxyConfig, mode: routingMode)
+        // 抓包开着时给这条连接建一个 .dmp 写入器;关着(或拿不到容器)就 nil,pump 里是 no-op。
+        let capture = packetCaptureEnabled
+            ? PacketCaptureWriter.forConnection(
+                appGroup: appGroup, processID: processID.value, host: host, port: port,
+                at: Date().timeIntervalSince1970
+            )
+            : nil
         let context = ConnectionContext(
-            id: UUID().uuidString, processID: processID, host: host, port: port, rule: rule, proxyKind: proxyKind
+            id: UUID().uuidString, processID: processID, host: host, port: port,
+            rule: rule, proxyKind: proxyKind, capture: capture
         )
 
         // 命中 Block 规则:直接拒绝这条 flow,不建立任何远端连接。记一条 closed 事件
@@ -265,6 +281,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     /// 结束事件只发一次(两个 pump 都可能触发 teardown)。
     private func emitClose(_ context: ConnectionContext, failed: Bool) {
         guard context.markClosedOnce() else { return }
+        context.capture?.close() // 抓包文件随连接结束落盘关闭。
         emitConnectionEvent(context, phase: failed ? .failed : .closed)
     }
 
@@ -335,6 +352,7 @@ private extension ProxyExtensionProvider {
                     return
                 }
                 context.addUp(Int64(data.count))
+                context.capture?.write(outbound: true, data)
                 Task { await router.route(processID: context.processID, bytesUp: Int64(data.count), bytesDown: 0, rule: context.rule, now: Date()) }
                 self.pumpClientToRemote(tcpFlow: tcpFlow, remote: remote, context: context, router: router)
             })
@@ -362,6 +380,7 @@ private extension ProxyExtensionProvider {
                     return
                 }
                 context.addDown(Int64(data.count))
+                context.capture?.write(outbound: false, data)
                 Task { await router.route(processID: context.processID, bytesUp: 0, bytesDown: Int64(data.count), rule: context.rule, now: Date()) }
                 self.pumpRemoteToClient(tcpFlow: tcpFlow, remote: remote, context: context, router: router)
             }

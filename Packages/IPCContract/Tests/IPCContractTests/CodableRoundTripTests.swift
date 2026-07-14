@@ -81,6 +81,9 @@ struct CodableRoundTripTests {
 
         let routing = AppToExtensionMessage.applyRoutingMode(.chain(["a", "b"]))
         #expect(try roundTrip(routing) == routing)
+
+        let capture = AppToExtensionMessage.setPacketCapture(true)
+        #expect(try roundTrip(capture) == capture)
     }
 
     @Test("ProxyRoutingModeDTO round-trips every case")

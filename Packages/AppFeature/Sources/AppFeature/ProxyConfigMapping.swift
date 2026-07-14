@@ -25,6 +25,11 @@ public enum ProxyConfigMapping {
         .applyRoutingMode(dtoMode(from: mode))
     }
 
+    /// 把抓包开关翻成 `setPacketCapture` 消息。
+    public static func packetCaptureMessage(_ enabled: Bool) -> IPCContract.AppToExtensionMessage {
+        .setPacketCapture(enabled)
+    }
+
     /// 穷举 switch(不带 default):`Core.ProxyRoutingMode` 新增 case 时这里编译报错。
     private static func dtoMode(from mode: Core.ProxyRoutingMode) -> IPCContract.ProxyRoutingModeDTO {
         switch mode {

@@ -28,19 +28,25 @@ final class ConnectionContext: @unchecked Sendable {
     let port: UInt16
     let rule: ProxyRuleDTO
     let proxyKind: ProxyKindDTO?
+    /// 逐连接抓包写入器(抓包开关关时为 nil)。pump 往它写上下行字节,teardown 时 close。
+    let capture: PacketCaptureWriter?
 
     private let lock = NSLock()
     private var up: Int64 = 0
     private var down: Int64 = 0
     private var closed = false
 
-    init(id: String, processID: ProcessIdentifierDTO, host: String, port: UInt16, rule: ProxyRuleDTO, proxyKind: ProxyKindDTO?) {
+    init(
+        id: String, processID: ProcessIdentifierDTO, host: String, port: UInt16,
+        rule: ProxyRuleDTO, proxyKind: ProxyKindDTO?, capture: PacketCaptureWriter? = nil
+    ) {
         self.id = id
         self.processID = processID
         self.host = host
         self.port = port
         self.rule = rule
         self.proxyKind = proxyKind
+        self.capture = capture
     }
 
     func addUp(_ n: Int64) { lock.withLock { up += n } }

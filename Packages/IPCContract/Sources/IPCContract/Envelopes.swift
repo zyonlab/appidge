@@ -3,6 +3,8 @@ public enum AppToExtensionMessage: Sendable, Equatable, Codable {
     case requestDiagnostic(DiagnosticRequestDTO)
     case applyProxyConfig(ProxyConfigMessage)
     case applyRoutingMode(ProxyRoutingModeDTO)
+    /// 开/关逐连接抓包(.dmp)。
+    case setPacketCapture(Bool)
 }
 
 public enum ExtensionToAppMessage: Sendable, Equatable, Codable {

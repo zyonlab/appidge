@@ -59,6 +59,7 @@ struct RulesPaneView: View {
                 )) {
                     Text("直连").tag(ProxyRule.direct)
                     Text("代理").tag(ProxyRule.proxied)
+                    Text("拦截").tag(ProxyRule.block)
                 }
                 .labelsHidden()
                 .frame(width: 120)
@@ -96,6 +97,7 @@ struct ActivityMonitorPaneView: View {
                 )) {
                     Text("直连").tag(ProxyRule.direct)
                     Text("代理").tag(ProxyRule.proxied)
+                    Text("拦截").tag(ProxyRule.block)
                 }
                 .labelsHidden()
                 .frame(width: 120)

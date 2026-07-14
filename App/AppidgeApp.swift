@@ -11,9 +11,13 @@ struct AppidgeApp: App {
 
     // 代理密码存 Keychain，不落 JSON（见 PersistedProxyServer 结构上无 password 字段）。
     private let credentialStore: any CredentialStore = KeychainCredentialStore()
+    // 连接日志落盘：每条连接事件顺带写 rolling JSONL，启动时 loadRecent 回灌（重启不丢历史）。
+    private let connectionLogFileStore: ConnectionLogFileStore
 
     init() {
         let transport = AppGroupAppSideTransport(appGroup: "group.com.appidge")
+        let connectionLogFileStore = ConnectionLogFileStore()
+        self.connectionLogFileStore = connectionLogFileStore
         let store = Store(effectHandler: { effect in
             switch effect {
             case .log:
@@ -41,7 +45,9 @@ struct AppidgeApp: App {
             }
         })
         _store = State(initialValue: store)
-        _ipcReceiver = State(initialValue: IPCReceiver(store: store, transport: transport))
+        _ipcReceiver = State(initialValue: IPCReceiver(
+            store: store, transport: transport, connectionLogFileStore: connectionLogFileStore
+        ))
     }
 
     var body: some Scene {
@@ -56,6 +62,7 @@ struct AppidgeApp: App {
             .task {
                 await ipcReceiver.start()
                 await restorePersistedConfiguration()
+                await restoreRecentConnectionLog()
                 store.dispatch(.appLaunched)
             }
         }
@@ -85,6 +92,17 @@ struct AppidgeApp: App {
         // 从 Keychain 回填密码，重启后恢复的代理不用重输。
         for action in await configuration.restorationActions(rehydratingCredentialsFrom: credentialStore) {
             store.dispatch(action)
+        }
+    }
+
+    /// 启动时把上次落盘的连接日志（最近若干条）回灌进 store，重启后仍能看到历史连接。
+    /// 每条走既有的 `connectionEventReceived`（按 id upsert），顺序 oldest→newest 与内存
+    /// 环形缓冲一致。读不到（首次启动/无文件）就什么也不做。
+    @MainActor
+    private func restoreRecentConnectionLog() async {
+        let recent = await connectionLogFileStore.loadRecent(limit: 200)
+        for entry in recent {
+            store.dispatch(.connectionEventReceived(entry))
         }
     }
 

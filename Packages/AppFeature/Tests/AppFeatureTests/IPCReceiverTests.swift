@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 import Core
 import IPCContract
 @testable import AppFeature
@@ -78,6 +79,40 @@ struct IPCReceiverTests {
             try? await Task.sleep(nanoseconds: 2_000_000)
         }
         #expect(healthy == false)
+    }
+
+    @Test("a connectionEvent delivered via simulateIncoming is dispatched into state AND appended to the log file store")
+    func connectionEventPersistsToFileStore() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+            .appendingPathComponent("connections.log.jsonl")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let fileStore = ConnectionLogFileStore(fileURL: url)
+
+        let store = await MainActor.run { Store() }
+        let transport = MockAppSideTransport()
+        let receiver = await MainActor.run {
+            IPCReceiver(store: store, transport: transport, connectionLogFileStore: fileStore)
+        }
+        await receiver.start()
+
+        let dto = ConnectionEventDTO(
+            id: "c1", processID: ProcessIdentifierDTO("com.x"), targetHost: "example.com", targetPort: 443,
+            rule: .proxied, proxyKind: .socks5, phase: .opened, bytesUp: 0, bytesDown: 0
+        )
+        await transport.simulateIncoming(.connectionEvent(dto))
+
+        // 落盘经 actor + Task,轮询等它出现。
+        var loaded: [Core.ConnectionLogEntry] = []
+        for _ in 0..<100 {
+            loaded = await fileStore.loadRecent(limit: 10)
+            if !loaded.isEmpty { break }
+            try? await Task.sleep(nanoseconds: 2_000_000)
+        }
+        #expect(loaded.map(\.id) == ["c1"])
+        // 同时确认既有内存链路没被影响:它也进了 store.state.connectionLog。
+        let inState = await MainActor.run { store.state.connectionLog.map(\.id) }
+        #expect(inState == ["c1"])
     }
 
     @Test("stop() after start() prevents a later incoming message from reaching the store")

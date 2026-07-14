@@ -16,21 +16,34 @@ import IPCContract
 public final class IPCReceiver {
     private let store: Store
     private let transport: any AppSideTransport
+    /// 可选:每条连接事件顺带落盘(rolling JSONL),重启后由 App 用 `loadRecent` 回灌。
+    /// nil 则只走内存(既有行为),现有测试不受影响。
+    private let connectionLogFileStore: ConnectionLogFileStore?
 
-    public init(store: Store, transport: any AppSideTransport) {
+    public init(
+        store: Store,
+        transport: any AppSideTransport,
+        connectionLogFileStore: ConnectionLogFileStore? = nil
+    ) {
         self.store = store
         self.transport = transport
+        self.connectionLogFileStore = connectionLogFileStore
     }
 
     public func start() async {
         let dispatch: @MainActor (Core.Action) -> Void = { [weak self] action in
             self?.store.dispatch(action)
         }
+        let fileStore = connectionLogFileStore
         await transport.startListening { message in
             let actions = ExtensionMessageHandling.actions(for: message)
             Task {
                 for action in actions {
                     await dispatch(action)
+                    // 连接事件除了进内存日志,也落盘一份,好让重启后能 loadRecent 回灌。
+                    if case .connectionEventReceived(let entry) = action {
+                        await fileStore?.append(entry)
+                    }
                 }
             }
         }

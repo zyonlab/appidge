@@ -29,4 +29,6 @@ public enum Action: Sendable, Equatable {
     case setPacketCaptureEnabled(Bool)
     /// 设置 proxied 进程的 UDP 处理策略(拦截/直连/SOCKS5 代理)。下发给扩展。
     case setUDPPolicy(UDPPolicy)
+    /// 系统扩展激活状态变化(由 `SystemExtensionActivator` 的 delegate 回调驱动)。纯状态回灌,无副作用。
+    case extensionActivationChanged(ExtensionActivation)
 }

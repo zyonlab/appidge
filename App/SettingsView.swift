@@ -14,9 +14,28 @@ struct SettingsView: View {
                     get: { store.state.isGlobalProxyEnabled },
                     set: { store.dispatch(.setGlobalProxyEnabled($0)) }
                 ))
+                LabeledContent("系统扩展") {
+                    HStack(spacing: 8) {
+                        let a = Self.activation(store.state.extensionActivation)
+                        Text(a.label).foregroundStyle(a.color)
+                        if !store.state.extensionActivation.isRunning {
+                            Button("启用") { SystemExtensionActivator.shared.activate() }
+                                .controlSize(.small)
+                        }
+                    }
+                }
                 LabeledContent("引擎状态") {
                     Text(store.state.isEngineHealthy ? "正常" : "异常，已回退直连")
                         .foregroundStyle(store.state.isEngineHealthy ? Color.secondary : Color.red)
+                }
+                if case .failed(let reason) = store.state.extensionActivation {
+                    Text("扩展加载失败：\(reason)")
+                        .font(.caption).foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if !store.state.extensionActivation.isRunning {
+                    Text("流量只有在系统扩展被批准并运行后才会真正被接管——点「启用」，再去「系统设置 → 隐私与安全性」允许。")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -52,6 +71,17 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 480, height: 440)
+    }
+
+    /// 扩展激活状态 → 设置页里的一行文案 + 颜色。待批准用橙色(需用户行动),失败/异常用红,其余次要灰。
+    private static func activation(_ state: ExtensionActivation) -> (label: String, color: Color) {
+        switch state {
+        case .active: ("已接管", .secondary)
+        case .inactive: ("未接入", .secondary)
+        case .activating: ("安装中…", .orange)
+        case .needsApproval: ("待批准（去系统设置允许）", .orange)
+        case .failed: ("未安装", .red)
+        }
     }
 
     private static func udpHint(_ policy: UDPPolicy) -> String {

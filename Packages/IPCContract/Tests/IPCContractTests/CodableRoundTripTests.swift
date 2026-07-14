@@ -10,16 +10,28 @@ struct CodableRoundTripTests {
         return try JSONDecoder().decode(T.self, from: data)
     }
 
-    @Test("RuleSetMessage round-trips — 规则下发")
+    @Test("RuleSetMessage round-trips — 规则下发（含细粒度规则表）")
     func ruleSetMessage() throws {
         let message = RuleSetMessage(
             assignments: [
                 RuleAssignmentDTO(processID: ProcessIdentifierDTO("com.example.curl"), rule: .proxied),
                 RuleAssignmentDTO(processID: ProcessIdentifierDTO("com.example.safari"), rule: .direct)
             ],
+            matchRules: [
+                MatchRuleDTO(id: "r1", appPattern: "*", hostPattern: "*.corp.net", portRange: 22...22, rule: .direct),
+                MatchRuleDTO(id: "r2", appPattern: "com.google.*", hostPattern: "*", portRange: nil, rule: .proxied)
+            ],
             globalProxyEnabled: true
         )
         #expect(try roundTrip(message) == message)
+    }
+
+    @Test("MatchRuleDTO round-trips with and without a port range")
+    func matchRuleDTORoundTrip() throws {
+        let ranged = MatchRuleDTO(id: "a", appPattern: "*", hostPattern: "*.x", portRange: 80...443, rule: .proxied)
+        #expect(try roundTrip(ranged) == ranged)
+        let anyPort = MatchRuleDTO(id: "b", appPattern: "*", hostPattern: "*", portRange: nil, rule: .direct)
+        #expect(try roundTrip(anyPort) == anyPort)
     }
 
     @Test("FlowStatsBatchMessage round-trips — 流量批量上报")

@@ -4,12 +4,12 @@ import Testing
 @Suite("Reducer pure function")
 struct ReducerTests {
 
-    @Test("global proxy toggle flips state, no effects")
+    @Test("global proxy toggle flips state and pushes the rule set to the extension")
     func globalToggle() {
         let state = AppState()
         let (next, effects) = Reducer.reduce(state, .setGlobalProxyEnabled(true))
         #expect(next.isGlobalProxyEnabled == true)
-        #expect(effects.isEmpty)
+        #expect(effects == [.applyRuleSet(globalProxyEnabled: true, assignments: [:], matchRules: [])])
 
         let (next2, _) = Reducer.reduce(next, .setGlobalProxyEnabled(false))
         #expect(next2.isGlobalProxyEnabled == false)
@@ -48,7 +48,8 @@ struct ReducerTests {
         let (next, effects) = Reducer.reduce(state, .assignRule(processID: a, rule: .proxied))
         #expect(next.processes[a]?.rule == .proxied)
         #expect(next.processes[b]?.rule == .direct)
-        #expect(effects.isEmpty)
+        // only the non-direct assignment is pushed; the extension defaults unknowns to direct
+        #expect(effects == [.applyRuleSet(globalProxyEnabled: false, assignments: [a: .proxied], matchRules: [])])
     }
 
     @Test("flowStatsDelta accumulates onto existing per-process stats")

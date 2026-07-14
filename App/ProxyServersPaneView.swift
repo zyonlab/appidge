@@ -63,8 +63,13 @@ private struct ProxyServerRow: View {
                 .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(server.host):\(server.port)")
-                    .monospacedDigit()
+                HStack(spacing: 6) {
+                    Text("\(server.host):\(server.port)")
+                        .monospacedDigit()
+                    Text(Self.kindLabel(server.kind))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
                 if let username = server.username, !username.isEmpty {
                     Text(username)
                         .font(.caption)
@@ -85,6 +90,13 @@ private struct ProxyServerRow: View {
             Button("删除", role: .destructive, action: onRemove)
         }
     }
+
+    private static func kindLabel(_ kind: ProxyKind) -> String {
+        switch kind {
+        case .socks5: "SOCKS5"
+        case .httpConnect: "HTTP"
+        }
+    }
 }
 
 /// 「添加代理服务器」表单。`@State` 是本地输入草稿，不是 app state；点「添加」时组装一台
@@ -96,6 +108,7 @@ private struct AddProxyServerForm: View {
     @State private var portText = ""
     @State private var username = ""
     @State private var password = ""
+    @State private var kind: ProxyKind = .socks5
 
     private var parsedPort: UInt16? {
         UInt16(portText.trimmingCharacters(in: .whitespaces))
@@ -111,8 +124,14 @@ private struct AddProxyServerForm: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("添加代理服务器（SOCKS5）")
+            Text("添加代理服务器")
                 .font(.subheadline)
+
+            Picker("协议", selection: $kind) {
+                Text("SOCKS5").tag(ProxyKind.socks5)
+                Text("HTTP CONNECT").tag(ProxyKind.httpConnect)
+            }
+            .pickerStyle(.segmented)
 
             TextField("地址，如 127.0.0.1", text: $host)
             TextField("端口，如 1080", text: $portText)
@@ -132,7 +151,7 @@ private struct AddProxyServerForm: View {
             id: ProxyServerID(UUID().uuidString),
             host: trimmedHost,
             port: port,
-            kind: .socks5,
+            kind: kind,
             username: username.isEmpty ? nil : username,
             password: password.isEmpty ? nil : password
         )
@@ -141,5 +160,6 @@ private struct AddProxyServerForm: View {
         portText = ""
         username = ""
         password = ""
+        kind = .socks5
     }
 }

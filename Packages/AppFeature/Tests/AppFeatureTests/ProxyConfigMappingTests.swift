@@ -59,15 +59,21 @@ struct ProxyConfigMappingTests {
         )))
     }
 
-    @Test("ProxyKind.socks5 maps to ProxyKindDTO.socks5")
-    func kindMapping() {
-        let server = Core.ProxyServer(id: Core.ProxyServerID("k"), host: "h", port: 1, kind: .socks5)
+    @Test(
+        "ProxyKind maps 1:1 to ProxyKindDTO across all cases",
+        arguments: [
+            (Core.ProxyKind.socks5, ProxyKindDTO.socks5),
+            (Core.ProxyKind.httpConnect, ProxyKindDTO.httpConnect)
+        ]
+    )
+    func kindMapping(coreKind: Core.ProxyKind, expectedDTO: ProxyKindDTO) {
+        let server = Core.ProxyServer(id: Core.ProxyServerID("k"), host: "h", port: 1, kind: coreKind)
         let message = ProxyConfigMapping.proxyConfigMessage(servers: [server], activeID: nil)
 
         guard case .applyProxyConfig(let config) = message else {
             Issue.record("expected applyProxyConfig envelope")
             return
         }
-        #expect(config.servers.first?.kind == .socks5)
+        #expect(config.servers.first?.kind == expectedDTO)
     }
 }

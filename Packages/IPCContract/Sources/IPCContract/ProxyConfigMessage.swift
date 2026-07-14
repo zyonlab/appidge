@@ -1,5 +1,6 @@
 public enum ProxyKindDTO: String, Sendable, Equatable, Codable {
     case socks5
+    case httpConnect
 }
 
 /// 上游代理服务器的 wire-format。跟 Core.ProxyServer 是同一信息的传输孪生

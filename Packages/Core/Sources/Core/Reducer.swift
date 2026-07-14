@@ -296,6 +296,10 @@ private extension Reducer {
             var state = state
             state.udpPolicy = policy
             return (state, [.applyUDPPolicy(policy)])
+        case .extensionActivationChanged(let activation):
+            var state = state
+            state.extensionActivation = activation
+            return (state, [])
         default:
             return nil
         }

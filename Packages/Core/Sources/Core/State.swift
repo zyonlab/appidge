@@ -19,6 +19,9 @@ public struct AppState: Sendable, Equatable {
     public var isPacketCaptureEnabled: Bool
     /// proxied 进程的 UDP/QUIC 怎么处理(默认 `.block` 止漏)。下发给扩展。
     public var udpPolicy: UDPPolicy
+    /// 系统扩展的安装/批准/运行状态。运行时状态,不持久化(和 `isEngineHealthy` 一样),
+    /// 启动时由 `SystemExtensionActivator` 查询回填。状态栏据此如实显示是否已接管。见 ``ExtensionActivation``。
+    public var extensionActivation: ExtensionActivation
 
     /// 连接日志保留的最大条数;超出丢最旧。
     public static let connectionLogCap = 500
@@ -37,7 +40,8 @@ public struct AppState: Sendable, Equatable {
         connectionLog: [ConnectionLogEntry] = [],
         loopWarning: String? = nil,
         isPacketCaptureEnabled: Bool = false,
-        udpPolicy: UDPPolicy = .block
+        udpPolicy: UDPPolicy = .block,
+        extensionActivation: ExtensionActivation = .inactive
     ) {
         self.isGlobalProxyEnabled = isGlobalProxyEnabled
         self.isEngineHealthy = isEngineHealthy
@@ -53,5 +57,6 @@ public struct AppState: Sendable, Equatable {
         self.loopWarning = loopWarning
         self.isPacketCaptureEnabled = isPacketCaptureEnabled
         self.udpPolicy = udpPolicy
+        self.extensionActivation = extensionActivation
     }
 }

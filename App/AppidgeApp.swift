@@ -70,11 +70,20 @@ struct AppidgeApp: App {
                 }
             }
             .task {
+                // 扩展激活状态经 activator 的 delegate 回调回灌 store（状态栏据此如实显示）。
+                SystemExtensionActivator.shared.onStateChange = { activation in
+                    store.dispatch(.extensionActivationChanged(activation))
+                }
                 await ipcReceiver.start()
                 await restorePersistedConfiguration()
                 await restoreRecentConnectionLog()
                 await profilesModel.loadLibrary()
                 store.dispatch(.appLaunched)
+                // 已完成引导 = 之前提交过激活。激活状态不持久化，重新提交一次（幂等）把状态
+                // 栏校准到真实情况：已批准立刻回 .active，否则如实回 needsApproval/failed。
+                if store.state.hasCompletedOnboarding {
+                    SystemExtensionActivator.shared.activate()
+                }
             }
         }
         .onChange(of: scenePhase) { _, newPhase in

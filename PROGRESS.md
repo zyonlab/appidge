@@ -675,3 +675,23 @@ SOCKS4/NTLM/Kerberos/便携版 ③公证需要人的凭据。
 - **待公证后复验**:装带 entitlement 的 Debug build 后,启动期我们 activator 的日志一条没落
   (`activate()` 疑似没跑到,或只是 os_log 级别被过滤)。有兜底:设置页「启用」按钮直接调 `activate()`。
   等有了可加载的**公证** build,再端到端验证 启动→activate→needsApproval→点允许→active,顺带定位这个。
+- **公证脚本修复(已提交 38539bf)**:manual Developer ID 的 `exportArchive` 必须在 ExportOptions 里给
+  `provisioningProfiles` 显式映射 bundle id→profile 名,否则报 "requires a profile with Network
+  Extensions and System Extension features"。已修 `scripts/archive-and-notarize.sh`,export 通过、
+  notarytool 上传成功。公证首单在苹果侧排队偏慢(40+ 分钟),`--wait` 出结果自动 staple。
+
+### UI 重设计:调研 + 首轮并行落地(2026-07-14)
+- **调研**:三路并行(Apple HIG/Liquid Glass · Little Snitch/Proxifier/Surge/LuLu 拆解 · SwiftUI 动画),
+  产出可视化提案(artifact)。统领原则:**玻璃只给导航层,数据表/行不上玻璃**;四语义色=路由词汇表。
+- **首轮三个并行 PR(worktree 隔离,文件零重叠,各自 TDD + 本地全绿门禁后串行合并,38539bf)**:
+  - `pr-rule-enable`:规则逐条启用/停用。Core 加 `ProxyMatchRule.isEnabled` + `setMatchRuleEnabled`
+    action + reducer;下发前 `RuleSetMapping.filter(\.isEnabled)`(禁用规则不进 wire,IPC/扩展零改动);
+    RulesEditor 每行开关 + 右键启用/停用 + 停用行淡化。Core +4 / AppFeature +3 测试。
+  - `pr-menubar-dashboard`:菜单栏下拉→状态仪表盘(诚实状态行 / 全局↑↓ / 活动连接 / Top-5 进程 /
+    总开关 / 设置入口)。纯读 state,只改 `ContentView.swift`。
+  - `pr-connection-chip`:连接表「规则·代理」列→语义 chip(符号+色+字),状态列符号+色+字。只改
+    `ConnectionsTable.swift`。
+  - 合并后组合复验:SPM 421 测试全绿 · `swiftlint --strict` 0 · `xcodebuild` Debug 零并发警告。已装新 UI Debug build。
+- **已知小尾巴(下轮收)**:① `RouteText.color` 被 TrafficPane 也用,「直连」还是中性灰非绿——把语义色抽出两处共用;
+  ② `MenuBarExtra` 是默认 `.menu` 样式,复杂样式被收着,要完整面板得切 `.menuBarExtraStyle(.window)`。
+- **UI 路线图(见 artifact)**:P1 结构大件 `NavigationSplitView + .inspector` 取代 `VSplitView` 未动,是下一步最划算的一改。

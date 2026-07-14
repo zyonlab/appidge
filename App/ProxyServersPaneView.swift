@@ -26,6 +26,10 @@ struct ProxyServersPaneView: View {
 
             Divider()
 
+            RoutingModeSection(store: store, servers: sortedServers)
+
+            Divider()
+
             AddProxyServerForm(store: store)
         }
         .padding()
@@ -46,6 +50,104 @@ struct ProxyServersPaneView: View {
                     onRemove: { store.dispatch(.removeProxyServer(server.id)) }
                 )
             }
+        }
+    }
+}
+
+/// 「路由模式」区：对标 Proxifier 的 Proxy Chains + 冗余/均衡策略。选一种模式；非 single
+/// 时勾选参与的上游（勾选顺序即链的跳序 / 故障转移的尝试序，显示为编号）。
+///
+/// UI 只读 `store.state.proxyRoutingMode`、只 `dispatch(.setProxyRoutingMode(...))`；模式↔种类
+/// 的拍平与顺序保留逻辑都在 AppFeature 的 `RoutingModeKind` / `togglingMember`（已单测），
+/// 视图不含业务判断。故意做得朴素（这轮 UI 先简单），排序沿用 id 升序。
+private struct RoutingModeSection: View {
+    var store: Store
+    let servers: [ProxyServer]
+
+    private var mode: ProxyRoutingMode { store.state.proxyRoutingMode }
+    private var kind: RoutingModeKind { RoutingModeKind(mode) }
+    private var selectedIDs: [ProxyServerID] { mode.orderedServerIDs }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("路由模式")
+                .font(.subheadline)
+
+            Picker("路由模式", selection: kindBinding) {
+                Text("单台").tag(RoutingModeKind.single)
+                Text("代理链").tag(RoutingModeKind.chain)
+                Text("故障转移").tag(RoutingModeKind.failover)
+                Text("负载均衡").tag(RoutingModeKind.loadBalance)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            Text(Self.explanation(kind))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if kind != .single {
+                memberPicker
+            }
+        }
+        .frame(maxWidth: 360, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var memberPicker: some View {
+        if servers.isEmpty {
+            Text("先添加代理服务器，再选择参与的上游。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(servers, id: \.id) { server in
+                    let position = selectedIDs.firstIndex(of: server.id).map { $0 + 1 }
+                    Toggle(isOn: memberBinding(server.id)) {
+                        HStack(spacing: 6) {
+                            if let position {
+                                Text("\(position).")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .monospacedDigit()
+                            }
+                            Text("\(server.host):\(server.port)")
+                                .font(.caption)
+                                .monospacedDigit()
+                        }
+                    }
+                    .toggleStyle(.checkbox)
+                }
+            }
+        }
+    }
+
+    private var kindBinding: Binding<RoutingModeKind> {
+        Binding(
+            get: { kind },
+            // 切种类时把已选 id 顺序带过去，不因 single↔chain↔… 丢选择。
+            set: { store.dispatch(.setProxyRoutingMode($0.mode(carrying: selectedIDs))) }
+        )
+    }
+
+    private func memberBinding(_ id: ProxyServerID) -> Binding<Bool> {
+        Binding(
+            get: { selectedIDs.contains(id) },
+            set: { store.dispatch(.setProxyRoutingMode(mode.togglingMember(id, included: $0))) }
+        )
+    }
+
+    private static func explanation(_ kind: RoutingModeKind) -> String {
+        switch kind {
+        case .single:
+            "所有走代理的连接都用「使用中」的那台上游。"
+        case .chain:
+            "连接依次穿过选中的多台上游（client → 上游1 → 上游2 → … → 目标），顺序即下面的编号。"
+        case .failover:
+            "按编号顺序尝试，第一台连不上就换下一台，直到某台成功。"
+        case .loadBalance:
+            "每条新连接在选中的上游之间轮流，分摊流量。"
         }
     }
 }

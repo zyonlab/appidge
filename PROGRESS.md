@@ -442,3 +442,58 @@ EngineKit 118 · AppFeature 65 · ArchitectureTests 11),`xcodebuild` Debug 零�
 已和用户确认:进程代理不必需,先不做)或需要人工的一次性步骤(系统扩展批准的两步),以及若干诚实小限制
 (DNS-over-proxy 只在 app 用域名连时生效、UpstreamExclusion 纯文本不解析主机名、凭据未进 Keychain 前需重填——
 已在 Keychain PR 解决、连接日志未持久化只在内存)。
+
+## Phase 6：P2 高级路由（代理链 / 故障转移 / 负载均衡），两个顺序 PR
+
+用户改主意，要补齐 P2（"补齐P2 高级功能，需要人工干预的case 留下回头我自测"）——所以 Phase 5
+末尾"先不做 P2"那条作废。仍自己顺序作者每个 PR、CI 逐个把关。
+
+**这三种模式各是什么（用户问过）**：
+- **代理链 chain**：client → 上游1 → 上游2 → … → 目标。逐跳嵌套隧道：拨上游1，在这条 TCP 上对
+  上游2 做握手（上游1 转发），再对上游3……最后对目标。全链复用**首跳那一条** NWConnection。
+- **故障转移 failover**：按序尝试候选上游，第一台握手成功就用它，全失败抛最后一个错（fail-open 关流）。
+- **负载均衡 loadBalance**：每条新连接在候选上游间轮询（RoundRobinSelector，游标跨 flow 存活）。
+
+**PR-K（#15）模型 + IPC + 策略原语**：
+- `Core.ProxyRoutingMode`(.single | .chain/.failover/.loadBalance([ProxyServerID])) + `AppState.proxyRoutingMode`
+  + `setProxyRoutingMode` action + `Effect.applyRoutingMode`（独立消息，不动 applyProxyConfig 及其测试）。
+- `IPCContract.ProxyRoutingModeDTO` + `AppToExtensionMessage.applyRoutingMode`。
+- **EngineKit 策略原语（TDD 核心，全注入、零真实网络）**：`RoundRobinSelector`(actor)、`ChainConnector`
+  (纯序列器，拨号+握手由注入的 hop 完成)、`FailoverConnector`(首个成功胜出)。9 测试。
+- AppFeature 映射 + 持久化存/取模式（默认 .single 不重发）；App effectHandler 下发；扩展先只**存**模式。
+  main 行为不变、保持绿。
+
+**PR-L（#16）扩展多上游接线 + 路由模式 UI**：
+- **`EngineKit.ProxyRouteResolver`（纯函数，TDD 15 测试）**：`(mode, servers, activeServerID) → ResolvedRoute`
+  (.direct/.single/.chain/.failover/.loadBalance)。降级契约集中在这里：认不得的 id 丢掉、解析空了回落到
+  单台 active、再没 active 就直连、链只剩一台 collapse 成 single。扩展现场只 switch 一个 ResolvedRoute。
+- **`Extension/ProxyDialer`（无状态拨号）**：`ResolvedRoute + target → 已就绪的 NWConnection`。single 拨一台；
+  failover 用 FailoverConnector 包 openSingleTunnel；loadBalance 轮询挑一台；chain 用 ChainConnector + chainHop
+  （首跳新拨、后续复用 base 隧道），取首跳 NWConnectionByteStream 的底层连接当整条链的隧道。从 provider 拆出来
+  是为了瘦身（type_body_length / file_length 两条 lint 触发过——拆完即消）。
+- 扩展 `openRemote` 改为 resolve → ProxyDialer.open；连接日志的 proxyKind 取解析后路由首跳的 kind（直连记 nil）。
+- **`AppFeature.RoutingModeKind` + `ProxyRoutingMode.togglingMember`（纯选择逻辑，8 测试）**：把带关联值的模式拍平成
+  Picker 用的无参枚举，切种类保留已选 id 顺序，勾选按点击顺序进链。
+- **UI**：`ProxyServersPaneView` 加「路由模式」区——分段选择器 + 每种模式一句说明 + 非 single 时列出上游让勾选
+  （勾选顺序显示为编号，即链的跳序 / 故障转移的尝试序）。UI 只读 state、只 dispatch，逻辑全在已测的 AppFeature 助手。
+- 持久化：`restorationActions`（含真机走的凭据回填变体）都带 `setProxyRoutingMode`，重启后恢复模式（各加了测试钉住）。
+
+**架构决策记一笔**：路由**解析器**放 EngineKit（对 DTO 求值，不依赖 Core，守住 B2）；**拨号器** ProxyDialer 放
+扩展（碰真实 NWConnection/NetworkExtension，不进 SPM 测试，守住 B4）；**选择器/种类映射**放 AppFeature（给 UI 用，
+可测）。Core 只放 `ProxyRoutingMode` 数据模型。同 Phase 5 规则/日志的分层套路。
+
+**最终**：PR-K/PR-L 全 CI 绿后 merge，288 个 SPM 测试全绿（Core 47 · IPCContract 11 · EngineKit 142 ·
+AppFeature 77 · ArchitectureTests 11；相对 Phase 5 的 247：EngineKit +24（9 strategy + 15 resolver）、
+AppFeature +12、Core +4、IPCContract +1），`xcodebuild` Debug 零并发警告，swiftlint --strict 零违规。
+
+### ⚠️ 待人工自测（需真流量 / 需在系统设置点允许，loop 物理上做不了，回头自测回填）
+这些是 API/系统决定的一次性人工步骤，不是没做：
+
+1. **系统扩展批准**：装 app → 首次启动触发 NETransparentProxy 安装 → 「系统设置 → 隐私与安全性」点「允许」。
+   （沿用 Phase 1 的 smoke-ne.sh：装扩展 → curl 走代理 → 打印观测到的进程身份级别。）
+2. **代理链端到端**：配 ≥2 台真上游（如本地起两个 SOCKS5 / 一个 SOCKS5 + 一个 HTTP），选「代理链」，勾选顺序，
+   用真流量确认逐跳穿通、且目标侧看到的是链尾出口。**待回填**：混合协议链（SOCKS5→HTTP→目标）握手时序是否稳。
+3. **故障转移**：把候选里第一台设成连不上的地址，确认自动落到第二台；全down 时 fail-open（关流不卡其它流量）。
+4. **负载均衡**：配 ≥2 台，发多条连接，确认在上游间轮转（可在两台上游侧看命中分布）。
+5. **连接日志的 proxyKind 展示**：多台模式下日志里的协议标签取的是"首跳"，负载均衡实际选台逐连接轮转，
+   标签是近似展示——真机确认是否需要改成"实际所用那台"（要的话让 ProxyDialer 把选中 kind 回传给事件）。

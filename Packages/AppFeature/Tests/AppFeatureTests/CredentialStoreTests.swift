@@ -78,6 +78,19 @@ struct CredentialStoreTests {
         #expect(restoredPasswords["b"] == .some(nil))
     }
 
+    @Test("the credential-rehydrating restore path (the one the app actually runs) still emits the routing mode")
+    func rehydratingPreservesRoutingMode() async {
+        var state = Core.AppState()
+        state.proxyServers[Core.ProxyServerID("a")] = Core.ProxyServer(id: Core.ProxyServerID("a"), host: "h", port: 1)
+        state.proxyServers[Core.ProxyServerID("b")] = Core.ProxyServer(id: Core.ProxyServerID("b"), host: "h", port: 2)
+        state.proxyRoutingMode = .failover([Core.ProxyServerID("a"), Core.ProxyServerID("b")])
+        let config = PersistedConfiguration(from: state)
+
+        let actions = await config.restorationActions(rehydratingCredentialsFrom: InMemoryCredentialStore())
+
+        #expect(actions.contains(.setProxyRoutingMode(.failover([Core.ProxyServerID("a"), Core.ProxyServerID("b")]))))
+    }
+
     @Test("on-disk config still has no plaintext password even with the credential path in play")
     func diskHasNoPassword() throws {
         let server = Core.ProxyServer(

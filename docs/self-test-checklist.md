@@ -10,18 +10,31 @@
 
 ## 0. 前置（一次性，不做后面全跑不了）
 
-- [ ] **0.1 Apple Developer Portal 开 System Extension capability**
-  - 现状：现有 Developer ID profile **没启用** System Extension capability，所以 `App.entitlements` 一旦加
-    `com.apple.developer.system-extension.install`，`xcodebuild` 就拒签（见 CRITERIA.md「唯一不计入的一步」）。
-  - 步骤：登录 [developer.apple.com](https://developer.apple.com) → 给 `APP_BUNDLE_ID` 这个 App ID 打开
-    **System Extension** capability → 重新生成两个 Developer ID provisioning profile → 替换本地
-    `Signing/*.provisionprofile`（`PROFILE_APP` / `PROFILE_EXT` 指向的两个文件）。
-  - 期望：`xcodebuild -scheme App -configuration Release archive` 能带 system-extension entitlement 签过。
+- [ ] **0.1 Apple Developer Portal 开 System Extension capability（你来，约 5 分钟）**
+  - 现状（2026-07 实测确认）：`PROFILE_APP` 指向的 Developer ID profile 授权了完整
+    NetworkExtension，但**没有** System Extension capability。一旦给 `App.entitlements` 加
+    `com.apple.developer.system-extension.install`，`xcodebuild` 就拒签，报：
+    > Provisioning profile "appidge App DevID" doesn't support the System Extension capability.
+    这个 entitlement **没有**对应的 App ID 主 capability，藏在 **Additional Capabilities** 里，必须开了它、
+    重签 profile 才行——不是随便就能签的。
+  - 步骤：登录 [developer.apple.com](https://developer.apple.com) → Certificates, IDs & Profiles
+    → Identifiers → 选 `APP_BUNDLE_ID`(com.appidge.app) → 切到 **Additional Capabilities** 标签页
+    → 勾 **System Extension** → Save → Profiles 里把 `appidge App DevID`（Developer ID 型）Edit/重生成
+    → 下载的 `.provisionprofile` 覆盖 `PROFILE_APP` 指向的文件。
+  - **只有主 app 的 profile 要动**：扩展（`PROFILE_EXT`）只需 Network Extension，不涉及 System Extension。
+  - 期望：改回 entitlement 后 `xcodebuild -scheme App -configuration Release` 能签过。
 
-- [ ] **0.2 安装 app + 系统扩展点「允许」**
-  - 步骤：装好 `appidge.app` → 首次启动会触发 `OSSystemExtensionManager.submitRequest` 安装
-    NETransparentProxy 系统扩展 → **系统设置 → 隐私与安全性** → 点「允许」。
-  - 期望：扩展状态变为已启用；`systemextensionsctl list` 里能看到 `EXT_BUNDLE_ID` 处于 activated 状态。
+- [ ] **0.2 装 app + 让扩展能被加载 + 点「允许」**
+  - **加载前提（Developer ID 的系统扩展二选一）**：macOS 只会加载①**已公证**的，或②**开发者模式**下的
+    系统扩展。
+    - 公证（推荐，和 Proxifier 同路，不用动 SIP）：跑 `scripts/` 里的打包+公证（`notarytool` 需要
+      Apple ID app 专用密码 / API key，配 `.env`，明文不经手）→ staple → 装 `/Applications`。
+    - 开发者模式（快但要关 SIP）：Recovery 里 `csrutil disable` → `systemextensionsctl developer on`
+      → 装未公证 build。多数人不愿关 SIP，仅本地调试用。
+  - 批准位置（**macOS 15+/26 已挪窝**，实测确认）：启动 app 触发 `OSSystemExtensionManager.submitRequest`
+    → **系统设置 → 通用 → 登录项与扩展 → 网络扩展** → 打开 appidge 那条（旧文档写的「隐私与安全性」已过时）。
+  - 期望：`systemextensionsctl list` 里 `EXT_BUNDLE_ID` 处于 `[activated enabled]`；app 状态栏从
+    「扩展未安装 / 待批准」变「引擎正常」。
 
 - [ ] **0.3 跑 smoke 脚本**
   - 步骤：`./scripts/smoke-ne.sh`（会签名校验 → 启动 app → 提交扩展激活 → 发一条 curl 走代理 → 抓

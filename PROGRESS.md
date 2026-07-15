@@ -713,3 +713,67 @@ SOCKS4/NTLM/Kerberos/便携版 ③公证需要人的凭据。
   门控、只动少量聚合值(不动表格每行,守 §12)。
 - **UI 路线图后续**:P2 余项——上玻璃(Xcode 26 SDK 重编译)、带宽图拖选筛列表、Inspector 取证详情
   (签名/父进程链,需扩展补 flow 元数据)。
+
+---
+
+## 本轮(2026-07-15):扩展路由通了 + CPU 死转根治 + UI 加不了规则修复 + 防环设计定论
+
+### 已修 + 已 commit
+- **`5a7ad53` fix(extension): 按进程选择性接管 TCP,根治 provider CPU 死转**。根因(cpu_resource.diag 回溯):
+  `handleNewTCPFlow` 之前对所有 flow 无条件 `return true` 并把 `.direct` 也 pump 进自己;自建的
+  `NWConnection` 继承系统代理(yunti)→ Network.framework `nw_endpoint_proxy_start_next_child` 自递归 →
+  provider 99% CPU 空转 → 被 CPU 杀 → 会话掉、0 流量。改法:`effectiveRuleSync`(锁保护快照
+  storedPerProcessRules + storedMatchRules + proxyConfig,同步镜像原 async 版,复用公共 RuleMatcher),
+  非 `.proxied/.block` 一律 `return false` 放过(与 UDP 路径一致)。实测 provider 0% CPU、无新 cpu_resource。
+  **=> appidge 变白名单:默认放过,只接管显式启用的进程。**
+- **`f3d7c2f` fix(ui): 面板底部工具栏(规则/代理的 ＋)不再被状态栏盖住**。根因:窗底 StatusBar 用
+  NavigationSplitView 的 `.safeAreaInset(edge:.bottom)`,detail 列内容伸进被 inset 的区域,把面板底部工具栏盖在
+  状态栏底下(高 inset 的「代理」露头、矮的「规则」全被盖)。改法:MainWindow 把 StatusBar 改成 VStack 同级
+  子视图(真正占位);规则/代理面板底部工具栏改用面板级 `.safeAreaInset(edge:.bottom)`。签名 Debug 版实测 ＋ 正常。
+
+### 公证的坑(已有绕法,需固化)
+- **yunti(=xray,pid 697,听 14984 HTTP / 16787 SOCKS5)的 HTTP 代理会把 codesign 的 RFC3161 时间戳 POST 打回
+  HTTP 400**(实测:HTTP 代理 400 / SOCKS5 200 / 直连 200)。codesign 走 macOS **系统代理**(=yunti HTTP 14984),
+  故归档签名必报「A timestamp was expected but was not found」。绕法:`build/notarize-noproxy.sh` —— 构建期间
+  `networksetup` 临时关系统 HTTP/HTTPS 代理(host 有直连网),trap 在退出时恢复。
+  **⚠️ 被中途 kill 时 trap 不跑、代理留在关的状态,手动恢复:`networksetup -setwebproxy Wi-Fi 127.0.0.1 14984`
+  + `-setsecurewebproxy Wi-Fi 127.0.0.1 14984`。** 纯本地 Debug 用 `OTHER_CODE_SIGN_FLAGS=--timestamp=none`
+  跳过时间戳(带签名+entitlements,能做 App Group IPC)。
+
+### 当前状态(清 context 前快照)
+- 已 commit:5a7ad53 + f3d7c2f。project.yml=0.2.10/12。
+- **/Applications 装的仍是 0.2.9**(有 CPU 修复 + 只有面板级 safeAreaInset 的半截 UI 修复,规则 ＋ 仍看不见);
+  **0.2.10(含 MainWindow VStack 全修)尚未公证安装**(公证被中断)。下轮:`sh build/notarize-noproxy.sh` 出 0.2.10 装上。
+- IPC 已验证:签名 Debug 版 UI 加的「代理 16787」+ 规则「*×*→代理」正确序列化进 App Group 容器(扩展收件箱)。
+  扩展侧 file-log(ext-diag)不写 —— `containerURL(forSecurityApplicationGroupIdentifier:)` 在 sandbox 扩展里返回 nil,
+  要扩展侧日志得改走 UserDefaults(同 deliver)。
+- 端到端(真流量→扩展拦→转 yunti)**未验**:开发机 Bash 沙箱发不出可拦截的直连流量,需真终端 `curl --noproxy '*'
+  https://ifconfig.me` 看出口 IP + 容器连接事件。
+- Proxifier 僵尸透明代理扩展 `com.initex.proxifier.v3.macos.ProxifierExtension [activated enabled]`(provider 没跑),
+  建议系统设置拆掉。
+
+### 防环设计定论(回环 vs 进程身份 / Proxifier / 本地服务)
+**环有两跳,分属两个正交维度:**
+- 跳1 `启用的 app → 本地代理 127.0.0.1:16787`:目的地=**回环** → `LoopbackDetector`/`UpstreamExclusion`
+  (**destination/目的地**维度)搞定。✅ 已有。
+- 跳2 `代理进程 xray → 它真正的上游(公网 IP)`:目的地=**公网**,回环判定看不见它。只能靠 **source/来源进程身份**
+  排除 xray。**=> 回环与进程身份是两个正交维度,各管一跳;纯回环判定根治不了跳2 的环(它目的地不是本地)。**
+
+**Proxifier 怎么做**(概念准确):进程感知的用户态 proxifier(能看到每条连接 + 属主进程)。① 到代理服务器地址的
+连接自动直连(destination auto-direct);② 规则按**应用**匹配,本地代理时给"代理 app → 直连"(source),自动
+检测/建议。appidge 已有 ①(UpstreamExclusion)+ 自身进程排除(ProcessOriginExclusion),**缺"代理进程(xray)自动排除"**。
+
+**本地开发服务别走代理**:(a) 连到本地/LAN 的 dev server → destination 维度,加**私网段直连**
+(10/8、172.16/12、192.168/16、169.254/16、::1、fc00::/7);(b) dev 工具的出站 → 白名单默认直连,不启用不代理。
+
+**完整方案 = 白名单 + 两维自动排除:**
+1. 白名单(默认放过,只代理启用的进程)—— ✅ 本轮已做。**别用 `*`**(会把 xray 也 catch 成环),用具体进程规则。
+2. destination 自动直连:回环(✅)+ **私网段(待加,纯地址判定、好 TDD、零进程身份不确定性)**。
+3. source 自动直连:自身进程(✅)+ **代理进程(待加,Proxifier 式):配回环代理时 App 侧用 libproc 查监听该端口的
+   PID → SecCode 取签名标识 → 随 ruleSet 下发 → 扩展 effectiveRuleSync 命中即 direct。**
+   ⚠️ 不确定点:xray 多半未签名/ad-hoc,`sourceAppSigningIdentifier` 可能是路径/特殊值,App 侧 SecCode 取到的要和
+   扩展看到的**一致**才行——用一条真流量验证后再定死(不一致则改用可执行路径匹配)。
+4. `LoopDetector` 留作运行期安全网(现只告警;可增强为命中即把该进程转 direct 主动断环)。
+
+**下轮实现顺序:** 先「私网段直连」(干净可 TDD、直接解决"本地/LAN 服务别走代理")→ 再「代理进程自动排除」
+(需真流量确认身份匹配)→ 出 0.2.11 公证装上 → 真终端 curl 端到端验证。

@@ -777,3 +777,69 @@ SOCKS4/NTLM/Kerberos/便携版 ③公证需要人的凭据。
 
 **下轮实现顺序:** 先「私网段直连」(干净可 TDD、直接解决"本地/LAN 服务别走代理")→ 再「代理进程自动排除」
 (需真流量确认身份匹配)→ 出 0.2.11 公证装上 → 真终端 curl 端到端验证。
+
+## Phase 11:「私网段直连」+「代理进程自动排除」并行落地(worktree 并行 agent + 我串行接线)
+
+按上面定下的顺序推进,两个基础层文件互不重叠、并行 worktree agent 各自 TDD;共享的 Core/IPCContract
+新增字段我自己先做(避免两个 agent 抢同一批文件);集成接线(effectiveRuleSync + xcodebuild)我串行做。
+
+**共享基础(我,先做)**:`Core.Action.proxyProcessIdentitiesResolved(Set<String>)` +
+`AppState.dynamicOriginExclusionIdentifiers` + `Effect.applyProcessOriginExclusions` +
+`IPCContract.ProcessOriginExclusionMessage`/envelope case。刻意**不**碰现有 `proxyConfigPush`——
+「什么时候该查」的决策留给 AppFeature,Core 侧只加纯粹的"结果回灌"通路,零破坏现有代理配置 reducer 测试
+(那些测试的默认 host 全是 `127.0.0.1`,一旦在 Core 侧顺带触发查询 effect 就会全炸)。4 测试。
+
+**并行 worktree agent A —— `PrivateNetworkExclusion`(EngineKit,15 测试)**:纯 `inet_pton` CIDR 判定,
+覆盖 10/8、172.16/12(非字节对齐,`(byte1 & 0xF0) == 0x10`)、192.168/16、169.254/16、fc00::/7(`(byte0 &
+0xFE) == 0xFC`)。不含 `::1`(回环是 `LoopbackDetector` 的职责,不重复、不 import)。风格与
+`UpstreamExclusion`/`LoopbackDetector` 一致,非 IP 字面量一律 `false`。
+
+**并行 worktree agent B —— `LocalProcessIdentityResolver`(AppFeature,17 测试)**:
+- `LocalProcessIdentity.swift`:协议 `LocalProcessIdentityResolving` + 真实实现
+  `LibprocSecCodeProcessIdentityResolver`(`proc_listallpids` 遍历 + `proc_pidinfo(PROC_PIDLISTFDS)` +
+  `proc_pidfdinfo(PROC_PIDFDSOCKETINFO)` 找 LISTEN 态 TCP socket 匹配端口 → `SecCodeCopyGuestWithAttributes`
+  → `SecCodeCopyStaticCode`(文档化的转换路径,不强转)→ `SecCodeCopySigningInformation` 取
+  `kSecCodeInfoIdentifier`)+ `MockLocalProcessIdentityResolver`(actor,同 `MockProxyReachabilityProbe`
+  风格)。真实实现不进单测(同 `KeychainCredentialStore` 先例),`@unchecked Sendable`(无可变状态,每次调用
+  独立系统调用)。agent 用真实 `python3 -m http.server` 验证过端到端能查到 `com.apple.python3`。
+- `LocalProxyOriginDiscovery.swift`:编排层(同 `ProxyChecker` 分层意图)——只查 active 上游(只有它真的
+  转发流量);host 不是 `127.0.0.1`/`::1`/`localhost` 字面量就不查(对着远程地址查本机监听表没意义,这里
+  故意不做完整 CIDR,那是 agent A 的地界);resolver 返回 nil 视为「本轮没发现」→ 空集合(「变了才推」的
+  幂等已经在 Core reducer 做了,这里不重复维护「记住上次结果」状态)。
+
+**集成(我)**:
+1. `AppidgeApp.swift`:`applyProxyConfig` 效果分支下发消息后,顺带跑一次
+   `LocalProxyOriginDiscovery.discover`,查到的标识经 `.proxyProcessIdentitiesResolved` 回灌;
+   `.applyProcessOriginExclusions` 效果分支下发给扩展。发现逻辑拆成 `static func
+   resolveProcessOriginExclusions` 避免撑爆 `init` 的 `function_body_length` 预算。
+2. `ProxyExtensionProvider.swift`:`effectiveRuleSync` 在回环之后新增私网段判定;新增
+   `ownIdentifiers` 计算属性(静态自身标识 ∪ app 动态下发的标识)替换原来只读静态集合的两处调用点
+   (TCP 的 `effectiveRuleSync` + UDP 的 `blockOrAllowUDPFlow`);`handleAppMessage` 加
+   `applyProcessOriginExclusions` 分支写锁保护的动态集合。
+3. **踩坑**:UDP 处理那段 `private extension` 加了新逻辑后把文件推到 421 行(超 400 行 lint 红线)。
+   同 Phase 10 `TCPFlowPump.swift` 的先例,把 UDP 处理整段拆到新文件
+   `Extension/ProxyExtensionProviderUDP.swift`,把它跨文件访问到的几个成员(`configLock`/
+   `proxyConfig`/`perProcessRules`/`udpPolicy`/`storedUDPRelays`/`ownIdentifiers`/顶层 `flowLogger`)
+   从 `private` 放宽到 `internal`(`private` 只在同文件 extension 内透明,跨文件必须放宽——这是 App/
+   Extension 可执行 target 内部的文件拆分,不是 SPM 包的公共 API 面,不违反任何 B 系列架构不变量)。
+4. **踩坑 #2**:新建的 `.swift` 文件不会被已提交进 git 的 `appidge.xcodeproj` 自动感知——
+   `project.yml` 的 `sources: - path: Extension` 只在 `xcodegen generate` 重新生成时才会把新文件
+   加进 target,手动 `Write` 一个文件到 `Extension/` 目录后必须重跑 `xcodegen generate`
+   再 `xcodebuild`,否则报 `cannot find 'blockOrAllowUDPFlow' in scope`(新文件根本没编译进目标)。
+
+**最终验证**:5 包 460 SPM 测试全绿(Core 71 · IPCContract 13 · EngineKit 207 · AppFeature 158 ·
+ArchitectureTests 11),`xcodebuild -scheme App -configuration Debug` 零并发警告,
+`codesign --verify --deep --strict` exit 0,`swiftlint --strict` 只剩 1 条既存违规(`beginFlow`
+6 个参数,Phase 10 遗留,非本轮引入,未处理)。
+
+**待人工自测(设备限定,需系统扩展获批 + 真流量)**:
+1. 私网段直连:配一台 LAN/局域网服务(如同网段另一台机器的 HTTP 服务)、给发起连接的 app 设成走代理,
+   确认连去 10.x/172.16.x/192.168.x 地址时仍是直连(不经过配置的上游)。
+2. 代理进程自动排除:本机跑一个本地 SOCKS5/HTTP 代理(如 yunti/xray 监听 127.0.0.1 的某端口)、
+   在 appidge 里把它配成上游代理,确认 `dynamicOriginExclusionIdentifiers` 查到了该进程的签名标识
+   (可在 app 侧加日志或用 Console.app 观测),并确认它自身的出站连接不再被转发环二次接管——
+   这是本文件「防环设计定论」一节里唯一还没验证的不确定点(`sourceAppSigningIdentifier` 的粒度
+   是否和 App 侧 `SecCodeCopySigningInformation` 查到的标识**一致**)。若不一致,需要改用可执行路径
+   匹配而非签名标识匹配(见「防环设计定论」第 3 条的兜底方案)。
+
+**仍未动**:出 0.2.11 公证装上、真终端 curl 端到端验证(等①系统扩展获批 ②公证凭据配好)。

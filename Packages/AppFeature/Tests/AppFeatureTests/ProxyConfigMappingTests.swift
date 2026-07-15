@@ -89,6 +89,22 @@ struct ProxyConfigMappingTests {
         #expect(ProxyConfigMapping.udpPolicyMessage(core) == .setUDPPolicy(dto))
     }
 
+    @Test("processOriginExclusionsMessage maps a Set<String> into applyProcessOriginExclusions (order-independent)")
+    func processOriginExclusionsMapping() {
+        let message = ProxyConfigMapping.processOriginExclusionsMessage(["com.example.xray", "com.example.v2ray"])
+        guard case .applyProcessOriginExclusions(let payload) = message else {
+            Issue.record("expected applyProcessOriginExclusions envelope")
+            return
+        }
+        #expect(Set(payload.identifiers) == ["com.example.xray", "com.example.v2ray"])
+    }
+
+    @Test("processOriginExclusionsMessage on an empty set maps to an empty identifiers list")
+    func processOriginExclusionsMappingEmpty() {
+        let message = ProxyConfigMapping.processOriginExclusionsMessage([])
+        #expect(message == .applyProcessOriginExclusions(ProcessOriginExclusionMessage(identifiers: [])))
+    }
+
     @Test(
         "ProxyKind maps 1:1 to ProxyKindDTO across all cases",
         arguments: [

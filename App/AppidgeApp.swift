@@ -19,6 +19,9 @@ struct AppidgeApp: App {
         let transport = AppGroupAppSideTransport(appGroup: "group.com.appidge")
         let connectionLogFileStore = ConnectionLogFileStore()
         self.connectionLogFileStore = connectionLogFileStore
+        // 本地代理进程(如 xray/yunti)签名标识查询：libproc 查监听端口 + SecCode 取签名标识，
+        // 用于转发环硬化的「来源进程自动排除」第二正交维度（见 LocalProxyOriginDiscovery）。
+        let processIdentityResolver: any LocalProcessIdentityResolving = LibprocSecCodeProcessIdentityResolver()
         let store = Store(effectHandler: { effect in
             switch effect {
             case .log:
@@ -33,7 +36,9 @@ struct AppidgeApp: App {
             case .applyProxyConfig(let servers, let activeID):
                 let message = ProxyConfigMapping.proxyConfigMessage(servers: servers, activeID: activeID)
                 await transport.send(message)
-                return nil // 纯下发，扩展据此更新 active 上游 + 上游排除集合
+                return await Self.resolveProcessOriginExclusions(
+                    servers: servers, activeID: activeID, using: processIdentityResolver
+                )
             case .applyRuleSet(let globalProxyEnabled, let assignments, let matchRules):
                 let message = RuleSetMapping.ruleSetMessage(
                     globalProxyEnabled: globalProxyEnabled, assignments: assignments, matchRules: matchRules
@@ -49,6 +54,9 @@ struct AppidgeApp: App {
             case .applyUDPPolicy(let policy):
                 await transport.send(ProxyConfigMapping.udpPolicyMessage(policy))
                 return nil // 纯下发，扩展据此在拦截/直连/SOCKS5 代理之间切换 UDP 处理
+            case .applyProcessOriginExclusions(let identifiers):
+                await transport.send(ProxyConfigMapping.processOriginExclusionsMessage(identifiers))
+                return nil // 纯下发，扩展据此把这些签名标识并进「来源进程自动排除」集合
             }
         })
         _store = State(initialValue: store)
@@ -151,5 +159,20 @@ struct AppidgeApp: App {
             await FilePersistenceStore().save(configuration)            // 无密码落盘
             await PersistedConfiguration.saveCredentials(from: servers, to: credentialStore) // 密码进 Keychain
         }
+    }
+
+    /// applyProxyConfig 下发之后顺带查一次:active 上游若指向本机(如用户配的是本地
+    /// xray/yunti),查出它的签名标识、包成 `.proxyProcessIdentitiesResolved` 供 store
+    /// 回灌——转发环硬化的「来源进程自动排除」（见 LocalProxyOriginDiscovery）。拆成静态
+    /// 方法只是为了不撑爆 init 里 effectHandler 闭包的长度，逻辑本身不复杂。
+    private static func resolveProcessOriginExclusions(
+        servers: [Core.ProxyServer], activeID: Core.ProxyServerID?, using resolver: any LocalProcessIdentityResolving
+    ) async -> Core.Action {
+        let discoveryState = Core.AppState(
+            proxyServers: Dictionary(uniqueKeysWithValues: servers.map { ($0.id, $0) }),
+            activeProxyServerID: activeID
+        )
+        let identifiers = await LocalProxyOriginDiscovery.discover(state: discoveryState, using: resolver)
+        return .proxyProcessIdentitiesResolved(identifiers)
     }
 }

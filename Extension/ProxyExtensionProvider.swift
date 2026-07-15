@@ -7,7 +7,7 @@ import os.log
 
 /// smoke-ne.sh 用 `log stream` 观测这个 subsystem，确认真实流量下
 /// `sourceAppSigningIdentifier` 拿到的是父 app 级还是 CLI 子进程级身份。
-private let flowLogger = Logger(subsystem: "com.appidge.app.ProxyExtension", category: "FlowIdentity")
+let flowLogger = Logger(subsystem: "com.appidge.app.ProxyExtension", category: "FlowIdentity")
 
 /// NEAppProxyTCPFlow 是 NetworkExtension 的旧 Obj-C API，早于 Swift 6 并发审计，
 /// 但按文档「Instances of this class are thread safe」，用 `@retroactive @unchecked
@@ -18,11 +18,16 @@ extension NEAppProxyTCPFlow: @retroactive @unchecked Sendable {}
 /// NETransparentProxyProvider 的真实实现（E1）：接管每条 flow，真实双向转发字节（不是空壳），
 /// 计量经 ``FlowRouter`` 批量上报，诊断经 ``DiagnosticsRunner``。
 ///
-/// 路由决策（``effectiveRule``）三层，从强到弱：
-/// 1. **回环排除**（``LoopbackDetector``）：目的地是 127.0.0.0/8 / ::1 / localhost → 强制直连。
-/// 2. **上游排除**（``UpstreamExclusion``）：目的地正是配置的某台上游代理 → 强制直连，
+/// 路由决策（``effectiveRuleSync``），从强到弱：
+/// 1. **来源进程排除**（``ProcessOriginExclusion``）：发起方是我们自己组件或 app 动态查到的
+///    本地代理进程（如 xray/yunti）→ 强制直连，与下面的地址判定正交，见 PROGRESS.md「防环
+///    设计定论」。
+/// 2. **回环排除**（``LoopbackDetector``）：目的地是 127.0.0.0/8 / ::1 / localhost → 强制直连。
+/// 3. **私网段排除**（``PrivateNetworkExclusion``）：目的地是 10/8、172.16/12、192.168/16、
+///    169.254/16、fc00::/7 → 强制直连（本地/局域网服务不该走代理）。
+/// 4. **上游排除**（``UpstreamExclusion``）：目的地正是配置的某台上游代理 → 强制直连，
 ///    否则"扩展连上游"这一跳会被自己再抓一次，形成转发环。
-/// 3. 否则用该进程分配的规则（``AppliedRuleSetStore``）。
+/// 5. 细粒度规则表（``RuleMatcher``），再不命中则用该进程分配的粗粒度规则（``AppliedRuleSetStore``）。
 ///
 /// 转发（``openRemote``）：`.proxied` 且有 active 上游 → 经 ``SOCKS5Connector`` 隧道；
 /// 否则直连目的地。拨号/握手失败 fail-open：关掉这条 flow，不阻塞其它流量。
@@ -49,7 +54,9 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
 
     // App 下发的代理配置。handleAppMessage（写）和 handleNewFlow 的 Task（读）并发访问，
     // 用锁保护——provider 已是 @unchecked Sendable，这里显式担起这份线程安全。
-    private let configLock = NSLock()
+    // 不是 private:UDP 处理拆到同 target 的 ProxyExtensionProviderUDP.swift,需要跨文件访问
+    // (private 只在同文件内的 extension 才透明,见「拆文件压行数」的既有先例,同 TCPFlowPump)。
+    let configLock = NSLock()
     private var storedProxyConfig: ProxyConfigMessage?
     private var storedRoutingMode: ProxyRoutingModeDTO = .single
     // 每进程规则的同步快照:handleNewFlow(TCP 和 UDP)都必须同步决定接管与否(返回 Bool,
@@ -68,21 +75,25 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     private var storedUDPPolicy: UDPPolicyDTO = .block
     // 活跃的 SOCKS5 UDP 中继,按 flow 生命周期持有(否则 relay 被释放、连接被取消)。按生成的
     // id 存,relay 结束时经 onFinished 拿 id 移除。锁保护。
-    private var storedUDPRelays: [String: SOCKS5UDPRelay] = [:]
+    var storedUDPRelays: [String: SOCKS5UDPRelay] = [:]
+    // App 侧动态查到的本地代理进程(如 xray/yunti)签名标识集合,与静态的 ownProcessIdentifiers
+    // 合并使用(见 ownIdentifiers 计算属性)——转发环硬化「来源进程自动排除」的第二正交维度。
+    // 运行时发现的结果,不持久化,重启后由 app 重新查、applyProcessOriginExclusions 重新下发。
+    private var storedDynamicOriginExclusions: Set<String> = []
 
     private var packetCaptureEnabled: Bool {
         configLock.withLock { storedPacketCaptureEnabled }
     }
 
-    private var udpPolicy: UDPPolicyDTO {
+    var udpPolicy: UDPPolicyDTO {
         configLock.withLock { storedUDPPolicy }
     }
 
-    private var proxyConfig: ProxyConfigMessage? {
+    var proxyConfig: ProxyConfigMessage? {
         configLock.withLock { storedProxyConfig }
     }
 
-    private var perProcessRules: [String: ProxyRuleDTO] {
+    var perProcessRules: [String: ProxyRuleDTO] {
         configLock.withLock { storedPerProcessRules }
     }
 
@@ -92,6 +103,12 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
 
     private var routingMode: ProxyRoutingModeDTO {
         configLock.withLock { storedRoutingMode }
+    }
+
+    /// 「来源进程自动排除」的完整集合:自身组件(静态,启动时定)∪ app 动态查到的本地代理进程
+    /// (运行时可变,随 applyProcessOriginExclusions 更新)。两路来源都命中即强制直连。
+    var ownIdentifiers: Set<String> {
+        Self.ownProcessIdentifiers.union(configLock.withLock { storedDynamicOriginExclusions })
     }
 
     override func startProxy(options: [String: Any]?, completionHandler: @escaping (Error?) -> Void) {
@@ -169,6 +186,8 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             configLock.withLock { storedPacketCaptureEnabled = enabled }
         case .setUDPPolicy(let policy):
             configLock.withLock { storedUDPPolicy = policy }
+        case .applyProcessOriginExclusions(let message):
+            configLock.withLock { storedDynamicOriginExclusions = Set(message.identifiers) }
         }
     }
 
@@ -308,12 +327,15 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     /// 再查每进程规则,都不命中回落 `.direct`。调用方对 `.direct` 一律 return false(放行、不接管)。
     /// host/port 拿不到(极少数解析不出目的地)时跳过地址类判定,只按每进程规则。
     private func effectiveRuleSync(sourceID: String, host: String?, port: UInt16?) -> ProxyRuleDTO {
-        // 转发环硬化(按来源):我们自己组件(app/扩展)发起的连接不接管——无关目的地,先判。
-        if ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourceID, ownIdentifiers: Self.ownProcessIdentifiers) {
+        // 转发环硬化(按来源):我们自己组件(app/扩展)+ app 动态查到的本地代理进程发起的连接
+        // 不接管——无关目的地,先判。
+        if ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourceID, ownIdentifiers: ownIdentifiers) {
             return .direct
         }
         if let host, let port {
             if LoopbackDetector.isLoopback(host: host) { return .direct }
+            // 私网段/link-local 目的地址强制直连(本地/局域网服务不该走代理),与回环正交、互补。
+            if PrivateNetworkExclusion.isPrivateNetwork(host: host) { return .direct }
             let upstreams = Set((proxyConfig?.servers ?? []).map { UpstreamEndpoint(host: $0.host, port: $0.port) })
             if UpstreamExclusion.isUpstream(host: host, port: port, upstreams: upstreams) { return .direct }
             // 细粒度规则表(进程 × 主机 × 端口)优先于每进程粗粒度规则;命中即用其动作。
@@ -344,58 +366,6 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         return try await ProxyDialer.open(
             route: route, to: target, directEndpoint: endpoint, roundRobin: roundRobinSelector
         )
-    }
-
-}
-
-/// UDP 处理 + flow 双向 pump 拆到同文件 extension 里(不占 provider 类体的长度预算,且同文件仍可
-/// 访问其 private 成员)。
-private extension ProxyExtensionProvider {
-    /// UDP/QUIC:按 3 态策略处理。allowDirect→不接管(原生直连);block→接管并 drop(止漏);
-    /// proxy→经 SOCKS5 UDP ASSOCIATE 中继。
-    func blockOrAllowUDPFlow(_ flow: NEAppProxyUDPFlow) -> Bool {
-        let sourceID = flow.metaData.sourceAppSigningIdentifier
-        let active = proxyConfig?.activeServer
-        let disposition = UDPFlowPolicy.disposition(
-            sourceIdentifier: sourceID,
-            ownIdentifiers: Self.ownProcessIdentifiers,
-            perProcessRule: perProcessRules[sourceID],
-            udpPolicy: udpPolicy,
-            upstreamIsSOCKS5: active?.kind == .socks5
-        )
-        switch disposition {
-        case .allowDirect:
-            return false // 不接管,UDP 原生直连。
-        case .block:
-            flowLogger.log("blocking UDP flow from \(sourceID, privacy: .public)")
-            flow.open(withLocalFlowEndpoint: nil) { error in
-                flow.closeReadWithError(error)
-                flow.closeWriteWithError(error)
-            }
-            return true
-        case .proxy:
-            // disposition 已保证 active 是 SOCKS5;兜底再判一次。
-            guard let active, active.kind == .socks5 else {
-                flow.open(withLocalFlowEndpoint: nil) { error in
-                    flow.closeReadWithError(error); flow.closeWriteWithError(error)
-                }
-                return true
-            }
-            startUDPRelay(flow: flow, proxy: active)
-            return true
-        }
-    }
-
-    /// 建一个 SOCKS5 UDP 中继并按 id 持有(结束时经 onFinished 用同一 id 移除)。id 是 let,可安全
-    /// 被 @Sendable 的 onFinished 捕获(不像捕获 relay 变量那样触发并发告警)。
-    func startUDPRelay(flow: NEAppProxyUDPFlow, proxy: ProxyServerDTO) {
-        let id = UUID().uuidString
-        let relay = SOCKS5UDPRelay(flow: flow, proxy: proxy) { [weak self] in
-            guard let self else { return }
-            self.configLock.withLock { _ = self.storedUDPRelays.removeValue(forKey: id) }
-        }
-        configLock.withLock { storedUDPRelays[id] = relay }
-        Task { await relay.start() }
     }
 
 }

@@ -35,6 +35,12 @@ public enum ProxyConfigMapping {
         .setUDPPolicy(dtoUDPPolicy(from: policy))
     }
 
+    /// 把动态发现的本地代理进程签名标识集合翻成 `applyProcessOriginExclusions` 消息。
+    /// `Set` 无序,wire 上用 `[String]` 承载(和其它列表型 DTO 一致),顺序不作约定。
+    public static func processOriginExclusionsMessage(_ identifiers: Set<String>) -> IPCContract.AppToExtensionMessage {
+        .applyProcessOriginExclusions(IPCContract.ProcessOriginExclusionMessage(identifiers: Array(identifiers)))
+    }
+
     /// 穷举 switch(不带 default):`Core.UDPPolicy` 新增 case 时这里编译报错。
     private static func dtoUDPPolicy(from policy: Core.UDPPolicy) -> IPCContract.UDPPolicyDTO {
         switch policy {

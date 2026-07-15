@@ -84,8 +84,19 @@ enum ProxyDialer {
     }
 
     /// 直连目的地并挂起到 `.ready`(或失败)。返回时连接已可读写。
+    ///
+    /// **必须显式清空这条连接的代理配置**——绝不能让它默认继承系统级 HTTP/SOCKS 代理(比如
+    /// yunti):那正是 5a7ad53 那次 CPU 死转事故的根因(我们自建的直连 `NWConnection` 被
+    /// Network.framework 自己的系统代理解析递归绕死,provider 100% CPU 被系统杀)。现在
+    /// `.direct` 规则也会走这条路径(``TCPFlowDecision/handle(_:)`` 不再排除 `.direct`),
+    /// 所以这里的"直连"必须是真正意义上不经过任何代理的直连,用 `NWParameters.PrivacyContext`
+    /// 显式把 `proxyConfigurations` 清空(macOS 14+ API,部署目标已是 15.0)。
     static func openDirect(to endpoint: Network.NWEndpoint) async throws -> NWConnection {
-        let connection = NWConnection(to: endpoint, using: .tcp)
+        let parameters = NWParameters.tcp
+        let privacyContext = NWParameters.PrivacyContext(description: "appidge.directDial")
+        privacyContext.proxyConfigurations = []
+        parameters.setPrivacyContext(privacyContext)
+        let connection = NWConnection(to: endpoint, using: parameters)
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let box = ResumeOnceBox(continuation)
             connection.stateUpdateHandler = { state in

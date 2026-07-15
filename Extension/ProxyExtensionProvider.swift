@@ -15,22 +15,33 @@ let flowLogger = Logger(subsystem: "com.appidge.app.ProxyExtension", category: "
 /// 零并发警告，`@retroactive` 避免了「未来 Apple 自己加 Sendable 会冲突」的警告）。
 extension NEAppProxyTCPFlow: @retroactive @unchecked Sendable {}
 
+/// `effectiveRuleSync` 对一条 TCP flow 的判定结论。`.bypass` 是转发环硬化的安全边界(见类型
+/// 注释四道闸),绝不接管;`.handle` 是"我们接管这条 flow"——即使 rule 是 `.direct` 也接管
+/// (自己直连,只是不走代理),这样才能对任意进程计量/显示速率。
+enum TCPFlowDecision: Equatable {
+    case bypass
+    case handle(ProxyRuleDTO)
+}
+
 /// NETransparentProxyProvider 的真实实现（E1）：接管每条 flow，真实双向转发字节（不是空壳），
 /// 计量经 ``FlowRouter`` 批量上报，诊断经 ``DiagnosticsRunner``。
 ///
-/// 路由决策（``effectiveRuleSync``），从强到弱：
+/// 路由决策（``effectiveRuleSync``），从强到弱:
 /// 1. **来源进程排除**（``ProcessOriginExclusion``）：发起方是我们自己组件或 app 动态查到的
-///    本地代理进程（如 xray/yunti）→ 强制直连，与下面的地址判定正交，见 PROGRESS.md「防环
-///    设计定论」。
-/// 2. **回环排除**（``LoopbackDetector``）：目的地是 127.0.0.0/8 / ::1 / localhost → 强制直连。
+///    本地代理进程（如 xray/yunti）→ `.bypass`（强制直连、不接管），与下面的地址判定正交，
+///    见 PROGRESS.md「防环设计定论」。
+/// 2. **回环排除**（``LoopbackDetector``）：目的地是 127.0.0.0/8 / ::1 / localhost → `.bypass`。
 /// 3. **私网段排除**（``PrivateNetworkExclusion``）：目的地是 10/8、172.16/12、192.168/16、
-///    169.254/16、fc00::/7 → 强制直连（本地/局域网服务不该走代理）。
-/// 4. **上游排除**（``UpstreamExclusion``）：目的地正是配置的某台上游代理 → 强制直连，
+///    169.254/16、fc00::/7 → `.bypass`（本地/局域网服务不该走代理）。
+/// 4. **上游排除**（``UpstreamExclusion``）：目的地正是配置的某台上游代理 → `.bypass`，
 ///    否则"扩展连上游"这一跳会被自己再抓一次，形成转发环。
-/// 5. 细粒度规则表（``RuleMatcher``），再不命中则用该进程分配的粗粒度规则（``AppliedRuleSetStore``）。
+/// 5. 细粒度规则表（``RuleMatcher``），再不命中则用该进程分配的粗粒度规则（``AppliedRuleSetStore``）；
+///    以上四道闸都没命中时一律 `.handle(rule)` ——**包括 `rule == .direct`**：我们接管、自己拨号
+///    直连原目的地(不经代理),只是为了能统一计量/显示速率,不是让它"多走一层"。
 ///
 /// 转发（``openRemote``）：`.proxied` 且有 active 上游 → 经 ``SOCKS5Connector`` 隧道；
-/// 否则直连目的地。拨号/握手失败 fail-open：关掉这条 flow，不阻塞其它流量。
+/// 否则直连目的地（``ProxyDialer/openDirect(to:)`` 显式清空代理配置，避免重蹈 5a7ad53 的覆辙）。
+/// 拨号/握手失败 fail-open：关掉这条 flow，不阻塞其它流量。
 final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Sendable {
     private var router: FlowRouter?
     private var transport: NEFlowTransport?
@@ -211,13 +222,14 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         let remoteHostname = tcpFlow.remoteHostname
         let hostPort = ProxyDialer.hostPort(from: remoteEndpoint)
 
-        // 按进程**选择性接管**:同步解出规则,非 .proxied/.block 一律**放行**(return false),让系统
-        // 原生直连——appidge 不进它的数据路径,不影响 yunti / 全局流量;只有用户在 app 里显式给该
-        // 进程设了走代理/拦截才接管。这也彻底断掉了"接管并 pump 直连流量 → 自建的 NWConnection
-        // 继承系统代理(yunti) → Network.framework 代理端点解析递归死循环"那条 99% CPU 空转链
-        // (见 cpu_resource 回溯:nw_endpoint_proxy_start_next_child 自递归)。UDP 侧早已是这个语义。
-        let rule = effectiveRuleSync(sourceID: sourceID, host: hostPort?.0, port: hostPort?.1)
-        guard rule != .direct else { return false }
+        // 转发环硬化的四道闸(自身来源/回环/私网段/上游排除)—— .bypass 绝不接管,让系统原生处理,
+        // 这是 CPU 死转事故(5a7ad53)划定的安全边界,不能碰。除此之外一律 .handle(rule)接管——
+        // 包括 rule == .direct:现在"直连"也由我们自己拨号(见 ProxyDialer.openDirect 的显式
+        // no-proxy NWParameters),只是不走代理、原样连到原目的地,这样"应用"页才能对所有进程
+        // 显示真实速率/流量,不再局限于走代理的进程。
+        guard case .handle(let rule) = effectiveRuleSync(sourceID: sourceID, host: hostPort?.0, port: hostPort?.1) else {
+            return false
+        }
 
         flowLogger.log("""
         handleNewTCPFlow INTERCEPT src=\(sourceID, privacy: .public) rule=\(String(describing: rule), privacy: .public) \
@@ -323,27 +335,33 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
 
     /// handleNewFlow 必须**同步**决定接管与否(返回 Bool),不能 await actor。这是原 async effectiveRule
     /// 的同步镜像:用锁保护的快照(storedMatchRules / storedPerProcessRules / storedProxyConfig)做
-    /// 完全相同的三层决策。三个排除(自身来源 / 回环 / 上游)命中即 `.direct`;否则先查 match 规则表、
-    /// 再查每进程规则,都不命中回落 `.direct`。调用方对 `.direct` 一律 return false(放行、不接管)。
+    /// 完全相同的判定,只是结论现在分两种:
+    /// - `.bypass`:转发环硬化的四道闸(自身来源 / 回环 / 私网段 / 上游排除)命中——**绝不接管**,
+    ///   让系统原生处理。这四类划定的是 CPU 死转事故(5a7ad53)之后的安全边界,不能扩大。
+    /// - `.handle(rule)`:除以上四类之外,一律接管——包含 `rule == .direct` 的情形(用户没给这个
+    ///   进程分配代理/拦截规则时的默认值)。以前 `.direct` 也是"放行不接管",现在改成"接管但自己
+    ///   直连"(见 `TCPFlowDecision` 与 `ProxyDialer.openDirect`),这样"应用"页才能对任意进程展示
+    ///   真实速率——代价是必须保证直连路径不会重新引入 5a7ad53 那次的系统代理递归,见 openDirect
+    ///   显式清空 NWParameters 的代理配置。
     /// host/port 拿不到(极少数解析不出目的地)时跳过地址类判定,只按每进程规则。
-    private func effectiveRuleSync(sourceID: String, host: String?, port: UInt16?) -> ProxyRuleDTO {
+    private func effectiveRuleSync(sourceID: String, host: String?, port: UInt16?) -> TCPFlowDecision {
         // 转发环硬化(按来源):我们自己组件(app/扩展)+ app 动态查到的本地代理进程发起的连接
         // 不接管——无关目的地,先判。
         if ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourceID, ownIdentifiers: ownIdentifiers) {
-            return .direct
+            return .bypass
         }
         if let host, let port {
-            if LoopbackDetector.isLoopback(host: host) { return .direct }
+            if LoopbackDetector.isLoopback(host: host) { return .bypass }
             // 私网段/link-local 目的地址强制直连(本地/局域网服务不该走代理),与回环正交、互补。
-            if PrivateNetworkExclusion.isPrivateNetwork(host: host) { return .direct }
+            if PrivateNetworkExclusion.isPrivateNetwork(host: host) { return .bypass }
             let upstreams = Set((proxyConfig?.servers ?? []).map { UpstreamEndpoint(host: $0.host, port: $0.port) })
-            if UpstreamExclusion.isUpstream(host: host, port: port, upstreams: upstreams) { return .direct }
+            if UpstreamExclusion.isUpstream(host: host, port: port, upstreams: upstreams) { return .bypass }
             // 细粒度规则表(进程 × 主机 × 端口)优先于每进程粗粒度规则;命中即用其动作。
             if let matched = RuleMatcher.firstMatch(matchRules, app: sourceID, host: host, port: port) {
-                return matched
+                return .handle(matched)
             }
         }
-        return perProcessRules[sourceID] ?? .direct
+        return .handle(perProcessRules[sourceID] ?? .direct)
     }
 
     /// `.proxied` → 按 ``ProxyRouteResolver`` 解析出的路由拨上游、做隧道握手,返回已就绪、可直接

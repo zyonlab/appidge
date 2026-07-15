@@ -66,4 +66,28 @@ struct ConnectionLogReducerTests {
         #expect(state.connectionLog.first?.id == "c0") // still first, updated in place
         #expect(state.connectionLog.first?.phase == .closed)
     }
+
+    @Test("a connection event for a never-before-seen process registers it in state.processes (default direct)")
+    func registersUnknownProcess() {
+        let (next, _) = Reducer.reduce(AppState(), .connectionEventReceived(entry("c1")))
+        #expect(next.processes[ProcessID("com.x")]?.rule == .direct)
+        #expect(next.processes[ProcessID("com.x")]?.displayName == "com.x")
+    }
+
+    @Test("a connection event for an already-known process leaves its displayName/rule untouched")
+    func knownProcessUntouched() {
+        var state = AppState()
+        state.processes[ProcessID("com.x")] = MonitoredProcess(
+            id: ProcessID("com.x"), displayName: "My App", executablePath: "/Applications/My App.app", rule: .proxied
+        )
+        let (next, _) = Reducer.reduce(state, .connectionEventReceived(entry("c1")))
+        #expect(next.processes[ProcessID("com.x")]?.displayName == "My App")
+        #expect(next.processes[ProcessID("com.x")]?.rule == .proxied)
+    }
+
+    @Test("registering a new process from a connection event does not itself emit a rule-set push")
+    func registeringDoesNotPushRuleSet() {
+        let (_, effects) = Reducer.reduce(AppState(), .connectionEventReceived(entry("c1")))
+        #expect(effects.isEmpty)
+    }
 }

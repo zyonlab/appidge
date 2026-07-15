@@ -17,22 +17,28 @@ struct ProxyServersPaneView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        Group {
             if sortedServers.isEmpty {
                 ContentUnavailableView(
                     "还没有代理服务器",
                     systemImage: "server.rack",
                     description: Text("点下面的「＋」添加一台上游代理。")
                 )
-                .frame(maxHeight: .infinity)
             } else {
                 serverTable
             }
-            Divider()
-            toolbar
-            Divider()
-            RoutingModeSection(store: store, servers: sortedServers)
-                .padding()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // 工具栏 + 路由模式固定在底部,始终可见(同 RulesEditorPaneView:避免空态把它们挤出可视区)。
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+                Divider()
+                toolbar
+                Divider()
+                RoutingModeSection(store: store, servers: sortedServers)
+                    .padding()
+            }
+            .background(.bar)
         }
         .sheet(isPresented: $showingAdd) {
             AddProxyServerSheet(store: store)

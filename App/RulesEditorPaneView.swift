@@ -14,19 +14,27 @@ struct RulesEditorPaneView: View {
     private var rules: [ProxyMatchRule] { store.state.rules }
 
     var body: some View {
-        VStack(spacing: 0) {
+        Group {
             if rules.isEmpty {
                 ContentUnavailableView(
                     "还没有规则",
                     systemImage: "list.bullet.rectangle",
                     description: Text("点「＋」加一条，比如「主机 *.google.com → 代理」。规则从上到下、首个命中生效。")
                 )
-                .frame(maxHeight: .infinity)
             } else {
                 rulesTable
             }
-            Divider()
-            toolbar
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // 工具栏用 safeAreaInset 固定在面板底部,始终可见。之前它是 VStack 的末尾元素,空态的
+        // ContentUnavailableView 会把它挤出可视区(叠加窗底状态栏的 safeAreaInset)——「＋」消失、
+        // 没法加规则。改为底部 inset 后与状态栏各占一层、永远露出来。
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+                Divider()
+                toolbar
+            }
+            .background(.bar)
         }
         .sheet(isPresented: $showingAdd) {
             AddMatchRuleSheet(store: store)

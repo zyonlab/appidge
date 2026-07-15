@@ -21,8 +21,8 @@ packages:
 settingGroups:
   common:
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "0.2.8"
-    CURRENT_PROJECT_VERSION: "10"
+    MARKETING_VERSION: "0.2.10"
+    CURRENT_PROJECT_VERSION: "12"
     CODE_SIGN_STYLE: Manual
     CODE_SIGN_IDENTITY: "Developer ID Application"
     DEVELOPMENT_TEAM: $(DEVELOPMENT_TEAM)

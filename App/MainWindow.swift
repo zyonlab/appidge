@@ -19,36 +19,40 @@ struct MainWindow: View {
     @State private var showInspector = true
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $section) {
-                ForEach(SidebarSection.allCases) { item in
-                    Label(item.title, systemImage: item.symbol).tag(item)
+        VStack(spacing: 0) {
+            NavigationSplitView {
+                List(selection: $section) {
+                    ForEach(SidebarSection.allCases) { item in
+                        Label(item.title, systemImage: item.symbol).tag(item)
+                    }
+                }
+                .navigationSplitViewColumnWidth(min: 168, ideal: 188, max: 240)
+                .navigationTitle("appidge")
+            } detail: {
+                detail
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if let warning = store.state.loopWarning {
+                    LoopWarningBanner(signature: warning) { store.dispatch(.dismissLoopWarning) }
                 }
             }
-            .navigationSplitViewColumnWidth(min: 168, ideal: 188, max: 240)
-            .navigationTitle("appidge")
-        } detail: {
-            detail
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Toggle(isOn: Binding(
+                        get: { store.state.isGlobalProxyEnabled },
+                        set: { store.dispatch(.setGlobalProxyEnabled($0)) }
+                    )) {
+                        Label("全局代理", systemImage: "network")
+                    }
+                    .toggleStyle(.switch)
+                    .help("总开关：关掉时全部直连")
+                }
+            }
+            // 状态栏作为 VStack 同级子视图(而非 NavigationSplitView 的 .safeAreaInset)。用 bottom
+            // safeAreaInset 时,detail 列内容会伸进被 inset 的区域,把面板底部工具栏(如「规则」的 ＋)
+            // 盖在状态栏底下——高的 inset(如「代理」含路由模式)能露头、矮的(「规则」只一行工具栏)
+            // 全被盖住。作为同级子视图它真正占位,detail 内容排在其上方,工具栏恒可见。
             StatusBar(store: store)
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if let warning = store.state.loopWarning {
-                LoopWarningBanner(signature: warning) { store.dispatch(.dismissLoopWarning) }
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Toggle(isOn: Binding(
-                    get: { store.state.isGlobalProxyEnabled },
-                    set: { store.dispatch(.setGlobalProxyEnabled($0)) }
-                )) {
-                    Label("全局代理", systemImage: "network")
-                }
-                .toggleStyle(.switch)
-                .help("总开关：关掉时全部直连")
-            }
         }
         .frame(minWidth: 900, minHeight: 520)
     }

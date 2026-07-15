@@ -864,3 +864,86 @@ ArchitectureTests 11),`xcodebuild -scheme App -configuration Debug` 零并发警
 再点一次「允许」才能换成新版本生效(旧的两条 0.2.7/0.2.8 记录已经是 `[terminated waiting to
 uninstall on reboot]`,同样的「等重启才彻底清掉」模式大概率也适用于这次的版本升级)。之后再跑
 `scripts/smoke-ne.sh` / 真终端 curl 验证端到端。
+
+## Phase 12:「应用页展示所有进程 + 直连也计量」尝试、回归、复盘(2026-07-15 晚)
+
+### 0.2.12:短暂放开 `.direct` 也接管——真机验证抓到真问题,已回退到 0.2.13
+
+为了让"应用"页对所有进程(不只是走代理的)展示实时速率,把 `effectiveRuleSync` 改成
+`.direct` 也 `.handle`(接管、自己直连、不走代理,只是为了计量);`Core.connectionEventReceived`
+顺带把第一次见到的进程注册进 `state.processes`(这部分设计合理,后续保留了);`ProxyDialer.openDirect`
+补了显式清空 `NWParameters.PrivacyContext.proxyConfigurations` 防止重蹈 5a7ad53 CPU 死转的覆辙。
+
+**真机验证(commit `1c12609`)抓到真问题**:xray/yunti 在这台机器上是**两个进程**——监听配置端口
+(16787)的那个 `sourceAppSigningIdentifier` 报 `com.example.yunti`,能被 `LocalProxyOriginDiscovery`
+正确排除;它另一个真正做出站连接的进程却报成完全不同的 `a.out`,没被现有的按签名标识排除覆盖到。
+15 分钟内接管的 8892 条 flow 里 8781 条是这个没被排除的 xray 进程——不是死循环,但把用户已经在用
+的真实代理软件的全部流量套了层不必要的转发,带来真实的 CPU/延迟开销。**回退**:`effectiveRuleSync`
+解出 `.direct` 时统一 `.bypass`,恢复到只有 `.proxied`/`.block` 才接管的原语义。
+
+### 调研 Proxifier + ProxyBridge,找到根因的正确修法(0.2.14)
+
+用户要求调研成熟工具怎么处理"活动进程全部转发 + 自动排除本地代理软件 + 防环",两路调研:
+
+**Proxifier(黑盒,读官方文档)**:
+- "Handle Direct Connections" 就是我们想做的事——`.direct` 规则命中的连接照样被接管、计量,
+  只是不转发去代理("This working mode does not differ in any way from working through a
+  proxy server, except that the connection is established directly")。确认这个设计目标本身
+  合理,不是异想天开。
+- 但"自动检测本地代理软件"**不存在**——loop 文档原话:"Proxifier should be configured to
+  bypass connections made by local proxy"(手动配)、"and the Handle Direct Connections option
+  should be disabled"(官方推荐的安全默认值是**关掉**全量接管,除非已手动配好排除规则)。
+  防环规则匹配按**可执行文件名**(不认路径,"the path of the file is not relevant"),支持通配符
+  + 分号分隔多个文件名——即"多进程本地代理软件"这个问题,Proxifier 的答案是"用户自己把每个
+  相关可执行文件名都列进排除规则",不是自动认出整个进程家族。
+- 兜底是被动的"Infinite Connection Loop Detection"——自适应监控,检测到环就阻断所有新连接
+  弹窗,不是预防。
+
+**ProxyBridge(开源,github.com/InterceptSuite/ProxyBridge,直接读 `AppProxyProvider.swift`
+源码而非文档)**:
+- 自身排除只硬编码两个 bundle id(`if processPath == "com.interceptsuite.ProxyBridge" ...
+  { return false } // never proxy our own traffic, it would loop`)——对第三方本地代理软件
+  **完全没有**自动排除,比我们已有的 `LocalProxyOriginDiscovery` 更弱。
+- `DIRECT` 动作明确 `return false`(不接管,原生直连)——和我们回退后的 0.2.13 语义一致,不是
+  Proxifier 那种全量接管的路子,是又一个"回退状态本身没问题"的独立信号。
+- **关键技巧,直接解了这次的 bug**:每条 flow 除了 `sourceAppSigningIdentifier`,还从
+  `NEFlowMetaData.sourceAppAuditToken`(定长 `audit_token_t`,PID 在下标 5)解出真实 PID,
+  再用 `proc_pidpath` 查它的可执行文件路径,签名标识和路径两路信号**独立**匹配,任一命中就算数。
+  未签名软件的多个进程签名标识可能不一致,但可执行文件路径更稳(同一个软件安装的多个进程通常
+  共享/关联同一个可执行文件)。
+
+**结论落地(0.2.14,commit `74ae521`)**:不是"自动排除做过头了要收手",是"自动排除的信号
+只有一路、覆盖不全"——照抄 ProxyBridge 的技巧补第二路信号:
+- `IPCContract.ProcessOriginExclusionMessage` 加 `executablePaths` 字段;`Core` 新增
+  `OriginExclusionDiscovery(identifiers:executablePaths:)` 取代裸 `Set<String>`。
+- `AppFeature.LocalProcessIdentity`(新类型)取代裸签名标识字符串;
+  `LibprocSecCodeProcessIdentityResolver` 查到监听端口的 PID 后顺带 `proc_pidpath` 查路径。
+- `Extension/ProcessPathResolver.swift`(新文件):audit token → PID → `proc_pidpath`,
+  带 PID→路径缓存(避免同一进程每条 flow 都重复系统调用)。`effectiveRuleSync` 现在对签名标识、
+  可执行文件路径两路信号各自独立判一次 `ProcessOriginExclusion.shouldBypass`,UDP 路径同步补上。
+- **`.direct` 这次没有重新放开接管**——先把排除信号做扎实,下一轮真机验证过两路信号确实兜住
+  本地代理软件的所有进程之后,再考虑要不要重新支持"应用页对所有进程显示速率"。
+
+### 顺带修的诊断能力缺口:`ExtDiag` 从来没真正写出过东西
+
+排查过程中发现 `ExtDiag`(扩展侧文件日志)用 `containerURL(forSecurityApplicationGroupIdentifier:)`
+写文件,这条路径在这台机器的沙盒扩展里从来没成功写出过 `ext-diag.log`(此前已经是 known gap,
+PROGRESS 里记过但没修)。**改用 App Group `UserDefaults`**(`NEFlowTransport.deliver`/
+`AppGroupAppSideTransport` 那套已反复验证能跨进程工作的同一套 IPC 通道),滚动缓冲 2000 行。
+终端读取:`defaults read group.com.appidge ExtDiag.log`。新增详细日志覆盖:
+- `handleAppMessage` 收到 `applyRuleSet`/`applyProxyConfig`/`applyProcessOriginExclusions` 时
+  记一条摘要(规则表/服务器列表/排除标识长什么样)——定位"配置有没有真的下发到扩展"。
+- `handleNewTCPFlow`/`blockOrAllowUDPFlow` **每条 flow**(不只是被接管的)都记一条判定结果 +
+  原因标签(`bypass:own-identifier` / `bypass:loopback` / `handle:matchRule(...)` 等)——
+  定位"用户配置不对 vs 压根没拦截到"不用再靠重新公证装机才能看结果。
+
+拆文件压 lint 阈值:`effectiveRuleSync` + `makeDiagnosticsRunner` 拆到新文件
+`Extension/ProxyExtensionProviderRouting.swift`(同既有的 TCPFlowPump/UDP 处理拆文件先例)。
+
+**最终**:5 包 466 SPM 测试全绿,`xcodebuild` Debug 零并发警告,`codesign --verify --deep --strict`
+通过,`swiftlint --strict` 只剩 1 条 pre-existing 无关违规(`beginFlow` 参数数)。
+
+**这轮的教训**:两次"CPU 死转"类事故(5a7ad53、0.2.12 的转发环流量放大)都是同一类根因——
+**转发环防护的"自动排除"信号覆盖不全**,不是"接管流量"这个方向错了。下次再想放开 `.direct`
+接管前,先确认两路信号(签名标识 + 可执行文件路径)在真机上确实兜住了本地代理软件的全部进程,
+用新增的 `ExtDiag` 详细日志直接验证,不用再靠"装上跑一段时间看有没有异常流量"这种滞后的方式发现。

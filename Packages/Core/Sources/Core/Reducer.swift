@@ -317,6 +317,12 @@ private extension Reducer {
             var state = state
             state.extensionActivation = activation
             return (state, [])
+        case .proxyProcessIdentitiesResolved(let identifiers):
+            // 未变化就不推(和 applyProxyConfig 等其它下发一致的幂等守卫)。
+            guard state.dynamicOriginExclusionIdentifiers != identifiers else { return (state, []) }
+            var state = state
+            state.dynamicOriginExclusionIdentifiers = identifiers
+            return (state, [.applyProcessOriginExclusions(identifiers)])
         default:
             return nil
         }

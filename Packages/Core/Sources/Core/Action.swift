@@ -35,4 +35,7 @@ public enum Action: Sendable, Equatable {
     case setUDPPolicy(UDPPolicy)
     /// 系统扩展激活状态变化(由 `SystemExtensionActivator` 的 delegate 回调驱动)。纯状态回灌,无副作用。
     case extensionActivationChanged(ExtensionActivation)
+    /// App 侧查到了本地代理进程(如 xray/yunti)的签名标识集合(libproc 查监听端口 PID + SecCode
+    /// 取签名),用于转发环硬化的「来源进程自动排除」。何时查询由 AppFeature 编排,这里只回灌结果。
+    case proxyProcessIdentitiesResolved(Set<String>)
 }

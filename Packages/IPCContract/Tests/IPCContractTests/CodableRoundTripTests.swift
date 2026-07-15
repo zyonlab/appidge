@@ -177,4 +177,21 @@ struct CodableRoundTripTests {
         )
         #expect(try roundTrip(message) == message)
     }
+
+    @Test("ProcessOriginExclusionMessage round-trips, including the empty case — 动态来源排除标识")
+    func processOriginExclusionMessageRoundTrip() throws {
+        let populated = ProcessOriginExclusionMessage(identifiers: ["com.example.xray", "com.example.v2ray"])
+        #expect(try roundTrip(populated) == populated)
+
+        let empty = ProcessOriginExclusionMessage(identifiers: [])
+        #expect(try roundTrip(empty) == empty)
+    }
+
+    @Test("AppToExtensionMessage.applyProcessOriginExclusions round-trips through the envelope")
+    func applyProcessOriginExclusionsEnvelope() throws {
+        let message = AppToExtensionMessage.applyProcessOriginExclusions(
+            ProcessOriginExclusionMessage(identifiers: ["com.example.xray"])
+        )
+        #expect(try roundTrip(message) == message)
+    }
 }

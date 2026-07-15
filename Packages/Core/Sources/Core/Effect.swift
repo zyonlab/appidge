@@ -15,4 +15,7 @@ public enum Effect: Sendable, Equatable {
     case applyPacketCapture(Bool)
     /// UDP 策略变了,推给扩展。
     case applyUDPPolicy(UDPPolicy)
+    /// 动态发现的本地代理进程签名标识集合变了,推给扩展跟自身 app/扩展的标识合并,扩展侧命中
+    /// 即强制直连(转发环硬化的「来源进程自动排除」，见 `EngineKit.ProcessOriginExclusion`)。
+    case applyProcessOriginExclusions(Set<String>)
 }

@@ -7,6 +7,8 @@ public enum AppToExtensionMessage: Sendable, Equatable, Codable {
     case setPacketCapture(Bool)
     /// 设置 proxied 进程的 UDP 处理策略。
     case setUDPPolicy(UDPPolicyDTO)
+    /// 动态发现的本地代理进程签名标识集合(转发环硬化的「来源进程自动排除」)。
+    case applyProcessOriginExclusions(ProcessOriginExclusionMessage)
 }
 
 public enum ExtensionToAppMessage: Sendable, Equatable, Codable {

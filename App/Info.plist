@@ -22,5 +22,7 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSHumanReadableCopyright</key>
 	<string></string>
+	<key>NSSystemExtensionUsageDescription</key>
+	<string>appidge 需要一个系统扩展来按进程转发 / 拦截网络流量。</string>
 </dict>
 </plist>

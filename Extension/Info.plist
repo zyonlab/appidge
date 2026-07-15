@@ -28,5 +28,7 @@
 			<string>$(PRODUCT_MODULE_NAME).ProxyExtensionProvider</string>
 		</dict>
 	</dict>
+	<key>NSSystemExtensionUsageDescription</key>
+	<string>appidge 需要一个系统扩展来按进程转发 / 拦截网络流量。</string>
 </dict>
 </plist>

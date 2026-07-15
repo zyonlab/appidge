@@ -85,6 +85,7 @@ final class SystemExtensionActivator: NSObject, OSSystemExtensionRequestDelegate
     }
 
     nonisolated func requestNeedsUserApproval(_ request: OSSystemExtensionRequest) {
+        FileHandle.standardError.write(Data("SEA: needs user approval\n".utf8))
         activatorLogger.log("needs user approval in System Settings > Privacy & Security")
         Task { @MainActor in self.report(.needsApproval) }
     }
@@ -98,6 +99,7 @@ final class SystemExtensionActivator: NSObject, OSSystemExtensionRequestDelegate
     }
 
     nonisolated func request(_ request: OSSystemExtensionRequest, didFinishWithResult result: OSSystemExtensionRequest.Result) {
+        FileHandle.standardError.write(Data("SEA: activation finished result=\(result.rawValue)\n".utf8))
         activatorLogger.log("activation finished: \(String(describing: result), privacy: .public)")
         // .completed / .willCompleteAfterReboot 都视作已接管（重启后生效那种也算装上了）。
         Task { @MainActor in self.report(.active) }

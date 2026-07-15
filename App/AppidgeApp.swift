@@ -89,6 +89,10 @@ struct AppidgeApp: App {
                 if store.state.hasCompletedOnboarding {
                     SystemExtensionActivator.shared.activate()
                 }
+                // 扩展获批后,必须由 app 启动透明代理会话,流量才会进 provider。不依赖 activate() 的
+                // .completed 回调(旧版本「待重启卸载」时它可能一直不回),启动时直接尝试一次:
+                // 幂等——已在跑就跳过,扩展没批准则 startVPNTunnel 失败并记 stderr,不影响别的。
+                await TransparentProxyController.start()
             }
         }
         .onChange(of: scenePhase) { _, newPhase in

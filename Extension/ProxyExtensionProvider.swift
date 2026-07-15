@@ -16,8 +16,9 @@ let flowLogger = Logger(subsystem: "com.appidge.app.ProxyExtension", category: "
 extension NEAppProxyTCPFlow: @retroactive @unchecked Sendable {}
 
 /// `effectiveRuleSync` 对一条 TCP flow 的判定结论。`.bypass` 是转发环硬化的安全边界(见类型
-/// 注释四道闸),绝不接管;`.handle` 是"我们接管这条 flow"——即使 rule 是 `.direct` 也接管
-/// (自己直连,只是不走代理),这样才能对任意进程计量/显示速率。
+/// 注释四道闸)**以及** rule 最终解出是 `.direct` 的情形——一律不接管;`.handle` 只覆盖
+/// `.proxied`/`.block`。`.direct` 曾短暂改成"接管但自己直连",真机验证发现本地代理软件常有
+/// 多个进程、签名标识因进程而异,现有排除只精确匹配了其中一个,已回退,详见 `effectiveRuleSync`。
 enum TCPFlowDecision: Equatable {
     case bypass
     case handle(ProxyRuleDTO)
@@ -36,8 +37,8 @@ enum TCPFlowDecision: Equatable {
 /// 4. **上游排除**（``UpstreamExclusion``）：目的地正是配置的某台上游代理 → `.bypass`，
 ///    否则"扩展连上游"这一跳会被自己再抓一次，形成转发环。
 /// 5. 细粒度规则表（``RuleMatcher``），再不命中则用该进程分配的粗粒度规则（``AppliedRuleSetStore``）；
-///    以上四道闸都没命中时一律 `.handle(rule)` ——**包括 `rule == .direct`**：我们接管、自己拨号
-///    直连原目的地(不经代理),只是为了能统一计量/显示速率,不是让它"多走一层"。
+///    解出的结果只要是 `.direct` 也一律 `.bypass`——只有 `.proxied`/`.block` 才 `.handle`(见
+///    `TCPFlowDecision` 的说明,这条是回退过一次的边界,别再放开)。
 ///
 /// 转发（``openRemote``）：`.proxied` 且有 active 上游 → 经 ``SOCKS5Connector`` 隧道；
 /// 否则直连目的地（``ProxyDialer/openDirect(to:)`` 显式清空代理配置，避免重蹈 5a7ad53 的覆辙）。
@@ -335,14 +336,22 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
 
     /// handleNewFlow 必须**同步**决定接管与否(返回 Bool),不能 await actor。这是原 async effectiveRule
     /// 的同步镜像:用锁保护的快照(storedMatchRules / storedPerProcessRules / storedProxyConfig)做
-    /// 完全相同的判定,只是结论现在分两种:
-    /// - `.bypass`:转发环硬化的四道闸(自身来源 / 回环 / 私网段 / 上游排除)命中——**绝不接管**,
-    ///   让系统原生处理。这四类划定的是 CPU 死转事故(5a7ad53)之后的安全边界,不能扩大。
-    /// - `.handle(rule)`:除以上四类之外,一律接管——包含 `rule == .direct` 的情形(用户没给这个
-    ///   进程分配代理/拦截规则时的默认值)。以前 `.direct` 也是"放行不接管",现在改成"接管但自己
-    ///   直连"(见 `TCPFlowDecision` 与 `ProxyDialer.openDirect`),这样"应用"页才能对任意进程展示
-    ///   真实速率——代价是必须保证直连路径不会重新引入 5a7ad53 那次的系统代理递归,见 openDirect
-    ///   显式清空 NWParameters 的代理配置。
+    /// 完全相同的判定,结论分两种:
+    /// - `.bypass`:转发环硬化的四道闸(自身来源 / 回环 / 私网段 / 上游排除)命中,**或者**最终解出
+    ///   的规则就是 `.direct`——一律不接管,让系统原生处理。
+    /// - `.handle(rule)`:只有 `.proxied`/`.block` 才接管。
+    ///
+    /// ⚠️ **`.direct` 曾经短暂改成"接管但自己直连"(想让"应用"页对任意进程展示速率),已回退**:
+    /// 真机验证发现本地代理软件(如 xray/yunti)在系统里往往不止一个进程——`sourceAppSigningIdentifier`
+    /// 报告的身份可能因进程而异(例:监听配置端口的那个报 `com.example.yunti`,能被
+    /// `LocalProxyOriginDiscovery` 正确排除;但它另一个做实际出站连接的进程却报成了完全不同的
+    /// `a.out`),现有的"来源进程自动排除"只精确匹配了前者。一旦 `.direct` 也被接管,这类没被
+    /// 排除到的第二个进程的**全部真实流量**都会被透明地二次转发进我们自己的 pump——不是死循环,
+    /// 但是会把用户已经在用的真实代理软件的全部流量套一层不必要的转发,增加真实的 CPU/延迟开销
+    /// (真机 15 分钟内 8892 条接管里 8781 条是这个进程)。在把"排除本地代理进程"从「精确匹配监听
+    /// 该端口的那一个」加强成「覆盖它的整个进程家族(比如按可执行路径匹配,PROGRESS.md 里早就
+    /// 写好了这条兜底方案)」之前,`.direct` 必须继续保持"绝不接管"。
+    ///
     /// host/port 拿不到(极少数解析不出目的地)时跳过地址类判定,只按每进程规则。
     private func effectiveRuleSync(sourceID: String, host: String?, port: UInt16?) -> TCPFlowDecision {
         // 转发环硬化(按来源):我们自己组件(app/扩展)+ app 动态查到的本地代理进程发起的连接
@@ -356,12 +365,14 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             if PrivateNetworkExclusion.isPrivateNetwork(host: host) { return .bypass }
             let upstreams = Set((proxyConfig?.servers ?? []).map { UpstreamEndpoint(host: $0.host, port: $0.port) })
             if UpstreamExclusion.isUpstream(host: host, port: port, upstreams: upstreams) { return .bypass }
-            // 细粒度规则表(进程 × 主机 × 端口)优先于每进程粗粒度规则;命中即用其动作。
+            // 细粒度规则表(进程 × 主机 × 端口)优先于每进程粗粒度规则;命中即用其动作,
+            // 但命中的动作本身是 .direct 时同样不接管(见上面的回退说明)。
             if let matched = RuleMatcher.firstMatch(matchRules, app: sourceID, host: host, port: port) {
-                return .handle(matched)
+                return matched == .direct ? .bypass : .handle(matched)
             }
         }
-        return .handle(perProcessRules[sourceID] ?? .direct)
+        let resolved = perProcessRules[sourceID] ?? .direct
+        return resolved == .direct ? .bypass : .handle(resolved)
     }
 
     /// `.proxied` → 按 ``ProxyRouteResolver`` 解析出的路由拨上游、做隧道握手,返回已就绪、可直接

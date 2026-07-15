@@ -842,4 +842,25 @@ ArchitectureTests 11),`xcodebuild -scheme App -configuration Debug` 零并发警
    是否和 App 侧 `SecCodeCopySigningInformation` 查到的标识**一致**)。若不一致,需要改用可执行路径
    匹配而非签名标识匹配(见「防环设计定论」第 3 条的兜底方案)。
 
-**仍未动**:出 0.2.11 公证装上、真终端 curl 端到端验证(等①系统扩展获批 ②公证凭据配好)。
+**仍未动**:真终端 curl 端到端验证(等系统设置里给新版本重新点一次「允许」——见下面装机记录)。
+
+### 0.2.11 公证 + 装机(2026-07-15,本轮)
+
+`build/notarize-noproxy.sh` 跑通:archive→export→notarytool submit --wait→staple 一次成功,
+`status: Accepted`,`spctl -a -t exec` 确认 `source=Notarized Developer ID`。系统代理按预期
+临时关闭又自动恢复(`networksetup -getwebproxy Wi-Fi` 复查过,恢复到 `127.0.0.1:14984`)。
+
+**装 /Applications 踩了个新坑**:`rsync -a --delete build/export/appidge.app/ /Applications/appidge.app/`
+中途报 `mkstempat ... Operation not permitted` / `utimensat ... Operation not permitted`,卡在
+`Contents/Library/SystemExtensions/com.appidge.app.ProxyExtension.systemextension/` 底下——
+`systemextensionsctl list` 显示旧版本(0.2.9/11)当前是 `[activated enabled]`,**macOS 会对已批准
+激活的系统扩展所在的 bundle 路径加保护,不允许原地改写/覆盖**(防篡改),就地 rsync 这类"部分更新"
+对已激活扩展的目录必然失败。**修复**:不做原地覆盖,改成整体 `rm -rf /Applications/appidge.app`
+(删除本身不受这层保护,能删)+ `ditto build/export/appidge.app /Applications/appidge.app`(全新拷贝)。
+装完验证:版本 0.2.11/13、`spctl` accepted、`codesign --verify --deep --strict` 通过。
+
+**待人工**:重新启动 app 会让 `SystemExtensionActivator` 再提交一次激活请求,新版本(0.2.11/13 vs
+系统里记录的 0.2.9/11)大概率需要在「系统设置 → 隐私与安全性」(或「登录项与扩展 → 网络扩展」)
+再点一次「允许」才能换成新版本生效(旧的两条 0.2.7/0.2.8 记录已经是 `[terminated waiting to
+uninstall on reboot]`,同样的「等重启才彻底清掉」模式大概率也适用于这次的版本升级)。之后再跑
+`scripts/smoke-ne.sh` / 真终端 curl 验证端到端。

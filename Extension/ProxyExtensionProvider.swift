@@ -52,9 +52,13 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     private let configLock = NSLock()
     private var storedProxyConfig: ProxyConfigMessage?
     private var storedRoutingMode: ProxyRoutingModeDTO = .single
-    // 每进程规则的同步快照:UDP 决策在 handleNewFlow 里必须同步返回(读 actor 是 async,来不及),
-    // 所以在 applyRuleSet 时额外维护这份锁保护的快照。TCP 路径仍走 async 的 appliedRuleSetStore。
+    // 每进程规则的同步快照:handleNewFlow(TCP 和 UDP)都必须同步决定接管与否(返回 Bool,
+    // 读 actor 是 async 来不及),所以在 applyRuleSet 时额外维护这份锁保护的快照。
     private var storedPerProcessRules: [String: ProxyRuleDTO] = [:]
+    // 细粒度 match 规则(进程 × 主机 × 端口)的同步快照,配合 storedPerProcessRules 让 TCP 的
+    // handleNewFlow 能同步解出 effectiveRule(见 effectiveRuleSync)——不接管的流量必须在返回
+    // false 前就判定,绝不能先接管再 async 决定。
+    private var storedMatchRules: [MatchRuleDTO] = []
     // 主动环检测(兜底安全网):同一目标在极短窗口内被反复捕获即疑似转发环。阈值刻意调高——真实
     // 环会以每秒上千次的速度重捕,远超正常并发连接;精确阈值需真机微调(见 PROGRESS)。锁保护。
     private var storedLoopDetector = LoopDetector(threshold: 50, windowSeconds: 1.0)
@@ -82,11 +86,16 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         configLock.withLock { storedPerProcessRules }
     }
 
+    private var matchRules: [MatchRuleDTO] {
+        configLock.withLock { storedMatchRules }
+    }
+
     private var routingMode: ProxyRoutingModeDTO {
         configLock.withLock { storedRoutingMode }
     }
 
     override func startProxy(options: [String: Any]?, completionHandler: @escaping (Error?) -> Void) {
+        ExtDiag.log("startProxy called")
         let transport = NEFlowTransport(upstreamHost: "127.0.0.1", upstreamPort: 1080, appGroup: appGroup)
         self.transport = transport
         router = FlowRouter(transport: transport, flushInterval: 0.5, now: Date())
@@ -101,6 +110,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         // 「待人工回填」里 flow metadata 观测被卡住的一环)。UDP 纳入拦截是 A1「拦截 QUIC/UDP
         // 止漏」的前提。⚠️ 只能在真机 + 系统扩展获批后验证,见 PROGRESS.md 人工自测。
         setTunnelNetworkSettings(TransparentProxySettings.make()) { error in
+            ExtDiag.log("setTunnelNetworkSettings done error=\(error.map { "\($0)" } ?? "nil")")
             completionHandler(error)
         }
     }
@@ -131,12 +141,16 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         switch message {
         case .applyRuleSet(let ruleSet):
             await appliedRuleSetStore.apply(ruleSet)
-            // 同步快照供 UDP 决策用(见 storedPerProcessRules）。后到的同 id 覆盖先到的。
+            // 同步快照供 handleNewFlow(TCP+UDP)决策用。后到的同 id 覆盖先到的。
             let snapshot = Dictionary(
                 ruleSet.assignments.map { ($0.processID.value, $0.rule) },
                 uniquingKeysWith: { _, latest in latest }
             )
-            configLock.withLock { storedPerProcessRules = snapshot }
+            let matchRulesSnapshot = ruleSet.matchRules
+            configLock.withLock {
+                storedPerProcessRules = snapshot
+                storedMatchRules = matchRulesSnapshot
+            }
         case .requestDiagnostic(let request):
             guard let diagnosticsRunner else { return }
             let results = await diagnosticsRunner.run(processID: request.processID, kinds: request.kinds)
@@ -171,15 +185,26 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     private func handleNewTCPFlow(_ tcpFlow: NEAppProxyTCPFlow) -> Bool {
         guard let router else { return false }
 
-        let processID = ProcessIdentifierDTO(tcpFlow.metaData.sourceAppSigningIdentifier)
+        let sourceID = tcpFlow.metaData.sourceAppSigningIdentifier
+        let processID = ProcessIdentifierDTO(sourceID)
         let remoteEndpoint = tcpFlow.remoteFlowEndpoint
         // 原始主机名（app 用域名连的话 NE 会保留）——DNS-over-proxy 用它把域名交给代理去解析。
         let remoteHostname = tcpFlow.remoteHostname
-        flowLogger.log("""
-        handleNewTCPFlow sourceAppSigningIdentifier=\(tcpFlow.metaData.sourceAppSigningIdentifier, privacy: .public) \
-        remote=\(String(describing: remoteEndpoint), privacy: .public) hostname=\(remoteHostname ?? "-", privacy: .public)
-        """)
+        let hostPort = ProxyDialer.hostPort(from: remoteEndpoint)
 
+        // 按进程**选择性接管**:同步解出规则,非 .proxied/.block 一律**放行**(return false),让系统
+        // 原生直连——appidge 不进它的数据路径,不影响 yunti / 全局流量;只有用户在 app 里显式给该
+        // 进程设了走代理/拦截才接管。这也彻底断掉了"接管并 pump 直连流量 → 自建的 NWConnection
+        // 继承系统代理(yunti) → Network.framework 代理端点解析递归死循环"那条 99% CPU 空转链
+        // (见 cpu_resource 回溯:nw_endpoint_proxy_start_next_child 自递归)。UDP 侧早已是这个语义。
+        let rule = effectiveRuleSync(sourceID: sourceID, host: hostPort?.0, port: hostPort?.1)
+        guard rule != .direct else { return false }
+
+        flowLogger.log("""
+        handleNewTCPFlow INTERCEPT src=\(sourceID, privacy: .public) rule=\(String(describing: rule), privacy: .public) \
+        host=\(hostPort?.0 ?? "-", privacy: .public)
+        """)
+        ExtDiag.log("handleNewTCPFlow INTERCEPT src=\(sourceID) rule=\(rule) host=\(hostPort?.0 ?? "-")")
         tcpFlow.open(withLocalFlowEndpoint: nil) { [weak self] error in
             guard let self, error == nil else {
                 tcpFlow.closeReadWithError(error)
@@ -189,7 +214,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             Task {
                 await self.beginFlow(
                     tcpFlow: tcpFlow, to: remoteEndpoint, remoteHostname: remoteHostname,
-                    processID: processID, router: router
+                    processID: processID, rule: rule, router: router
                 )
             }
         }
@@ -201,9 +226,11 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         to remoteEndpoint: Network.NWEndpoint,
         remoteHostname: String?,
         processID: ProcessIdentifierDTO,
+        rule: ProxyRuleDTO,
         router: FlowRouter
     ) async {
-        let rule = await effectiveRule(for: processID, destination: remoteEndpoint)
+        // rule 由 handleNewTCPFlow 同步解出并传入(只有 .proxied/.block 才会走到这里);不再在此
+        // async 重解,既省一次 actor 往返,也避免"同步判接管、异步又判成 .direct"的竞态。
         await routingHistoryTracker.record(processID: processID, wasProxied: rule == .proxied)
 
         let (host, port) = ProxyDialer.hostPort(from: remoteEndpoint) ?? (remoteHostname ?? "?", 0)
@@ -275,23 +302,26 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         emitConnectionEvent(context, phase: failed ? .failed : .closed)
     }
 
-    /// 见类型注释的三层决策。回环 / 命中上游 → 强制直连；否则按进程规则。
-    private func effectiveRule(for processID: ProcessIdentifierDTO, destination: Network.NWEndpoint) async -> ProxyRuleDTO {
-        // 转发环硬化(按来源):我们自己组件(app/扩展)发起的连接强制直连,别再代理它——
-        // 无关目的地,先于地址类判定。
-        if ProcessOriginExclusion.shouldBypass(sourceIdentifier: processID.value, ownIdentifiers: Self.ownProcessIdentifiers) {
+    /// handleNewFlow 必须**同步**决定接管与否(返回 Bool),不能 await actor。这是原 async effectiveRule
+    /// 的同步镜像:用锁保护的快照(storedMatchRules / storedPerProcessRules / storedProxyConfig)做
+    /// 完全相同的三层决策。三个排除(自身来源 / 回环 / 上游)命中即 `.direct`;否则先查 match 规则表、
+    /// 再查每进程规则,都不命中回落 `.direct`。调用方对 `.direct` 一律 return false(放行、不接管)。
+    /// host/port 拿不到(极少数解析不出目的地)时跳过地址类判定,只按每进程规则。
+    private func effectiveRuleSync(sourceID: String, host: String?, port: UInt16?) -> ProxyRuleDTO {
+        // 转发环硬化(按来源):我们自己组件(app/扩展)发起的连接不接管——无关目的地,先判。
+        if ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourceID, ownIdentifiers: Self.ownProcessIdentifiers) {
             return .direct
         }
-        if let (host, port) = ProxyDialer.hostPort(from: destination) {
+        if let host, let port {
             if LoopbackDetector.isLoopback(host: host) { return .direct }
             let upstreams = Set((proxyConfig?.servers ?? []).map { UpstreamEndpoint(host: $0.host, port: $0.port) })
             if UpstreamExclusion.isUpstream(host: host, port: port, upstreams: upstreams) { return .direct }
             // 细粒度规则表(进程 × 主机 × 端口)优先于每进程粗粒度规则;命中即用其动作。
-            if let matched = await appliedRuleSetStore.matchRule(app: processID.value, host: host, port: port) {
+            if let matched = RuleMatcher.firstMatch(matchRules, app: sourceID, host: host, port: port) {
                 return matched
             }
         }
-        return await appliedRuleSetStore.currentRule(for: processID) ?? .direct
+        return perProcessRules[sourceID] ?? .direct
     }
 
     /// `.proxied` → 按 ``ProxyRouteResolver`` 解析出的路由拨上游、做隧道握手,返回已就绪、可直接

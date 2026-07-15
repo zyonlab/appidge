@@ -3,8 +3,14 @@ import NetworkExtension
 import IPCContract
 
 /// 透明代理的网络设置构造(放 provider 类外,免得撑大类体)。remote/local 均 nil ⇒ 匹配所有
-/// 出站 TCP+UDP,**回环除外**(Apple 文档明说 nil/nil 不含 loopback)——正好与 LoopbackDetector
+/// 出站流量,**回环除外**(Apple 文档明说 nil/nil 不含 loopback)——正好与 LoopbackDetector
 /// 一致:本地/回环流量不进代理、也不被拦。
+///
+/// `protocol` 用显式 `.TCP` + `.UDP` 两条,与单条 `.any` 等价(Apple SDK 头文件明确 `.any`
+/// 同时匹配 TCP+UDP;ProxyBridge 等真实项目用 `.any` 亦可)。逐协议写只是防御/可读性选择,**不是**
+/// 修复本身——"provider connected 却收不到 flow" 的真因是转发环死循环(catch-all + 接管 .direct
+/// 并 pump → 自建连接继承系统代理 → Network.framework 代理解析递归),已在 ProxyExtensionProvider
+/// 的 handleNewTCPFlow 按进程选择性接管里根治。
 enum TransparentProxySettings {
     static func make() -> NETransparentProxyNetworkSettings {
         let settings = NETransparentProxyNetworkSettings(tunnelRemoteAddress: "127.0.0.1")
@@ -12,7 +18,12 @@ enum TransparentProxySettings {
             NENetworkRule(
                 remoteNetworkEndpoint: nil, remotePrefix: 0,
                 localNetworkEndpoint: nil, localPrefix: 0,
-                protocol: .any, direction: .outbound
+                protocol: .TCP, direction: .outbound
+            ),
+            NENetworkRule(
+                remoteNetworkEndpoint: nil, remotePrefix: 0,
+                localNetworkEndpoint: nil, localPrefix: 0,
+                protocol: .UDP, direction: .outbound
             )
         ]
         return settings

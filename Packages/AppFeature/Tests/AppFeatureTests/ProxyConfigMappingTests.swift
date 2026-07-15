@@ -89,20 +89,25 @@ struct ProxyConfigMappingTests {
         #expect(ProxyConfigMapping.udpPolicyMessage(core) == .setUDPPolicy(dto))
     }
 
-    @Test("processOriginExclusionsMessage maps a Set<String> into applyProcessOriginExclusions (order-independent)")
+    @Test("processOriginExclusionsMessage maps identifiers + executablePaths into applyProcessOriginExclusions (order-independent)")
     func processOriginExclusionsMapping() {
-        let message = ProxyConfigMapping.processOriginExclusionsMessage(["com.example.xray", "com.example.v2ray"])
+        let discovery = Core.OriginExclusionDiscovery(
+            identifiers: ["com.example.xray", "com.example.v2ray"],
+            executablePaths: ["/usr/local/bin/xray"]
+        )
+        let message = ProxyConfigMapping.processOriginExclusionsMessage(discovery)
         guard case .applyProcessOriginExclusions(let payload) = message else {
             Issue.record("expected applyProcessOriginExclusions envelope")
             return
         }
         #expect(Set(payload.identifiers) == ["com.example.xray", "com.example.v2ray"])
+        #expect(Set(payload.executablePaths) == ["/usr/local/bin/xray"])
     }
 
-    @Test("processOriginExclusionsMessage on an empty set maps to an empty identifiers list")
+    @Test("processOriginExclusionsMessage on an empty discovery maps to empty lists")
     func processOriginExclusionsMappingEmpty() {
-        let message = ProxyConfigMapping.processOriginExclusionsMessage([])
-        #expect(message == .applyProcessOriginExclusions(ProcessOriginExclusionMessage(identifiers: [])))
+        let message = ProxyConfigMapping.processOriginExclusionsMessage(Core.OriginExclusionDiscovery())
+        #expect(message == .applyProcessOriginExclusions(ProcessOriginExclusionMessage(identifiers: [], executablePaths: [])))
     }
 
     @Test(

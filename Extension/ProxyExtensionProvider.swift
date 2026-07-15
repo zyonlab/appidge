@@ -30,7 +30,10 @@ enum TCPFlowDecision: Equatable {
 /// 路由决策（``effectiveRuleSync``），从强到弱:
 /// 1. **来源进程排除**（``ProcessOriginExclusion``）：发起方是我们自己组件或 app 动态查到的
 ///    本地代理进程（如 xray/yunti）→ `.bypass`（强制直连、不接管），与下面的地址判定正交，
-///    见 PROGRESS.md「防环设计定论」。
+///    见 PROGRESS.md「防环设计定论」。**两路独立信号**:签名标识（`sourceAppSigningIdentifier`）
+///    + 可执行文件路径（``ProcessPathResolver`` 从 flow 的 audit token 解出，照抄开源
+///    ProxyBridge 的做法）——未签名本地代理软件常有多个进程、签名标识因进程而异，路径是更稳的
+///    第二信号，任一命中即 `.bypass`。
 /// 2. **回环排除**（``LoopbackDetector``）：目的地是 127.0.0.0/8 / ::1 / localhost → `.bypass`。
 /// 3. **私网段排除**（``PrivateNetworkExclusion``）：目的地是 10/8、172.16/12、192.168/16、
 ///    169.254/16、fc00::/7 → `.bypass`（本地/局域网服务不该走代理）。
@@ -46,10 +49,11 @@ enum TCPFlowDecision: Equatable {
 final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Sendable {
     private var router: FlowRouter?
     private var transport: NEFlowTransport?
-    private var diagnosticsRunner: DiagnosticsRunner?
+    // 不是 private:makeDiagnosticsRunner 拆到同 target 的 ProxyExtensionProviderRouting.swift。
+    var diagnosticsRunner: DiagnosticsRunner?
     private let appGroup = "group.com.appidge"
-    private let appliedRuleSetStore = AppliedRuleSetStore()
-    private let routingHistoryTracker = RoutingHistoryTracker()
+    let appliedRuleSetStore = AppliedRuleSetStore()
+    let routingHistoryTracker = RoutingHistoryTracker()
     // 负载均衡的游标要跨 flow 存活才能真的轮转,所以 selector 是 provider 级的单例。
     private let roundRobinSelector = RoundRobinSelector()
 
@@ -62,6 +66,15 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         guard let ext = Bundle.main.bundleIdentifier else { return [] }
         let parent = ext.split(separator: ".").dropLast().joined(separator: ".")
         return parent.isEmpty ? [ext] : [ext, parent]
+    }()
+
+    /// 同上,但按可执行文件路径——`ProcessPathResolver` 从 flow 的 audit token 解出来的第二信号,
+    /// 和签名标识各自独立比对(见 `ownExecutablePaths` 计算属性、`ProcessPathResolver` 的类型注释)。
+    /// 只收自己扩展这一个:主 app 走的是 App Group IPC(UserDefaults),不产生会被 flow 拦截的
+    /// TCP/UDP 连接,没有可执行文件路径需要排除。
+    private static let ownProcessExecutablePaths: Set<String> = {
+        guard let path = Bundle.main.executablePath else { return [] }
+        return [path]
     }()
 
     // App 下发的代理配置。handleAppMessage（写）和 handleNewFlow 的 Task（读）并发访问，
@@ -92,6 +105,9 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     // 合并使用(见 ownIdentifiers 计算属性)——转发环硬化「来源进程自动排除」的第二正交维度。
     // 运行时发现的结果,不持久化,重启后由 app 重新查、applyProcessOriginExclusions 重新下发。
     private var storedDynamicOriginExclusions: Set<String> = []
+    // 同上,但按可执行文件路径(见 ownExecutablePaths)——未签名/ad-hoc 签名的本地代理软件常有
+    // 多个进程、签名标识因进程而异,路径是更稳的第二信号(照抄开源 ProxyBridge 的做法)。
+    private var storedDynamicOriginExclusionPaths: Set<String> = []
 
     private var packetCaptureEnabled: Bool {
         configLock.withLock { storedPacketCaptureEnabled }
@@ -109,7 +125,8 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         configLock.withLock { storedPerProcessRules }
     }
 
-    private var matchRules: [MatchRuleDTO] {
+    // 不是 private:effectiveRuleSync 拆到同 target 的 ProxyExtensionProviderRouting.swift。
+    var matchRules: [MatchRuleDTO] {
         configLock.withLock { storedMatchRules }
     }
 
@@ -117,10 +134,17 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         configLock.withLock { storedRoutingMode }
     }
 
-    /// 「来源进程自动排除」的完整集合:自身组件(静态,启动时定)∪ app 动态查到的本地代理进程
-    /// (运行时可变,随 applyProcessOriginExclusions 更新)。两路来源都命中即强制直连。
+    /// 「来源进程自动排除」的完整集合(签名标识维度):自身组件(静态,启动时定)∪ app 动态
+    /// 查到的本地代理进程(运行时可变,随 applyProcessOriginExclusions 更新)。两路来源都命中
+    /// 即强制直连。
     var ownIdentifiers: Set<String> {
         Self.ownProcessIdentifiers.union(configLock.withLock { storedDynamicOriginExclusions })
+    }
+
+    /// 同上,但按可执行文件路径维度——与 `ownIdentifiers` 是两个独立的排除信号,各自判一次
+    /// `ProcessOriginExclusion.shouldBypass`,任一命中就够(见 `effectiveRuleSync`)。
+    var ownExecutablePaths: Set<String> {
+        Self.ownProcessExecutablePaths.union(configLock.withLock { storedDynamicOriginExclusionPaths })
     }
 
     override func startProxy(options: [String: Any]?, completionHandler: @escaping (Error?) -> Void) {
@@ -151,21 +175,6 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         completionHandler()
     }
 
-    /// 复用同一个 appliedRuleSetStore/routingHistoryTracker 实例——诊断器读到的必须是
-    /// handleAppMessage/handleNewFlow 实际在写的那两个 store，不是各查各的空壳。
-    /// upstreamHost/Port 指向真实上游，让 upstreamReachable 诊断探的是"我们配的代理还在不在"。
-    private func makeDiagnosticsRunner(upstreamHost: String, upstreamPort: UInt16) -> DiagnosticsRunner {
-        DiagnosticsRunner(
-            ruleLookup: appliedRuleSetStore,
-            routingLookup: routingHistoryTracker,
-            upstreamProbe: NWConnectionUpstreamProbe(),
-            dnsResolver: NWConnectionDNSResolver(),
-            environmentReader: ProcessInfoEnvironmentReader(),
-            upstreamHost: upstreamHost,
-            upstreamPort: upstreamPort
-        )
-    }
-
     private func handleAppMessage(_ message: AppToExtensionMessage, transport: NEFlowTransport) async {
         switch message {
         case .applyRuleSet(let ruleSet):
@@ -180,6 +189,16 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
                 storedPerProcessRules = snapshot
                 storedMatchRules = matchRulesSnapshot
             }
+            // 定位「配置到底有没有下发到扩展」的关键日志:这次收到的规则表长什么样。
+            let matchRulesSummary = matchRulesSnapshot.map { rule -> String in
+                let port = rule.portRange.map(String.init(describing:)) ?? "any"
+                return "[\(rule.appPattern)/\(rule.hostPattern)/\(port)->\(rule.rule)]"
+            }.joined(separator: ",")
+            ExtDiag.log(
+                "applyRuleSet received: global=\(ruleSet.globalProxyEnabled) "
+                + "perProcess=\(snapshot.map { "\($0.key)->\($0.value)" }.joined(separator: ",")) "
+                + "matchRules=\(matchRulesSummary)"
+            )
         case .requestDiagnostic(let request):
             guard let diagnosticsRunner else { return }
             let results = await diagnosticsRunner.run(processID: request.processID, kinds: request.kinds)
@@ -192,6 +211,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             if let active = config.activeServer {
                 diagnosticsRunner = makeDiagnosticsRunner(upstreamHost: active.host, upstreamPort: active.port)
             }
+            ExtDiag.log("applyProxyConfig received: servers=\(config.servers.count) active=\(config.activeServerID ?? "nil")")
         case .applyRoutingMode(let mode):
             configLock.withLock { storedRoutingMode = mode }
         case .setPacketCapture(let enabled):
@@ -199,7 +219,14 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         case .setUDPPolicy(let policy):
             configLock.withLock { storedUDPPolicy = policy }
         case .applyProcessOriginExclusions(let message):
-            configLock.withLock { storedDynamicOriginExclusions = Set(message.identifiers) }
+            configLock.withLock {
+                storedDynamicOriginExclusions = Set(message.identifiers)
+                storedDynamicOriginExclusionPaths = Set(message.executablePaths)
+            }
+            ExtDiag.log(
+                "applyProcessOriginExclusions received: identifiers=\(message.identifiers.joined(separator: ",")) "
+                + "paths=\(message.executablePaths.joined(separator: ","))"
+            )
         }
     }
 
@@ -217,18 +244,29 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         guard let router else { return false }
 
         let sourceID = tcpFlow.metaData.sourceAppSigningIdentifier
+        let sourcePath = ProcessPathResolver.executablePath(from: tcpFlow.metaData.sourceAppAuditToken)
         let processID = ProcessIdentifierDTO(sourceID)
         let remoteEndpoint = tcpFlow.remoteFlowEndpoint
         // 原始主机名（app 用域名连的话 NE 会保留）——DNS-over-proxy 用它把域名交给代理去解析。
         let remoteHostname = tcpFlow.remoteHostname
         let hostPort = ProxyDialer.hostPort(from: remoteEndpoint)
 
-        // 转发环硬化的四道闸(自身来源/回环/私网段/上游排除)—— .bypass 绝不接管,让系统原生处理,
-        // 这是 CPU 死转事故(5a7ad53)划定的安全边界,不能碰。除此之外一律 .handle(rule)接管——
-        // 包括 rule == .direct:现在"直连"也由我们自己拨号(见 ProxyDialer.openDirect 的显式
-        // no-proxy NWParameters),只是不走代理、原样连到原目的地,这样"应用"页才能对所有进程
-        // 显示真实速率/流量,不再局限于走代理的进程。
-        guard case .handle(let rule) = effectiveRuleSync(sourceID: sourceID, host: hostPort?.0, port: hostPort?.1) else {
+        // 转发环硬化的四道闸(自身来源×2 信号/回环/私网段/上游排除)—— .bypass 绝不接管,让系统
+        // 原生处理,这是 CPU 死转事故(5a7ad53)划定的安全边界,不能碰。除此之外一律 .handle(rule)
+        // 接管——包括 rule == .direct:现在"直连"也由我们自己拨号(见 ProxyDialer.openDirect 的
+        // 显式 no-proxy NWParameters),只是不走代理、原样连到原目的地,这样"应用"页才能对所有
+        // 进程显示真实速率/流量,不再局限于走代理的进程。
+        let (decision, reason) = effectiveRuleSync(
+            sourceID: sourceID, sourcePath: sourcePath, host: hostPort?.0, port: hostPort?.1
+        )
+        // 每条 flow 的判定都记一笔(不只是被接管的)——定位"配置没生效 vs 压根没拦截到"的关键证据:
+        // 如果这里连日志都没有,说明 handleNewFlow 根本没被 NE 调用;如果有但全是 bypass,
+        // 说明拦截到了但规则/排除判定把它放行了,该去查规则配置对不对。
+        ExtDiag.log(
+            "handleNewTCPFlow src=\(sourceID) path=\(sourcePath ?? "-") host=\(hostPort?.0 ?? "-"):\(hostPort?.1.description ?? "-") "
+            + "decision=\(reason)"
+        )
+        guard case .handle(let rule) = decision else {
             return false
         }
 
@@ -236,7 +274,6 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         handleNewTCPFlow INTERCEPT src=\(sourceID, privacy: .public) rule=\(String(describing: rule), privacy: .public) \
         host=\(hostPort?.0 ?? "-", privacy: .public)
         """)
-        ExtDiag.log("handleNewTCPFlow INTERCEPT src=\(sourceID) rule=\(rule) host=\(hostPort?.0 ?? "-")")
         tcpFlow.open(withLocalFlowEndpoint: nil) { [weak self] error in
             guard let self, error == nil else {
                 tcpFlow.closeReadWithError(error)
@@ -332,47 +369,6 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         guard context.markClosedOnce() else { return }
         context.capture?.close() // 抓包文件随连接结束落盘关闭。
         emitConnectionEvent(context, phase: failed ? .failed : .closed)
-    }
-
-    /// handleNewFlow 必须**同步**决定接管与否(返回 Bool),不能 await actor。这是原 async effectiveRule
-    /// 的同步镜像:用锁保护的快照(storedMatchRules / storedPerProcessRules / storedProxyConfig)做
-    /// 完全相同的判定,结论分两种:
-    /// - `.bypass`:转发环硬化的四道闸(自身来源 / 回环 / 私网段 / 上游排除)命中,**或者**最终解出
-    ///   的规则就是 `.direct`——一律不接管,让系统原生处理。
-    /// - `.handle(rule)`:只有 `.proxied`/`.block` 才接管。
-    ///
-    /// ⚠️ **`.direct` 曾经短暂改成"接管但自己直连"(想让"应用"页对任意进程展示速率),已回退**:
-    /// 真机验证发现本地代理软件(如 xray/yunti)在系统里往往不止一个进程——`sourceAppSigningIdentifier`
-    /// 报告的身份可能因进程而异(例:监听配置端口的那个报 `com.example.yunti`,能被
-    /// `LocalProxyOriginDiscovery` 正确排除;但它另一个做实际出站连接的进程却报成了完全不同的
-    /// `a.out`),现有的"来源进程自动排除"只精确匹配了前者。一旦 `.direct` 也被接管,这类没被
-    /// 排除到的第二个进程的**全部真实流量**都会被透明地二次转发进我们自己的 pump——不是死循环,
-    /// 但是会把用户已经在用的真实代理软件的全部流量套一层不必要的转发,增加真实的 CPU/延迟开销
-    /// (真机 15 分钟内 8892 条接管里 8781 条是这个进程)。在把"排除本地代理进程"从「精确匹配监听
-    /// 该端口的那一个」加强成「覆盖它的整个进程家族(比如按可执行路径匹配,PROGRESS.md 里早就
-    /// 写好了这条兜底方案)」之前,`.direct` 必须继续保持"绝不接管"。
-    ///
-    /// host/port 拿不到(极少数解析不出目的地)时跳过地址类判定,只按每进程规则。
-    private func effectiveRuleSync(sourceID: String, host: String?, port: UInt16?) -> TCPFlowDecision {
-        // 转发环硬化(按来源):我们自己组件(app/扩展)+ app 动态查到的本地代理进程发起的连接
-        // 不接管——无关目的地,先判。
-        if ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourceID, ownIdentifiers: ownIdentifiers) {
-            return .bypass
-        }
-        if let host, let port {
-            if LoopbackDetector.isLoopback(host: host) { return .bypass }
-            // 私网段/link-local 目的地址强制直连(本地/局域网服务不该走代理),与回环正交、互补。
-            if PrivateNetworkExclusion.isPrivateNetwork(host: host) { return .bypass }
-            let upstreams = Set((proxyConfig?.servers ?? []).map { UpstreamEndpoint(host: $0.host, port: $0.port) })
-            if UpstreamExclusion.isUpstream(host: host, port: port, upstreams: upstreams) { return .bypass }
-            // 细粒度规则表(进程 × 主机 × 端口)优先于每进程粗粒度规则;命中即用其动作,
-            // 但命中的动作本身是 .direct 时同样不接管(见上面的回退说明)。
-            if let matched = RuleMatcher.firstMatch(matchRules, app: sourceID, host: host, port: port) {
-                return matched == .direct ? .bypass : .handle(matched)
-            }
-        }
-        let resolved = perProcessRules[sourceID] ?? .direct
-        return resolved == .direct ? .bypass : .handle(resolved)
     }
 
     /// `.proxied` → 按 ``ProxyRouteResolver`` 解析出的路由拨上游、做隧道握手,返回已就绪、可直接

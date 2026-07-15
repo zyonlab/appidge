@@ -11,6 +11,13 @@ extension ProxyExtensionProvider {
     /// proxy→经 SOCKS5 UDP ASSOCIATE 中继。
     func blockOrAllowUDPFlow(_ flow: NEAppProxyUDPFlow) -> Bool {
         let sourceID = flow.metaData.sourceAppSigningIdentifier
+        let sourcePath = ProcessPathResolver.executablePath(from: flow.metaData.sourceAppAuditToken)
+        // 路径维度的来源排除先判(和 TCP 侧的 effectiveRuleSync 对称)——UDPFlowPolicy.disposition
+        // 内部只判了签名标识那一路,这里补第二路信号。
+        if let sourcePath, ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourcePath, ownIdentifiers: ownExecutablePaths) {
+            ExtDiag.log("blockOrAllowUDPFlow src=\(sourceID) path=\(sourcePath) decision=bypass:own-path")
+            return false
+        }
         let active = proxyConfig?.activeServer
         let disposition = UDPFlowPolicy.disposition(
             sourceIdentifier: sourceID,
@@ -19,6 +26,7 @@ extension ProxyExtensionProvider {
             udpPolicy: udpPolicy,
             upstreamIsSOCKS5: active?.kind == .socks5
         )
+        ExtDiag.log("blockOrAllowUDPFlow src=\(sourceID) path=\(sourcePath ?? "-") disposition=\(disposition)")
         switch disposition {
         case .allowDirect:
             return false // 不接管,UDP 原生直连。

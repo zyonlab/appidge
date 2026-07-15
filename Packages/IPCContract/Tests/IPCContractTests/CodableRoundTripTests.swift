@@ -187,6 +187,16 @@ struct CodableRoundTripTests {
         #expect(try roundTrip(empty) == empty)
     }
 
+    @Test("ProcessOriginExclusionMessage carries executablePaths alongside identifiers — 第二排除信号")
+    func processOriginExclusionMessageWithPathsRoundTrip() throws {
+        let message = ProcessOriginExclusionMessage(
+            identifiers: ["com.example.yunti"],
+            executablePaths: ["/usr/local/bin/xray", "/usr/local/bin/xray-helper"]
+        )
+        #expect(try roundTrip(message) == message)
+        #expect(message.executablePaths.count == 2)
+    }
+
     @Test("AppToExtensionMessage.applyProcessOriginExclusions round-trips through the envelope")
     func applyProcessOriginExclusionsEnvelope() throws {
         let message = AppToExtensionMessage.applyProcessOriginExclusions(

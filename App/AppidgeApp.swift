@@ -54,9 +54,9 @@ struct AppidgeApp: App {
             case .applyUDPPolicy(let policy):
                 await transport.send(ProxyConfigMapping.udpPolicyMessage(policy))
                 return nil // 纯下发，扩展据此在拦截/直连/SOCKS5 代理之间切换 UDP 处理
-            case .applyProcessOriginExclusions(let identifiers):
-                await transport.send(ProxyConfigMapping.processOriginExclusionsMessage(identifiers))
-                return nil // 纯下发，扩展据此把这些签名标识并进「来源进程自动排除」集合
+            case .applyProcessOriginExclusions(let discovery):
+                await transport.send(ProxyConfigMapping.processOriginExclusionsMessage(discovery))
+                return nil // 纯下发，扩展据此把这些签名标识/可执行文件路径并进「来源进程自动排除」集合
             }
         })
         _store = State(initialValue: store)
@@ -162,9 +162,9 @@ struct AppidgeApp: App {
     }
 
     /// applyProxyConfig 下发之后顺带查一次:active 上游若指向本机(如用户配的是本地
-    /// xray/yunti),查出它的签名标识、包成 `.proxyProcessIdentitiesResolved` 供 store
-    /// 回灌——转发环硬化的「来源进程自动排除」（见 LocalProxyOriginDiscovery）。拆成静态
-    /// 方法只是为了不撑爆 init 里 effectHandler 闭包的长度，逻辑本身不复杂。
+    /// xray/yunti),查出它的签名标识 + 可执行文件路径、包成 `.proxyProcessIdentitiesResolved`
+    /// 供 store 回灌——转发环硬化的「来源进程自动排除」（见 LocalProxyOriginDiscovery）。拆成
+    /// 静态方法只是为了不撑爆 init 里 effectHandler 闭包的长度，逻辑本身不复杂。
     private static func resolveProcessOriginExclusions(
         servers: [Core.ProxyServer], activeID: Core.ProxyServerID?, using resolver: any LocalProcessIdentityResolving
     ) async -> Core.Action {
@@ -172,7 +172,7 @@ struct AppidgeApp: App {
             proxyServers: Dictionary(uniqueKeysWithValues: servers.map { ($0.id, $0) }),
             activeProxyServerID: activeID
         )
-        let identifiers = await LocalProxyOriginDiscovery.discover(state: discoveryState, using: resolver)
-        return .proxyProcessIdentitiesResolved(identifiers)
+        let discovery = await LocalProxyOriginDiscovery.discover(state: discoveryState, using: resolver)
+        return .proxyProcessIdentitiesResolved(discovery)
     }
 }

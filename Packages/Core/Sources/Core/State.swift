@@ -22,10 +22,10 @@ public struct AppState: Sendable, Equatable {
     /// 系统扩展的安装/批准/运行状态。运行时状态,不持久化(和 `isEngineHealthy` 一样),
     /// 启动时由 `SystemExtensionActivator` 查询回填。状态栏据此如实显示是否已接管。见 ``ExtensionActivation``。
     public var extensionActivation: ExtensionActivation
-    /// 动态发现的本地代理进程(如 xray/yunti)签名标识集合,由 AppFeature 用 libproc+SecCode 查到、
-    /// 经 `.proxyProcessIdentitiesResolved` 回灌。与静态的 app/扩展自身标识合并后下发给扩展,
-    /// 命中即强制直连。运行时发现的结果,不持久化(重启后重新查)。
-    public var dynamicOriginExclusionIdentifiers: Set<String>
+    /// 动态发现的本地代理进程(如 xray/yunti)——签名标识 + 可执行文件路径,由 AppFeature 用
+    /// libproc+SecCode 查到、经 `.proxyProcessIdentitiesResolved` 回灌。与静态的 app/扩展自身
+    /// 标识/路径合并后下发给扩展,任一信号命中即强制直连。运行时发现的结果,不持久化(重启后重新查)。
+    public var dynamicOriginExclusion: OriginExclusionDiscovery
 
     /// 连接日志保留的最大条数;超出丢最旧。
     public static let connectionLogCap = 500
@@ -46,7 +46,7 @@ public struct AppState: Sendable, Equatable {
         isPacketCaptureEnabled: Bool = false,
         udpPolicy: UDPPolicy = .block,
         extensionActivation: ExtensionActivation = .inactive,
-        dynamicOriginExclusionIdentifiers: Set<String> = []
+        dynamicOriginExclusion: OriginExclusionDiscovery = OriginExclusionDiscovery()
     ) {
         self.isGlobalProxyEnabled = isGlobalProxyEnabled
         self.isEngineHealthy = isEngineHealthy
@@ -63,6 +63,6 @@ public struct AppState: Sendable, Equatable {
         self.isPacketCaptureEnabled = isPacketCaptureEnabled
         self.udpPolicy = udpPolicy
         self.extensionActivation = extensionActivation
-        self.dynamicOriginExclusionIdentifiers = dynamicOriginExclusionIdentifiers
+        self.dynamicOriginExclusion = dynamicOriginExclusion
     }
 }

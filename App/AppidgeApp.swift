@@ -73,6 +73,10 @@ struct AppidgeApp: App {
                 // 扩展激活状态经 activator 的 delegate 回调回灌 store（状态栏据此如实显示）。
                 SystemExtensionActivator.shared.onStateChange = { activation in
                     store.dispatch(.extensionActivationChanged(activation))
+                    // 扩展获批(.active)后,必须由 app 侧启动透明代理会话,系统才会把流量交给 provider。
+                    if case .active = activation {
+                        Task { await TransparentProxyController.start() }
+                    }
                 }
                 SystemExtensionActivator.shared.diagnose() // 启动即打印 app 看到的扩展目录(排查 not-found)
                 await ipcReceiver.start()

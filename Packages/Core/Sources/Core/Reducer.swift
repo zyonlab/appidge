@@ -112,9 +112,21 @@ public enum Reducer {
         return (state, [])
     }
 
+    /// 每进程规则**统一收编进规则表**:除了更新 `processes[id].rule`(「应用」表的显示 + 持久化),
+    /// 还派生一条「该进程 × 任意主机 × 任意端口」的规则,按 `addMatchRule` 同一套去重/置顶语义
+    /// upsert 到表首。这保证「时间倒排、最新覆盖」跨两种入口(应用表右键 / 连接右键)一致成立:
+    /// 扩展的匹配器只看规则表的从上到下顺序,新做的每进程修改必然压过更早的连接级规则;显式改回
+    /// 「直连」也因此可表达、可下发(以前 `.direct` 在下发时被剥掉,只能靠"缺席"表示)。
+    /// 派生规则的 id 确定(`process:<id>`)——reduce 是纯函数,不能造随机 UUID;去重键命中时
+    /// 沿用表里现有那条,id 只在首次创建时用到。
     private static func assignRule(processID: ProcessID, rule: ProxyRule, _ state: AppState) -> (AppState, [Effect]) {
         var state = state
         state.processes[processID]?.rule = rule
+        let derived = ProxyMatchRule(
+            id: RuleID("process:\(processID.value)"),
+            appPattern: processID.value, hostPattern: "*", portRange: nil, action: rule
+        )
+        state = upsertingMatchRule(derived, state)
         return (state, [ruleSetPush(state)])
     }
 
@@ -298,6 +310,12 @@ private extension Reducer {
     /// 命中去重键时:动作也一样 = 纯重复,直接把它**移到表首**(体现"最近又点了一次");动作不同 =
     /// 用户想改判定,更新动作后同样移到表首。都不新增第二条同键规则。
     static func addMatchRule(_ rule: ProxyMatchRule, _ state: AppState) -> (AppState, [Effect]) {
+        let state = upsertingMatchRule(rule, state)
+        return (state, [ruleSetPush(state)])
+    }
+
+    /// upsert 的共同实现:`addMatchRule` 与 `assignRule`(派生规则)共用同一套去重/置顶语义。
+    static func upsertingMatchRule(_ rule: ProxyMatchRule, _ state: AppState) -> AppState {
         var state = state
         if let index = state.rules.firstIndex(where: {
             $0.appPattern == rule.appPattern && $0.hostPattern == rule.hostPattern && $0.portRange == rule.portRange
@@ -308,7 +326,7 @@ private extension Reducer {
         } else {
             state.rules.insert(rule, at: 0)
         }
-        return (state, [ruleSetPush(state)])
+        return state
     }
 
     static func removeMatchRule(_ id: RuleID, _ state: AppState) -> (AppState, [Effect]) {

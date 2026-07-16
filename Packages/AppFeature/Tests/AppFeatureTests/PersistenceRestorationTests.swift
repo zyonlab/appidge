@@ -164,7 +164,14 @@ struct PersistenceRestorationTests {
         #expect(state.processes[b]?.displayName == "B")
         #expect(state.processes[b]?.rule == .direct)
         #expect(state.hasCompletedOnboarding == true)
-        #expect(state.rules == config.matchRules)
+        // assignRule 重放会为非默认的每进程规则派生一条「进程 × * × *」规则(见 Reducer.assignRule
+        // 的"收编进规则表");真实 round-trip 里它本来就在持久化的 matchRules 里(存盘时就是从
+        // state.rules 带走的),这个手工 fixture 没带,所以重放后补在表尾。持久化的规则表本身
+        // 顺序原样在前。
+        #expect(Array(state.rules.prefix(config.matchRules.count)) == config.matchRules)
+        #expect(state.rules.count == config.matchRules.count + 1)
+        #expect(state.rules.last?.appPattern == "a")
+        #expect(state.rules.last?.action == .proxied)
         // Runtime/ephemeral fields untouched by restore, still at their fresh-launch defaults.
         #expect(state.isEngineHealthy == true)
     }

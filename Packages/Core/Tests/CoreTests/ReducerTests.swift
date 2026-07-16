@@ -37,8 +37,10 @@ struct ReducerTests {
         let (next, effects) = Reducer.reduce(state, .assignRule(processID: a, rule: .proxied))
         #expect(next.processes[a]?.rule == .proxied)
         #expect(next.processes[b]?.rule == .direct)
-        // only the non-direct assignment is pushed; the extension defaults unknowns to direct
-        #expect(effects == [.applyRuleSet(assignments: [a: .proxied], matchRules: [])])
+        // only the non-direct assignment is pushed; the extension defaults unknowns to direct.
+        // assignRule 还派生一条「该进程 × * × *」规则收编进规则表(跨入口时间倒排的关键)。
+        #expect(effects == [.applyRuleSet(assignments: [a: .proxied], matchRules: next.rules)])
+        #expect(next.rules.map(\.appPattern) == ["a"])
     }
 
     @Test("flowStatsDelta accumulates onto existing per-process stats")

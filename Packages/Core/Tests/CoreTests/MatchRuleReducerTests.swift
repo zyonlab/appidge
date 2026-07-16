@@ -138,6 +138,58 @@ struct MatchRuleReducerTests {
         #expect(state.rules.map(\.id) == [RuleID("specific"), RuleID("wild")])
     }
 
+    // MARK: - assignRule 收编进规则表(跨入口时间倒排)
+
+    @Test("assignRule derives a host-agnostic rule at the top of the table and updates the process")
+    func assignRuleDerivesTableRule() {
+        let a = ProcessID("com.example.app")
+        var state = AppState()
+        state.processes[a] = MonitoredProcess(id: a, displayName: "A", executablePath: "/a")
+
+        let (next, effects) = Reducer.reduce(state, .assignRule(processID: a, rule: .proxied))
+
+        #expect(next.processes[a]?.rule == .proxied)
+        #expect(next.rules.count == 1)
+        #expect(next.rules[0].appPattern == "com.example.app")
+        #expect(next.rules[0].hostPattern == "*")
+        #expect(next.rules[0].portRange == nil)
+        #expect(next.rules[0].action == .proxied)
+        #expect(effects == [.applyRuleSet(assignments: [a: .proxied], matchRules: next.rules)])
+    }
+
+    @Test("a NEWER per-process assignment outranks an OLDER connection-level rule — recency wins across entries")
+    func newerAssignmentOutranksOlderMatchRule() {
+        let a = ProcessID("com.example.app")
+        var state = AppState()
+        state.processes[a] = MonitoredProcess(id: a, displayName: "A", executablePath: "/a")
+        // 用户上周对某条连接右键"走代理"。
+        let old = ProxyMatchRule(
+            id: RuleID("old"), appPattern: "com.example.app", hostPattern: "1.2.3.4",
+            portRange: 443...443, action: .proxied
+        )
+        (state, _) = Reducer.reduce(state, .addMatchRule(old))
+        // 今天在「应用」表把整个进程改成"直连" → 派生规则必须压在旧规则之上(首个命中生效)。
+        let (next, _) = Reducer.reduce(state, .assignRule(processID: a, rule: .direct))
+        #expect(next.rules.map(\.appPattern) == ["com.example.app", "com.example.app"])
+        #expect(next.rules[0].hostPattern == "*")
+        #expect(next.rules[0].action == .direct)
+        #expect(next.rules[1].id == RuleID("old"))
+    }
+
+    @Test("re-assigning the same process updates the derived rule in place (no duplicates), moved to top")
+    func reassignUpsertsDerivedRule() {
+        let a = ProcessID("com.example.app")
+        var state = AppState()
+        state.processes[a] = MonitoredProcess(id: a, displayName: "A", executablePath: "/a")
+        (state, _) = Reducer.reduce(state, .assignRule(processID: a, rule: .proxied))
+        (state, _) = Reducer.reduce(state, .addMatchRule(rule("mid", host: "*.other")))
+        let (next, _) = Reducer.reduce(state, .assignRule(processID: a, rule: .block))
+        // 仍然只有一条派生规则,动作更新为 block,回到表首。
+        #expect(next.rules.count == 2)
+        #expect(next.rules[0].appPattern == "com.example.app")
+        #expect(next.rules[0].action == .block)
+    }
+
     // MARK: - per-rule enable/disable
 
     @Test("a rule created without specifying isEnabled defaults to enabled (still participates)")

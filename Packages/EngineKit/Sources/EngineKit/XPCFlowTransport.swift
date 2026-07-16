@@ -1,63 +1,40 @@
 import Foundation
-import Network
 import IPCContract
 
-/// 生产路径的真实 Transport（E2 的 XPC 版）：`forward()` 跟 ``NEFlowTransport`` 完全一致
-/// （direct 直接放行；proxied 用 Network.framework 探活上游代理，失败交给 FlowRouter
-/// fail-open），唯一的区别是 IPC 传输机制——App↔扩展改走 XPC（`IPCContract.XPCTransportConfig`
+/// 生产路径的真实 Transport（E2 的 XPC 版）：App↔扩展走 XPC（`IPCContract.XPCTransportConfig`
 /// 的 mach service），不再用 App Group UserDefaults + Darwin 通知（那条路径在 sysex 上不通，
 /// 见 ``NEFlowTransport`` 和 `IPCContract/XPCTransport.swift` 的注释）。
+///
+/// `forward()` 是**纯计量钩子、零 I/O**。⚠️ 曾经的实现对每个 `.proxied` 数据块都
+/// `probeUpstream()` 新建一条到上游的 TCP 连接(握手成功即 cancel)——TCPFlowPump 每读一个
+/// ≤64KB 的 chunk 就调一次 `FlowRouter.route` → `forward`,一次大下载就是数千次
+/// connect/handshake/cancel:耗尽扩展进程的临时端口与 fd、CPU 飙升,catch-all 接管下全系统
+/// 断网(真机"装上后 Chrome 等无法联网、重启才恢复"的直接放大器)。上游可达性属于诊断
+/// (`DiagnosticsRunner` 的 `upstreamReachable`),不属于数据面;数据面的失败本来就由 pump
+/// 的连接错误路径(fail-open 关流)处理。
 ///
 /// 并发安全用显式 `NSLock`，不用 actor：这个类型要 conform `@objc protocol`
 /// （`ExtensionXPCProtocol`）并被 XPC runtime 在任意队列上调用，跟 actor 隔离域不兼容；
 /// 这是这个代码库贯穿全局的写法（参考 ``NEFlowTransport`` 自己、
 /// `Extension/ProxyExtensionProvider.swift` 的 `configLock`）。
 public final class XPCFlowTransport: NSObject, Transport, ExtensionXPCProtocol, NSXPCListenerDelegate, @unchecked Sendable {
-    private let upstreamEndpoint: NWEndpoint
     private let lock = NSLock()
     private var appMessageHandler: (@Sendable (AppToExtensionMessage) -> Void)?
     private var currentConnection: NSXPCConnection?
     private var listener: NSXPCListener?
 
+    /// 参数保留只为调用点兼容(曾用于 forward 的逐 chunk 上游探活,见类型注释的 ⚠️)。
     public init(upstreamHost: String, upstreamPort: UInt16) {
-        self.upstreamEndpoint = NWEndpoint.hostPort(
-            host: NWEndpoint.Host(upstreamHost),
-            port: NWEndpoint.Port(rawValue: upstreamPort) ?? 443
-        )
         super.init()
     }
 
+    /// 纯计量钩子:字节已由 pump 真实转发,这里不做任何 I/O(见类型注释的 ⚠️)。
     public func forward(
         processID: ProcessIdentifierDTO,
         bytesUp: Int64,
         bytesDown: Int64,
         via rule: ProxyRuleDTO
-    ) async throws {
-        guard rule == .proxied else { return }
-        try await probeUpstream()
-    }
-
-    private func probeUpstream() async throws {
-        let connection = NWConnection(to: upstreamEndpoint, using: .tcp)
-        defer { connection.cancel() }
-
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            let box = ContinuationBox(continuation)
-            connection.stateUpdateHandler = { state in
-                switch state {
-                case .ready:
-                    box.resume(.success(()))
-                case .failed(let error):
-                    box.resume(.failure(error))
-                case .cancelled:
-                    box.resume(.failure(XPCFlowTransportError.upstreamUnreachable))
-                default:
-                    break
-                }
-            }
-            connection.start(queue: .global(qos: .utility))
-        }
-    }
+    ) async throws {}
 
     /// 通过当前已连接的 XPC connection 把消息推给 App。拿不到连接（还没人连上、
     /// 或连接已失效）就静默不发——跟 ``NEFlowTransport.deliver`` 在拿不到 UserDefaults
@@ -122,25 +99,3 @@ public final class XPCFlowTransport: NSObject, Transport, ExtensionXPCProtocol, 
     }
 }
 
-public enum XPCFlowTransportError: Error, Sendable {
-    case upstreamUnreachable
-}
-
-/// CheckedContinuation 只能 resume 一次；NWConnection 的 stateUpdateHandler 可能在
-/// ready 之后还回调 cancelled，用锁保护避免二次 resume 崩溃。
-private final class ContinuationBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var continuation: CheckedContinuation<Void, Error>?
-
-    init(_ continuation: CheckedContinuation<Void, Error>) {
-        self.continuation = continuation
-    }
-
-    func resume(_ result: Result<Void, Error>) {
-        lock.lock()
-        defer { lock.unlock() }
-        guard let continuation else { return }
-        self.continuation = nil
-        continuation.resume(with: result)
-    }
-}

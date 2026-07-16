@@ -30,6 +30,17 @@ enum TransparentProxySettings {
     }
 }
 
+/// `handleNewTCPFlow` 同步解出的、要传给 `beginFlow` 的判定结果:来源身份(含可读显示名)+
+/// 最终生效的 rule。打包成一个类型只是为了把 `beginFlow` 的参数数压回 lint 阈值内
+/// (处理来源信息的参数原本就有好几个,新增可读进程名会超),不是必须的抽象。
+struct FlowOrigin {
+    let processID: ProcessIdentifierDTO
+    /// 人类可读的进程名(见 `ProcessPathResolver.displayName(fromExecutablePath:)`)。
+    /// 解不出可执行文件路径、或路径解不出文件名时为 nil。
+    let displayName: String?
+    let rule: ProxyRuleDTO
+}
+
 /// 单条连接的上下文:身份 + 目标 + 决策(rule/proxyKind)+ 累计字节 + 结束只发一次的闸门。
 /// pump 回调从不同队列并发访问字节计数,用锁保护;`@unchecked Sendable` 显式担这份线程安全。
 final class ConnectionContext: @unchecked Sendable {
@@ -43,6 +54,8 @@ final class ConnectionContext: @unchecked Sendable {
     let openedAt: Date
     /// 逐连接抓包写入器(抓包开关关时为 nil)。pump 往它写上下行字节,teardown 时 close。
     let capture: PacketCaptureWriter?
+    /// 人类可读的进程名,原样透传进 ConnectionEventDTO(见 `FlowOrigin.displayName` 的注释)。
+    let processDisplayName: String?
 
     private let lock = NSLock()
     private var up: Int64 = 0
@@ -51,7 +64,8 @@ final class ConnectionContext: @unchecked Sendable {
 
     init(
         id: String, processID: ProcessIdentifierDTO, host: String, port: UInt16,
-        rule: ProxyRuleDTO, proxyKind: ProxyKindDTO?, openedAt: Date, capture: PacketCaptureWriter? = nil
+        rule: ProxyRuleDTO, proxyKind: ProxyKindDTO?, openedAt: Date, capture: PacketCaptureWriter? = nil,
+        processDisplayName: String? = nil
     ) {
         self.id = id
         self.processID = processID
@@ -61,6 +75,7 @@ final class ConnectionContext: @unchecked Sendable {
         self.proxyKind = proxyKind
         self.openedAt = openedAt
         self.capture = capture
+        self.processDisplayName = processDisplayName
     }
 
     func addUp(_ n: Int64) { lock.withLock { up += n } }

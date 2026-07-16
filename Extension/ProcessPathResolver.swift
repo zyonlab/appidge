@@ -47,6 +47,14 @@ enum ProcessPathResolver {
         return path
     }
 
+    /// 从可执行文件路径取最后一段路径分量,作为人类可读的进程名——比如
+    /// `/Users/admin/.yunti/xray-core/xray` → `xray`,比未签名进程的 `sourceAppSigningIdentifier`
+    /// (常是无意义的 `a.out`)可读得多。路径为空/解不出最后一段时返回 nil。
+    static func displayName(fromExecutablePath path: String) -> String? {
+        let name = (path as NSString).lastPathComponent
+        return name.isEmpty ? nil : name
+    }
+
     /// `audit_token_t` 是 8 个 `UInt32`;PID 按 Darwin 惯例在下标 5(ProxyBridge 与多个开源
     /// 实现一致的读法,不是我们自己猜的)。长度不对就是意外形态,不强行解析。
     private static func pid(fromAuditToken data: Data) -> pid_t? {

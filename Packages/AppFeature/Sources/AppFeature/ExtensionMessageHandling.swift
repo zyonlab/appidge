@@ -45,7 +45,8 @@ public enum ExtensionMessageHandling {
                 phase: corePhase(from: event.phase),
                 bytesUp: event.bytesUp,
                 bytesDown: event.bytesDown,
-                openedAt: event.openedAt
+                openedAt: event.openedAt,
+                processDisplayName: event.processDisplayName
             ))]
 
         case .loopDetected(let signature):

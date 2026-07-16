@@ -256,17 +256,11 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         // 接管——包括 rule == .direct:现在"直连"也由我们自己拨号(见 ProxyDialer.openDirect 的
         // 显式 no-proxy NWParameters),只是不走代理、原样连到原目的地,这样"应用"页才能对所有
         // 进程显示真实速率/流量,不再局限于走代理的进程。
-        let (decision, reason) = effectiveRuleSync(
+        // effectiveRuleSync 内部会把每条 flow 的判定原因记进 ExtDiag(不只是被接管的)——
+        // 定位"配置没生效 vs 压根没拦截到"的关键证据,见该函数的文档注释。
+        guard case .handle(let rule) = effectiveRuleSync(
             sourceID: sourceID, sourcePath: sourcePath, host: hostPort?.0, port: hostPort?.1
-        )
-        // 每条 flow 的判定都记一笔(不只是被接管的)——定位"配置没生效 vs 压根没拦截到"的关键证据:
-        // 如果这里连日志都没有,说明 handleNewFlow 根本没被 NE 调用;如果有但全是 bypass,
-        // 说明拦截到了但规则/排除判定把它放行了,该去查规则配置对不对。
-        ExtDiag.log(
-            "handleNewTCPFlow src=\(sourceID) path=\(sourcePath ?? "-") host=\(hostPort?.0 ?? "-"):\(hostPort?.1.description ?? "-") "
-            + "decision=\(reason)"
-        )
-        guard case .handle(let rule) = decision else {
+        ) else {
             return false
         }
 
@@ -274,6 +268,8 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         handleNewTCPFlow INTERCEPT src=\(sourceID, privacy: .public) rule=\(String(describing: rule), privacy: .public) \
         host=\(hostPort?.0 ?? "-", privacy: .public)
         """)
+        let name = sourcePath.flatMap(ProcessPathResolver.displayName(fromExecutablePath:))
+        let origin = FlowOrigin(processID: processID, displayName: name, rule: rule)
         tcpFlow.open(withLocalFlowEndpoint: nil) { [weak self] error in
             guard let self, error == nil else {
                 tcpFlow.closeReadWithError(error)
@@ -283,7 +279,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             Task {
                 await self.beginFlow(
                     tcpFlow: tcpFlow, to: remoteEndpoint, remoteHostname: remoteHostname,
-                    processID: processID, rule: rule, router: router
+                    origin: origin, router: router
                 )
             }
         }
@@ -294,10 +290,11 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         tcpFlow: NEAppProxyTCPFlow,
         to remoteEndpoint: Network.NWEndpoint,
         remoteHostname: String?,
-        processID: ProcessIdentifierDTO,
-        rule: ProxyRuleDTO,
+        origin: FlowOrigin,
         router: FlowRouter
     ) async {
+        let processID = origin.processID
+        let rule = origin.rule
         // rule 由 handleNewTCPFlow 同步解出并传入(只有 .proxied/.block 才会走到这里);不再在此
         // async 重解,既省一次 actor 往返,也避免"同步判接管、异步又判成 .direct"的竞态。
         await routingHistoryTracker.record(processID: processID, wasProxied: rule == .proxied)
@@ -326,7 +323,8 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             : nil
         let context = ConnectionContext(
             id: UUID().uuidString, processID: processID, host: host, port: port,
-            rule: rule, proxyKind: proxyKind, openedAt: Date(), capture: capture
+            rule: rule, proxyKind: proxyKind, openedAt: Date(), capture: capture,
+            processDisplayName: origin.displayName
         )
 
         // 命中 Block 规则:直接拒绝这条 flow,不建立任何远端连接。记一条 closed 事件
@@ -359,7 +357,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         let event = ConnectionEventDTO(
             id: context.id, processID: context.processID, targetHost: context.host, targetPort: context.port,
             rule: context.rule, proxyKind: context.proxyKind, phase: phase, bytesUp: bytes.up, bytesDown: bytes.down,
-            openedAt: context.openedAt
+            openedAt: context.openedAt, processDisplayName: context.processDisplayName
         )
         Task { await transport.deliver(.connectionEvent(event)) }
     }

@@ -131,7 +131,7 @@ private struct ConnectionDetail: View {
         if let e = entry {
             Form {
                 Section("进程") {
-                    LabeledContent("应用", value: appName(e.processID))
+                    LabeledContent("应用", value: appName(e))
                     LabeledContent("标识") {
                         Text(e.processID.value).monospaced().textSelection(.enabled).lineLimit(1)
                     }
@@ -171,8 +171,9 @@ private struct ConnectionDetail: View {
         }
     }
 
-    private func appName(_ id: ProcessID) -> String {
-        store.state.catalog[id]?.displayName ?? id.value
+    /// 优先级同 `ConnectionsTable.appName`:目录扫描名 > 扩展解出的可读进程名 > 原始 processID。
+    private func appName(_ entry: ConnectionLogEntry) -> String {
+        store.state.catalog[entry.processID]?.displayName ?? entry.processDisplayName ?? entry.processID.value
     }
 
     @ViewBuilder private func statusLabel(_ phase: ConnectionPhase) -> some View {

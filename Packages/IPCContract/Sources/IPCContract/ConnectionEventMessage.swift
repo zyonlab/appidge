@@ -22,6 +22,11 @@ public struct ConnectionEventDTO: Sendable, Equatable, Codable {
     public let bytesDown: Int64
     /// 连接建立时间(扩展在建立 flow 时打的时间戳,同一连接的后续事件沿用同一值)。
     public let openedAt: Date
+    /// 人类可读的进程名,扩展侧从 `sourceAppAuditToken` 解出可执行文件路径后取最后一段路径
+    /// 分量算出来的(比如 `/Users/admin/.yunti/xray-core/xray` → `xray`)——未签名命令行程序的
+    /// `sourceAppSigningIdentifier` 往往是没有意义的 `a.out`,这个字段给 UI 一个更可读的兜底。
+    /// 解不出可执行文件路径时为 nil,调用方回落到 `processID.value`。
+    public let processDisplayName: String?
 
     public init(
         id: String,
@@ -33,7 +38,8 @@ public struct ConnectionEventDTO: Sendable, Equatable, Codable {
         phase: ConnectionPhaseDTO,
         bytesUp: Int64,
         bytesDown: Int64,
-        openedAt: Date = Date(timeIntervalSince1970: 0)
+        openedAt: Date = Date(timeIntervalSince1970: 0),
+        processDisplayName: String? = nil
     ) {
         self.id = id
         self.processID = processID
@@ -45,5 +51,6 @@ public struct ConnectionEventDTO: Sendable, Equatable, Codable {
         self.bytesUp = bytesUp
         self.bytesDown = bytesDown
         self.openedAt = openedAt
+        self.processDisplayName = processDisplayName
     }
 }

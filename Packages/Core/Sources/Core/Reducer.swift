@@ -237,7 +237,9 @@ public enum Reducer {
         }
         if state.processes[entry.processID] == nil {
             state.processes[entry.processID] = MonitoredProcess(
-                id: entry.processID, displayName: entry.processID.value, executablePath: entry.processID.value
+                id: entry.processID,
+                displayName: entry.processDisplayName ?? entry.processID.value,
+                executablePath: entry.processID.value
             )
         }
         return (state, [])

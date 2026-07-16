@@ -102,6 +102,28 @@ struct ExtensionMessageHandlingTests {
         ))])
     }
 
+    @Test("connectionEvent carries processDisplayName through to the Core entry, nil when absent")
+    func connectionEventMapsProcessDisplayName() {
+        let named = ConnectionEventDTO(
+            id: "c4", processID: ProcessIdentifierDTO("a.out"), targetHost: "h", targetPort: 80,
+            rule: .proxied, proxyKind: .socks5, phase: .opened, bytesUp: 0, bytesDown: 0,
+            processDisplayName: "xray"
+        )
+        guard case .connectionEventReceived(let namedEntry) = ExtensionMessageHandling.actions(for: .connectionEvent(named)).first else {
+            Issue.record("expected connectionEventReceived"); return
+        }
+        #expect(namedEntry.processDisplayName == "xray")
+
+        let unnamed = ConnectionEventDTO(
+            id: "c5", processID: ProcessIdentifierDTO("com.x"), targetHost: "h", targetPort: 80,
+            rule: .direct, proxyKind: nil, phase: .opened, bytesUp: 0, bytesDown: 0
+        )
+        guard case .connectionEventReceived(let unnamedEntry) = ExtensionMessageHandling.actions(for: .connectionEvent(unnamed)).first else {
+            Issue.record("expected connectionEventReceived"); return
+        }
+        #expect(unnamedEntry.processDisplayName == nil)
+    }
+
     @Test("loopDetected maps to a loopWarningRaised action carrying the signature")
     func loopDetectedMapsToWarning() {
         let actions = ExtensionMessageHandling.actions(for: .loopDetected(signature: "10.0.0.1:1080"))

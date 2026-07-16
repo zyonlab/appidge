@@ -141,6 +141,24 @@ struct CodableRoundTripTests {
         #expect(try roundTrip(direct) == direct)
     }
 
+    @Test("ConnectionEventDTO carries an optional processDisplayName, round-trips with and without it")
+    func connectionEventProcessDisplayNameRoundTrip() throws {
+        let named = ConnectionEventDTO(
+            id: "c", processID: ProcessIdentifierDTO("a.out"), targetHost: "h", targetPort: 80,
+            rule: .proxied, proxyKind: .socks5, phase: .opened, bytesUp: 0, bytesDown: 0,
+            processDisplayName: "xray"
+        )
+        #expect(try roundTrip(named) == named)
+        #expect(named.processDisplayName == "xray")
+
+        let unnamed = ConnectionEventDTO(
+            id: "d", processID: ProcessIdentifierDTO("com.example"), targetHost: "h", targetPort: 80,
+            rule: .direct, proxyKind: nil, phase: .opened, bytesUp: 0, bytesDown: 0
+        )
+        #expect(try roundTrip(unnamed) == unnamed)
+        #expect(unnamed.processDisplayName == nil)
+    }
+
     @Test("ProxyServerDTO round-trips with and without credentials")
     func proxyServerDTORoundTrip() throws {
         let noAuth = ProxyServerDTO(id: "a", host: "127.0.0.1", port: 1080, kind: .socks5)

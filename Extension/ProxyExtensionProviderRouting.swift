@@ -44,14 +44,25 @@ extension ProxyExtensionProvider {
     ///
     /// host/port 拿不到(极少数解析不出目的地)时跳过地址类判定,只按每进程规则。
     ///
-    /// 返回值第二项是**判定原因**的简短标签,只用于 `ExtDiag` 诊断日志(定位"用户配置不对 vs
-    /// 根本没拦截到"用),不参与任何业务逻辑分支。
+    /// 判定原因会记进 `ExtDiag` 诊断日志(定位"用户配置不对 vs 根本没拦截到"用),
+    /// 不参与任何业务逻辑分支。
     ///
     /// `sourcePath`:`ProcessPathResolver` 从 flow 的 audit token 解出的可执行文件路径(可能为
     /// nil,解不出就跳过路径维度的排除)——和 `sourceID`(签名标识)是两个独立信号,各判一次
     /// `ProcessOriginExclusion.shouldBypass`,任一命中就 `.bypass`。见 `ownExecutablePaths`
     /// 的类型注释:为什么需要这第二个信号。
-    func effectiveRuleSync(
+    func effectiveRuleSync(sourceID: String, sourcePath: String?, host: String?, port: UInt16?) -> TCPFlowDecision {
+        let (decision, reason) = resolveDecision(sourceID: sourceID, sourcePath: sourcePath, host: host, port: port)
+        // 每条 flow 的判定都记一笔(不只是被接管的)——如果这里连日志都没有,说明 handleNewFlow
+        // 根本没被 NE 调用;如果有但全是 bypass,说明拦截到了但规则/排除判定把它放行了。
+        ExtDiag.log(
+            "handleNewTCPFlow src=\(sourceID) path=\(sourcePath ?? "-") host=\(host ?? "-"):\(port?.description ?? "-") "
+            + "decision=\(reason)"
+        )
+        return decision
+    }
+
+    private func resolveDecision(
         sourceID: String, sourcePath: String?, host: String?, port: UInt16?
     ) -> (TCPFlowDecision, String) {
         // 转发环硬化(按来源):我们自己组件(app/扩展)+ app 动态查到的本地代理进程发起的连接

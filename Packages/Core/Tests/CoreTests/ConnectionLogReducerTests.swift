@@ -90,4 +90,21 @@ struct ConnectionLogReducerTests {
         let (_, effects) = Reducer.reduce(AppState(), .connectionEventReceived(entry("c1")))
         #expect(effects.isEmpty)
     }
+
+    @Test("a connection event carrying processDisplayName uses it as the registered displayName")
+    func registersWithProcessDisplayName() {
+        let named = ConnectionLogEntry(
+            id: "c1", processID: ProcessID("a.out"), host: "example.com", port: 443,
+            rule: .proxied, proxyKind: .socks5, phase: .opened, bytesUp: 0, bytesDown: 0,
+            processDisplayName: "xray"
+        )
+        let (next, _) = Reducer.reduce(AppState(), .connectionEventReceived(named))
+        #expect(next.processes[ProcessID("a.out")]?.displayName == "xray")
+    }
+
+    @Test("a connection event without processDisplayName falls back to the raw processID for the registered displayName")
+    func registersWithoutProcessDisplayNameFallsBackToID() {
+        let (next, _) = Reducer.reduce(AppState(), .connectionEventReceived(entry("c1")))
+        #expect(next.processes[ProcessID("com.x")]?.displayName == "com.x")
+    }
 }

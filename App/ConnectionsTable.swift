@@ -19,7 +19,7 @@ struct ConnectionsTable: View {
         let filtered = key.isEmpty
             ? store.state.connectionLog
             : store.state.connectionLog.filter {
-                appName($0.processID).lowercased().contains(key) || $0.host.lowercased().contains(key)
+                appName($0).lowercased().contains(key) || $0.host.lowercased().contains(key)
             }
         return filtered.sorted(using: sortOrder)
     }
@@ -41,7 +41,7 @@ struct ConnectionsTable: View {
     private var table: some View {
         Table(rows, selection: $selection, sortOrder: $sortOrder) {
             TableColumn("应用", value: \.processID.value) { e in
-                AppLabel(name: appName(e.processID), path: store.state.catalog[e.processID]?.executablePath)
+                AppLabel(name: appName(e), path: store.state.catalog[e.processID]?.executablePath)
             }.width(min: 130, ideal: 190)
 
             TableColumn("目标", value: \.host) { e in
@@ -91,8 +91,10 @@ struct ConnectionsTable: View {
         }
     }
 
-    private func appName(_ id: ProcessID) -> String {
-        store.state.catalog[id]?.displayName ?? id.value
+    /// 优先级:目录扫描到的真实 app 名(最权威)> 扩展解出的可读进程名(未签名命令行程序的
+    /// 兜底,比如 `a.out` → `xray`)> 原始 processID(最后兜底)。
+    private func appName(_ entry: ConnectionLogEntry) -> String {
+        store.state.catalog[entry.processID]?.displayName ?? entry.processDisplayName ?? entry.processID.value
     }
 
     private func makeRules(_ entries: [ConnectionLogEntry], _ action: ProxyRule) {

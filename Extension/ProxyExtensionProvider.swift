@@ -268,7 +268,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         // effectiveRuleSync 内部把每条 flow 的判定原因记进 ExtDiag(不只是被接管的)——定位
         // "配置没生效 vs 压根没拦截到"的关键证据,见该函数的文档注释。
         let decision = effectiveRuleSync(
-            sourceID: sourceID, sourcePath: sourcePath, host: hostPort?.0, port: hostPort?.1
+            sourceID: sourceID, sourcePath: sourcePath, host: hostPort?.0, hostname: remoteHostname, port: hostPort?.1
         )
         let name = sourcePath.flatMap(ProcessPathResolver.displayName(fromExecutablePath:))
         switch decision {

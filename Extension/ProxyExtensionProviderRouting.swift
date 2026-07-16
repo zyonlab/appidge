@@ -53,27 +53,44 @@ extension ProxyExtensionProvider {
     /// nil,解不出就跳过路径维度的排除)——和 `sourceID`(签名标识)是两个独立信号,各判一次
     /// `ProcessOriginExclusion.shouldBypass`,任一命中就 `.bypass`。见 `ownExecutablePaths`
     /// 的类型注释:为什么需要这第二个信号。
-    func effectiveRuleSync(sourceID: String, sourcePath: String?, host: String?, port: UInt16?) -> TCPFlowDecision {
-        let (decision, reason) = resolveDecision(sourceID: sourceID, sourcePath: sourcePath, host: host, port: port)
+    ///
+    /// `hostname`:flow 的 `remoteHostname`(app 用域名连时 NE 保留的原始主机名,可能为 nil)。
+    /// 规则匹配与地址类硬闸对 hostname、endpoint host **两个候选各判一次,任一命中即命中**——
+    /// 用户从连接现拼的规则记录的是当时观测到的字面 host(常是 IP),同一域名下次解析到另一个
+    /// IP、或 NE 这次给的是域名,规则就"时灵时不灵";按两路候选匹配后,域名规则和 IP 规则都稳定生效。
+    func effectiveRuleSync(
+        sourceID: String, sourcePath: String?, host: String?, hostname: String?, port: UInt16?
+    ) -> TCPFlowDecision {
+        let (decision, reason) = resolveDecision(
+            sourceID: sourceID, sourcePath: sourcePath, host: host, hostname: hostname, port: port
+        )
         // 每条 flow 的判定都记一笔(不只是被接管的)——如果这里连日志都没有,说明 handleNewFlow
         // 根本没被 NE 调用;如果有但全是 bypass,说明拦截到了但规则/排除判定把它放行了。
         ExtDiag.log(
             "handleNewTCPFlow src=\(sourceID) path=\(sourcePath ?? "-") host=\(host ?? "-"):\(port?.description ?? "-") "
-            + "decision=\(reason)"
+            + "hostname=\(hostname ?? "-") decision=\(reason)"
         )
         return decision
     }
 
+    /// 参与匹配/硬闸的目标主机候选:remoteHostname(域名)优先、endpoint host(常为 IP)在后,
+    /// 去重、去 nil。两者常常只有一个非空。
+    private func hostCandidates(host: String?, hostname: String?) -> [String] {
+        var seen = Set<String>()
+        return [hostname, host].compactMap { $0 }.filter { seen.insert($0.lowercased()).inserted }
+    }
+
     private func resolveDecision(
-        sourceID: String, sourcePath: String?, host: String?, port: UInt16?
+        sourceID: String, sourcePath: String?, host: String?, hostname: String?, port: UInt16?
     ) -> (TCPFlowDecision, String) {
+        let candidates = hostCandidates(host: host, hostname: hostname)
         // ①② 硬边界:自身组件 + 地址类(回环/私网/上游)—— 一律 .bypass,不接管、活动栏不可见。
-        if let reason = hardBypassReason(sourceID: sourceID, sourcePath: sourcePath, host: host, port: port) {
+        if let reason = hardBypassReason(sourceID: sourceID, sourcePath: sourcePath, hosts: candidates, port: port) {
             return (.bypass, reason)
         }
         // ③ 解出动作:细粒度规则表(首个命中)优先于每进程规则;都没有 → 默认 .direct(策略 A:
         //    默认就接管并直连计量,活动栏能看到每条连接,含本地代理自己的出站)。
-        let (action, ruleSource) = resolveAction(sourceID: sourceID, host: host, port: port)
+        let (action, ruleSource) = resolveAction(sourceID: sourceID, hosts: candidates, port: port)
         // ④ 防环唯一约束:本地代理(xray/yunti)的流量**绝不能再代理回它**——解出 .proxied 就降级
         //    成 .direct(照常接管+直连+展示,只是不转发去上游)。其余动作(direct/block/observe)原样生效。
         if action == .proxied, isLocalProxyOrigin(sourceID: sourceID, sourcePath: sourcePath) {
@@ -90,8 +107,9 @@ extension ProxyExtensionProvider {
     /// 硬边界:命中就永远 `.bypass`(返回原因标签),不受任何规则影响。
     /// - 自身组件(app/扩展本体):接管自己必然自套死循环。只比对静态的 `selfXxx`,**不含**本地代理
     ///   (后者在策略 A 下要接管展示,只是禁止代理出去,见 `resolveDecision` ④)。
-    /// - 回环 / 私网 / 上游:基础设施噪声 + 防环,与来源无关。
-    private func hardBypassReason(sourceID: String, sourcePath: String?, host: String?, port: UInt16?) -> String? {
+    /// - 回环 / 私网 / 上游:基础设施噪声 + 防环,与来源无关。hostname/endpoint host 两个候选
+    ///   各判一次(任一命中即 bypass):上游若按域名配置、flow 端点却是 IP(或反之)也兜得住。
+    private func hardBypassReason(sourceID: String, sourcePath: String?, hosts: [String], port: UInt16?) -> String? {
         if ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourceID, ownIdentifiers: selfIdentifiers) {
             return "bypass:self-identifier"
         }
@@ -99,18 +117,24 @@ extension ProxyExtensionProvider {
            ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourcePath, ownIdentifiers: selfExecutablePaths) {
             return "bypass:self-path(\(sourcePath))"
         }
-        guard let host, let port else { return nil }
-        if LoopbackDetector.isLoopback(host: host) { return "bypass:loopback" }
-        if PrivateNetworkExclusion.isPrivateNetwork(host: host) { return "bypass:private-network" }
+        guard let port, !hosts.isEmpty else { return nil }
         let upstreams = Set((proxyConfig?.servers ?? []).map { UpstreamEndpoint(host: $0.host, port: $0.port) })
-        return UpstreamExclusion.isUpstream(host: host, port: port, upstreams: upstreams) ? "bypass:upstream" : nil
+        for host in hosts {
+            if LoopbackDetector.isLoopback(host: host) { return "bypass:loopback" }
+            if PrivateNetworkExclusion.isPrivateNetwork(host: host) { return "bypass:private-network" }
+            if UpstreamExclusion.isUpstream(host: host, port: port, upstreams: upstreams) { return "bypass:upstream" }
+        }
+        return nil
     }
 
-    /// 规则表(首个命中)→ 每进程规则 → 默认 `.direct`(策略 A)。
-    private func resolveAction(sourceID: String, host: String?, port: UInt16?) -> (ProxyRuleDTO, String) {
-        if let host, let port,
-           let matched = RuleMatcher.firstMatch(matchRules, app: sourceID, host: host, port: port) {
-            return (matched, "matchRule")
+    /// 规则表(首个命中,hostname/endpoint host 两候选各试一次)→ 每进程规则 → 默认 `.direct`(策略 A)。
+    private func resolveAction(sourceID: String, hosts: [String], port: UInt16?) -> (ProxyRuleDTO, String) {
+        if let port {
+            for host in hosts {
+                if let matched = RuleMatcher.firstMatch(matchRules, app: sourceID, host: host, port: port) {
+                    return (matched, "matchRule(\(host))")
+                }
+            }
         }
         if let perProcess = perProcessRules[sourceID] { return (perProcess, "perProcess") }
         return (.direct, "default")

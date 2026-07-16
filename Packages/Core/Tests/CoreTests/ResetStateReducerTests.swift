@@ -7,7 +7,7 @@ struct ResetStateReducerTests {
     @Test("resetState returns a default AppState and no effects, discarding prior state")
     func resetClearsEverything() {
         var state = AppState()
-        state.isGlobalProxyEnabled = true
+        state.isPacketCaptureEnabled = true
         state.proxyServers[ProxyServerID("a")] = ProxyServer(id: ProxyServerID("a"), host: "h", port: 1)
         state.rules = [ProxyMatchRule(id: RuleID("r"), appPattern: "*", hostPattern: "*", portRange: nil, action: .proxied)]
         state.connectionLog = [ConnectionLogEntry(

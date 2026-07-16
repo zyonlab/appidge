@@ -44,4 +44,15 @@ public struct ConnectionLogEntry: Sendable, Equatable, Codable, Identifiable {
         self.openedAt = openedAt
         self.processDisplayName = processDisplayName
     }
+
+    /// 应用重启后从磁盘回灌历史连接日志时用:仍停在 `opened` 阶段的记录不可能真的还活着——
+    /// 它所属的 flow 随上一次 app/扩展进程的生命周期一起没了,不会再收到 close 事件,永远
+    /// 停在"活动"(绿色圆点)会误导用户以为它现在还在跑。回灌前统一改判成 `closed`;
+    /// 已经是终态(`closed`/`failed`)的原样保留,不重复判定。
+    public func normalizedForRestore() -> ConnectionLogEntry {
+        guard phase == .opened else { return self }
+        var copy = self
+        copy.phase = .closed
+        return copy
+    }
 }

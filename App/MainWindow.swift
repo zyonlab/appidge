@@ -17,6 +17,7 @@ struct MainWindow: View {
     @State private var filter = ""
     @State private var selection: Set<ConnectionLogEntry.ID> = []
     @State private var showInspector = true
+    @State private var showingClearConfirmation = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -34,18 +35,6 @@ struct MainWindow: View {
             .safeAreaInset(edge: .top, spacing: 0) {
                 if let warning = store.state.loopWarning {
                     LoopWarningBanner(signature: warning) { store.dispatch(.dismissLoopWarning) }
-                }
-            }
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Toggle(isOn: Binding(
-                        get: { store.state.isGlobalProxyEnabled },
-                        set: { store.dispatch(.setGlobalProxyEnabled($0)) }
-                    )) {
-                        Label("全局代理", systemImage: "network")
-                    }
-                    .toggleStyle(.switch)
-                    .help("总开关：关掉时全部直连")
                 }
             }
             // 状态栏作为 VStack 同级子视图(而非 NavigationSplitView 的 .safeAreaInset)。用 bottom
@@ -84,11 +73,26 @@ struct MainWindow: View {
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
+                Button(role: .destructive) { showingClearConfirmation = true } label: {
+                    Label("清除记录", systemImage: "trash")
+                }
+                .disabled(store.state.connectionLog.isEmpty)
+                .help("清空当前显示的连接记录（不影响已生效的规则/流量统计）")
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button { showInspector.toggle() } label: {
                     Label("详情", systemImage: "sidebar.right")
                 }
                 .help("显示 / 隐藏连接详情")
             }
+        }
+        .confirmationDialog(
+            "清除全部连接记录？", isPresented: $showingClearConfirmation, titleVisibility: .visible
+        ) {
+            Button("清除", role: .destructive) { store.dispatch(.clearConnectionLog) }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("只清空「活动」页显示的连接记录，不影响已生效的规则或累计流量统计。")
         }
     }
 
@@ -155,6 +159,7 @@ private struct ConnectionDetail: View {
                     Menu {
                         Button("走代理") { makeRule(e, .proxied) }
                         Button("直连") { makeRule(e, .direct) }
+                        Button("观测") { makeRule(e, .observe) }
                         Button("拦截", role: .destructive) { makeRule(e, .block) }
                     } label: {
                         Label("为这条连接建规则", systemImage: "plus.rectangle.on.folder")

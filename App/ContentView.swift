@@ -118,16 +118,7 @@ struct MenuBarView: View {
 
             Divider()
 
-            // 5. 全局代理总开关(与主窗口 / 设置同一绑定)。
-            Toggle("全局代理", isOn: Binding(
-                get: { store.state.isGlobalProxyEnabled },
-                set: { store.dispatch(.setGlobalProxyEnabled($0)) }
-            ))
-            .toggleStyle(.switch)
-
-            Divider()
-
-            // 6. 页脚:设置 + 退出。
+            // 5. 页脚:设置 + 退出。
             HStack {
                 SettingsLink { Label("设置…", systemImage: "gearshape") }
                 Spacer()

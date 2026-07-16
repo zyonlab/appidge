@@ -32,10 +32,16 @@ public struct FlowStatsDelta: Sendable, Equatable, Codable {
 }
 
 public enum ProxyRule: Sendable, Equatable, Codable {
+    /// 直连:接管这条流量、由我们自己拨号直连原目的地(不走上游代理),**照常计量并显示**。
+    /// 这是默认策略(A):活动栏能看到每条连接的实时速率/流量,含本地代理(如 xray)自己的出站。
     case direct
     case proxied
     /// 拦截:命中的流量直接拒绝、不建立任何连接(对齐 Proxifier 的 Block 动作)。
     case block
+    /// 观测(B):**不接管数据通路**——在 flow 建立时记一条连接事件让它在活动栏可见,随即放行由
+    /// 系统原生处理。看得到"这个进程连了哪里",但没有逐连接速率/字节(我们没在数据通路里),
+    /// 换来的是**零转发开销**。适合不想让某个高流量进程经我们 pump 中转、又想看到它在连什么的场景。
+    case observe
 }
 
 public struct MonitoredProcess: Sendable, Equatable, Codable, Identifiable {

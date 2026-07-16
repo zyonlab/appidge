@@ -107,4 +107,55 @@ struct ConnectionLogReducerTests {
         let (next, _) = Reducer.reduce(AppState(), .connectionEventReceived(entry("c1")))
         #expect(next.processes[ProcessID("com.x")]?.displayName == "com.x")
     }
+
+    // MARK: - clearConnectionLog
+
+    @Test("clearConnectionLog empties connectionLog and emits an effect to clear the on-disk file")
+    func clearConnectionLogEmptiesAndPushesEffect() {
+        var (state, _) = Reducer.reduce(AppState(), .connectionEventReceived(entry("a")))
+        (state, _) = Reducer.reduce(state, .connectionEventReceived(entry("b")))
+        let (next, effects) = Reducer.reduce(state, .clearConnectionLog)
+        #expect(next.connectionLog.isEmpty)
+        #expect(effects == [.clearConnectionLogFile])
+    }
+
+    @Test("clearConnectionLog does not touch processes — only the log rows go away")
+    func clearConnectionLogLeavesProcessesUntouched() {
+        let (state, _) = Reducer.reduce(AppState(), .connectionEventReceived(entry("a")))
+        #expect(state.processes[ProcessID("com.x")] != nil)
+        let (next, _) = Reducer.reduce(state, .clearConnectionLog)
+        #expect(next.processes[ProcessID("com.x")] != nil)
+    }
+
+    @Test("clearConnectionLog on an already-empty log is a no-op with no effect")
+    func clearConnectionLogEmptyIsNoOp() {
+        let (next, effects) = Reducer.reduce(AppState(), .clearConnectionLog)
+        #expect(next.connectionLog.isEmpty)
+        #expect(effects.isEmpty)
+    }
+
+    // MARK: - normalizedForRestore
+
+    @Test("normalizedForRestore flips an opened entry to closed")
+    func normalizedForRestoreFlipsOpenedToClosed() {
+        let restored = entry("c1", phase: .opened).normalizedForRestore()
+        #expect(restored.phase == .closed)
+    }
+
+    @Test("normalizedForRestore leaves closed/failed entries untouched")
+    func normalizedForRestoreLeavesTerminalPhasesAlone() {
+        #expect(entry("c1", phase: .closed).normalizedForRestore().phase == .closed)
+        #expect(entry("c1", phase: .failed).normalizedForRestore().phase == .failed)
+    }
+
+    @Test("normalizedForRestore only touches phase — every other field is preserved")
+    func normalizedForRestorePreservesOtherFields() {
+        let original = entry("c1", phase: .opened, up: 10, down: 20)
+        let restored = original.normalizedForRestore()
+        #expect(restored.id == original.id)
+        #expect(restored.processID == original.processID)
+        #expect(restored.host == original.host)
+        #expect(restored.bytesUp == original.bytesUp)
+        #expect(restored.bytesDown == original.bytesDown)
+    }
 }

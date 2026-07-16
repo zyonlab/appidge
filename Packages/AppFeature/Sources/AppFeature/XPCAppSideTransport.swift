@@ -23,9 +23,18 @@ public final class XPCAppSideTransport: NSObject, AppSideTransport, AppXPCProtoc
     private var connection: NSXPCConnection?
     private var onMessage: (@Sendable (ExtensionToAppMessage) -> Void)?
     private var isListening = false
+    /// 每当**新建**一条到扩展的连接时触发一次(复用已有连接不触发)。集成方(app)据此把当前
+    /// 完整配置全量重推给扩展(`Action.resyncExtension`)——扩展升级/重启/XPC 掉线重连后,
+    /// 扩展是空规则起步的,必须由 app 主动补推,否则它一直空转。断线后会自动重连,重连成功即再触发。
+    private var onConnect: (@Sendable () -> Void)?
 
     override public init() {
         super.init()
+    }
+
+    /// 设置"连上扩展"回调。幂等,后设覆盖先设。传 nil 清除。
+    public func setOnConnect(_ handler: (@Sendable () -> Void)?) {
+        lock.withLock { self.onConnect = handler }
     }
 
     // MARK: - AppSideTransport
@@ -72,10 +81,11 @@ public final class XPCAppSideTransport: NSObject, AppSideTransport, AppXPCProtoc
 
     /// 返回一条可用的连接：已有的活跃连接直接复用，没有就新建一条并 `resume()`。
     /// 整个「查一次、没有就建」在同一次加锁内完成，避免并发 send() 时重复建连接。
+    /// **新建**连接时(而非复用)在锁外触发一次 `onConnect`——让 app 全量重推配置。
     private func currentConnection() -> NSXPCConnection {
-        lock.withLock {
+        let (conn, isNew) = lock.withLock { () -> (NSXPCConnection, Bool) in
             if let existing = self.connection {
-                return existing
+                return (existing, false)
             }
             let newConnection = NSXPCConnection(
                 machServiceName: XPCTransportConfig.machServiceName,
@@ -85,18 +95,37 @@ public final class XPCAppSideTransport: NSObject, AppSideTransport, AppXPCProtoc
             newConnection.exportedObject = self
             newConnection.remoteObjectInterface = NSXPCInterface(with: ExtensionXPCProtocol.self)
             newConnection.interruptionHandler = { [weak self] in
-                self?.clearConnection()
+                self?.handleConnectionDropped()
             }
             newConnection.invalidationHandler = { [weak self] in
-                self?.clearConnection()
+                self?.handleConnectionDropped()
             }
             newConnection.resume()
             self.connection = newConnection
-            return newConnection
+            return (newConnection, true)
         }
+        if isNew {
+            // 锁外触发,避免 onConnect 里回调进 send()→currentConnection() 造成重入死锁。
+            let handler = lock.withLock { self.onConnect }
+            handler?()
+        }
+        return conn
     }
 
-    private func clearConnection() {
-        lock.withLock { self.connection = nil }
+    /// 连接中断/失效:清掉存住的连接。若仍在监听(app 还想收扩展消息 = 还在使用中),就安排一次
+    /// 自动重连——扩展升级/重启后旧连接会断,若不主动重连,得等到下一次用户改配置才 `send()` 重连,
+    /// 期间扩展一直空转、活动栏空白。延迟 1s 是给扩展留重启窗口,也避免扩展彻底没了时的紧凑重试。
+    /// 重连即新建连接 → 再次触发 `onConnect` → app 重推配置,形成自愈闭环。
+    private func handleConnectionDropped() {
+        let shouldReconnect = lock.withLock { () -> Bool in
+            self.connection = nil
+            return self.isListening
+        }
+        guard shouldReconnect else { return }
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            guard let self, self.lock.withLock({ self.isListening }) else { return }
+            _ = self.currentConnection()   // 新建 → 触发 onConnect → app 重推
+        }
     }
 }

@@ -299,8 +299,7 @@ struct AppliedRuleSetStoreTests {
         let store = AppliedRuleSetStore()
         let target = ProcessIdentifierDTO("com.example.target")
         let ruleSet = RuleSetMessage(
-            assignments: [RuleAssignmentDTO(processID: target, rule: .proxied)],
-            globalProxyEnabled: true
+            assignments: [RuleAssignmentDTO(processID: target, rule: .proxied)]
         )
 
         await store.apply(ruleSet)
@@ -321,12 +320,10 @@ struct AppliedRuleSetStoreTests {
         let target = ProcessIdentifierDTO("com.example.target")
 
         await store.apply(RuleSetMessage(
-            assignments: [RuleAssignmentDTO(processID: target, rule: .direct)],
-            globalProxyEnabled: true
+            assignments: [RuleAssignmentDTO(processID: target, rule: .direct)]
         ))
         await store.apply(RuleSetMessage(
-            assignments: [RuleAssignmentDTO(processID: target, rule: .proxied)],
-            globalProxyEnabled: true
+            assignments: [RuleAssignmentDTO(processID: target, rule: .proxied)]
         ))
 
         let rule = await store.currentRule(for: target)
@@ -341,8 +338,7 @@ struct AppliedRuleSetStoreTests {
             matchRules: [
                 MatchRuleDTO(id: "1", appPattern: "*", hostPattern: "*.internal", portRange: nil, rule: .direct),
                 MatchRuleDTO(id: "2", appPattern: "*", hostPattern: "*", portRange: nil, rule: .proxied)
-            ],
-            globalProxyEnabled: true
+            ]
         ))
         #expect(await store.matchRule(app: "x", host: "wiki.internal", port: 443) == .direct)
         #expect(await store.matchRule(app: "x", host: "example.com", port: 443) == .proxied)
@@ -353,10 +349,9 @@ struct AppliedRuleSetStoreTests {
         let store = AppliedRuleSetStore()
         await store.apply(RuleSetMessage(
             assignments: [],
-            matchRules: [MatchRuleDTO(id: "old", appPattern: "*", hostPattern: "*", portRange: nil, rule: .proxied)],
-            globalProxyEnabled: true
+            matchRules: [MatchRuleDTO(id: "old", appPattern: "*", hostPattern: "*", portRange: nil, rule: .proxied)]
         ))
-        await store.apply(RuleSetMessage(assignments: [], matchRules: [], globalProxyEnabled: true))
+        await store.apply(RuleSetMessage(assignments: [], matchRules: []))
         #expect(await store.matchRule(app: "x", host: "example.com", port: 443) == nil)
     }
 }

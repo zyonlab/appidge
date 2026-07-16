@@ -103,10 +103,11 @@ struct DirectoryAndDiagnosticsReducerTests {
 
     @Test("onboardingCompleted flips the flag and nothing else")
     func onboardingCompletedFlipsFlag() {
-        let state = AppState(isGlobalProxyEnabled: true)
+        var state = AppState()
+        state.isPacketCaptureEnabled = true
         let (next, effects) = Reducer.reduce(state, .onboardingCompleted)
         #expect(next.hasCompletedOnboarding == true)
-        #expect(next.isGlobalProxyEnabled == true)
+        #expect(next.isPacketCaptureEnabled == true)
         #expect(effects.isEmpty)
     }
 

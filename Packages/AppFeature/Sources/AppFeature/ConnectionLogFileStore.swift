@@ -14,8 +14,13 @@ import Core
 /// 不必读回整个数组再整体重写;解析时逐行独立解码,坏一行只丢一行,不会带崩整份文件。
 public actor ConnectionLogFileStore {
     private let fileURL: URL
-    /// 文件行数上限。追加后一旦越过就重写,只保留最后这么多行,防止无界增长。
+    /// 文件行数上限。越过后裁回,只保留最后这么多行,防止无界增长。
     private let maxLines: Int
+    /// 距上次滚动检查的 append 次数,到 `rotationCheckStride` 才真的查一次(摊还,见 `append`)。
+    private var appendsSinceRotationCheck = 0
+    /// 每多少条 append 查一次滚动。取 `maxLines/4`(至少 1)——文件最多临时涨到 `maxLines * 1.25`,
+    /// 换来 append 的均摊成本从 O(n) 降到 O(1)。maxLines 很小时(测试)退化成每次都查,行为不变。
+    private var rotationCheckStride: Int { max(1, maxLines / 4) }
 
     /// 默认落盘位置:`~/Library/Application Support/appidge/connections.log.jsonl`。
     /// 与 `FilePersistenceStore.defaultFileURL` 同目录,仅文件名不同。
@@ -55,6 +60,13 @@ public actor ConnectionLogFileStore {
             try? payload.write(to: fileURL, options: .atomic)
         }
 
+        // 滚动检查**摊还**执行,不是每次 append 都做:`rotateIfNeeded` 要把整个文件读回来切行
+        // (满员时 2000 行 / ~300KB),每条日志都跑一遍就是 O(n) per append。策略 A 默认全量接管后
+        // 连接事件从个位数/分钟涨到十几条/秒,这条老路径直接把 app 烧到 100% CPU(真机实测)。
+        // 现在每 `rotationCheckStride` 条才查一次:文件最多临时超出上限那么多行,随后一次性裁回。
+        appendsSinceRotationCheck += 1
+        guard appendsSinceRotationCheck >= rotationCheckStride else { return }
+        appendsSinceRotationCheck = 0
         rotateIfNeeded()
     }
 
@@ -66,6 +78,13 @@ public actor ConnectionLogFileStore {
         return readLines().suffix(limit).compactMap { line in
             try? decoder.decode(Core.ConnectionLogEntry.self, from: Data(line.utf8))
         }
+    }
+
+    /// 用户在「活动」页手动清空连接日志时调:直接删掉磁盘文件(不是清空成 0 字节文件——
+    /// `append` 靠 `fileExists` 判断"续写 vs 新建",删文件让下次 append 走"新建"分支,
+    /// 逻辑更简单)。文件本来就不存在也不算错误。
+    public func clear() async {
+        try? FileManager.default.removeItem(at: fileURL)
     }
 
     // MARK: - 私有

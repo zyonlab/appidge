@@ -47,7 +47,8 @@ public enum UDPFlowPolicy {
             case .direct: return .allowDirect
             case .proxySOCKS5: return upstreamIsSOCKS5 ? .proxy : .block
             }
-        case .some(.direct), .none:
+        case .some(.direct), .some(.observe), .none:
+            // observe 只对 TCP 有"记录后放行"的语义;对 UDP 没有专门的观测通道,按直连放行处理。
             return .allowDirect
         }
     }

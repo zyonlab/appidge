@@ -47,8 +47,6 @@ public enum Reducer {
     /// 进程发现 / 规则 / 流量计量 / 引擎失败这一组。
     private static func reduceProcessAndFlow(_ state: AppState, _ action: Action) -> (AppState, [Effect])? {
         switch action {
-        case .setGlobalProxyEnabled(let enabled):
-            return setGlobalProxyEnabled(enabled, state)
         case .processDiscovered(let id, let displayName, let executablePath):
             return processDiscovered(id: id, displayName: displayName, executablePath: executablePath, state)
         case .assignRule(let processID, let rule):
@@ -77,68 +75,24 @@ public enum Reducer {
             return appLaunched(state)
         case .connectionEventReceived(let entry):
             return connectionEventReceived(entry, state)
+        case .clearConnectionLog:
+            return clearConnectionLog(state)
+        case .resyncExtension:
+            return resyncExtension(state)
         default:
             // 只可能是前面几组已处理的 case，reduce 不会走到这里。
             return (state, [])
         }
     }
 
-    /// 路由相关状态变了就产出"把完整规则集推给扩展"的 effect：全局开关 + 非默认的每进程规则
+    /// 路由相关状态变了就产出"把完整规则集推给扩展"的 effect：非默认的每进程规则
     /// + 细粒度规则表。app 侧 effectHandler 翻成 RuleSetMessage 发出。
     private static func ruleSetPush(_ state: AppState) -> Effect {
         let assignments = state.processes.compactMapValues { $0.rule == .direct ? nil : $0.rule }
         return .applyRuleSet(
-            globalProxyEnabled: state.isGlobalProxyEnabled,
             assignments: assignments,
             matchRules: state.rules
         )
-    }
-
-    private static func setGlobalProxyEnabled(_ enabled: Bool, _ state: AppState) -> (AppState, [Effect]) {
-        var state = state
-        state.isGlobalProxyEnabled = enabled
-        return (state, [ruleSetPush(state)])
-    }
-
-    private static func addMatchRule(_ rule: ProxyMatchRule, _ state: AppState) -> (AppState, [Effect]) {
-        var state = state
-        state.rules.append(rule)
-        return (state, [ruleSetPush(state)])
-    }
-
-    private static func removeMatchRule(_ id: RuleID, _ state: AppState) -> (AppState, [Effect]) {
-        var state = state
-        guard state.rules.contains(where: { $0.id == id }) else { return (state, []) }
-        state.rules.removeAll { $0.id == id }
-        return (state, [ruleSetPush(state)])
-    }
-
-    /// 按给定 id 顺序重排；未提及的规则保持原相对顺序、追加在后；未知 id 忽略。
-    private static func reorderMatchRules(_ order: [RuleID], _ state: AppState) -> (AppState, [Effect]) {
-        var state = state
-        let byID = Dictionary(state.rules.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        var reordered: [ProxyMatchRule] = []
-        var used = Set<RuleID>()
-        for id in order where !used.contains(id) {
-            if let rule = byID[id] {
-                reordered.append(rule)
-                used.insert(id)
-            }
-        }
-        for rule in state.rules where !used.contains(rule.id) {
-            reordered.append(rule)
-        }
-        state.rules = reordered
-        return (state, [ruleSetPush(state)])
-    }
-
-    /// 启用/停用指定规则(规则仍留在表里)。命中就翻转 `isEnabled` 并按老路推整表;
-    /// 未知 id 是 no-op、不推送(和 `removeMatchRule` 的守卫一致)。
-    private static func setMatchRuleEnabled(id: RuleID, enabled: Bool, _ state: AppState) -> (AppState, [Effect]) {
-        var state = state
-        guard let index = state.rules.firstIndex(where: { $0.id == id }) else { return (state, []) }
-        state.rules[index].isEnabled = enabled
-        return (state, [ruleSetPush(state)])
     }
 
     private static func processDiscovered(
@@ -176,7 +130,6 @@ public enum Reducer {
     private static func engineFailure(reason: String, _ state: AppState) -> (AppState, [Effect]) {
         var state = state
         state.isEngineHealthy = false
-        state.isGlobalProxyEnabled = false
         for id in state.processes.keys {
             state.processes[id]?.rule = .direct
         }
@@ -245,6 +198,30 @@ public enum Reducer {
         return (state, [])
     }
 
+    /// 只清 `connectionLog` 这张表,不碰 `processes`(累计流量/规则是独立概念,用户清的是
+    /// "这些行不想再看见",不是"忘掉这些进程")。已经是空的就是纯 no-op,不必让磁盘也白跑一趟。
+    private static func clearConnectionLog(_ state: AppState) -> (AppState, [Effect]) {
+        guard !state.connectionLog.isEmpty else { return (state, []) }
+        var state = state
+        state.connectionLog = []
+        return (state, [.clearConnectionLogFile])
+    }
+
+    /// 全量重推当前配置给扩展——state 原样不动,只产出一串"把现状推下去"的 effect。
+    /// 顺序固定(便于测试断言 + 确定性):规则集 → 代理配置 → 路由模式 → 抓包 → UDP 策略 → 排除名单。
+    /// 每一条都用现有的推送 effect(和用户改动时走的是同一批),扩展侧幂等接收。
+    /// 用途见 `Action.resyncExtension`:XPC(重)连上、或启动恢复完成后触发一次。
+    private static func resyncExtension(_ state: AppState) -> (AppState, [Effect]) {
+        (state, [
+            ruleSetPush(state),
+            proxyConfigPush(state),
+            .applyRoutingMode(state.proxyRoutingMode),
+            .applyPacketCapture(state.isPacketCaptureEnabled),
+            .applyUDPPolicy(state.udpPolicy),
+            .applyProcessOriginExclusions(state.dynamicOriginExclusion)
+        ])
+    }
+
     /// 代理配置发生真实变更后，产出"把当前完整配置推给扩展"的 effect。servers 按 id 排序，
     /// 让推送内容确定、幂等，也便于测试断言。
     private static func proxyConfigPush(_ state: AppState) -> Effect {
@@ -297,6 +274,66 @@ public enum Reducer {
         }
         state.activeProxyServerID = id
         return (state, [proxyConfigPush(state)])
+    }
+}
+
+/// 细粒度规则表(增/删/排序/启停)的实现放 Reducer 的同文件 extension 里,同样是不占主 enum 的
+/// 长度预算(见下面「设置类」extension 的同一条注释)。
+private extension Reducer {
+    /// 新规则**插到表首**(index 0 = 最高优先级),整表因此天然按"最近添加在最上"排列。
+    /// 规则匹配是"从上到下、首个命中生效",所以用户刚为某条连接建的规则会**立刻压过**已有的宽泛
+    /// 规则(比如 `*→*→代理`)——这正是"手动修改进程连接策略必须生效"的要求。
+    ///
+    /// 去重键:进程 glob × 主机 glob × 端口区间三者全同就算"同一条规则"(动作不算在键里)。
+    /// 命中去重键时:动作也一样 = 纯重复,直接把它**移到表首**(体现"最近又点了一次");动作不同 =
+    /// 用户想改判定,更新动作后同样移到表首。都不新增第二条同键规则。
+    static func addMatchRule(_ rule: ProxyMatchRule, _ state: AppState) -> (AppState, [Effect]) {
+        var state = state
+        if let index = state.rules.firstIndex(where: {
+            $0.appPattern == rule.appPattern && $0.hostPattern == rule.hostPattern && $0.portRange == rule.portRange
+        }) {
+            var existing = state.rules.remove(at: index)
+            existing.action = rule.action  // 动作以最新一次为准(相同则无变化)
+            state.rules.insert(existing, at: 0)
+        } else {
+            state.rules.insert(rule, at: 0)
+        }
+        return (state, [ruleSetPush(state)])
+    }
+
+    static func removeMatchRule(_ id: RuleID, _ state: AppState) -> (AppState, [Effect]) {
+        var state = state
+        guard state.rules.contains(where: { $0.id == id }) else { return (state, []) }
+        state.rules.removeAll { $0.id == id }
+        return (state, [ruleSetPush(state)])
+    }
+
+    /// 按给定 id 顺序重排；未提及的规则保持原相对顺序、追加在后；未知 id 忽略。
+    static func reorderMatchRules(_ order: [RuleID], _ state: AppState) -> (AppState, [Effect]) {
+        var state = state
+        let byID = Dictionary(state.rules.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var reordered: [ProxyMatchRule] = []
+        var used = Set<RuleID>()
+        for id in order where !used.contains(id) {
+            if let rule = byID[id] {
+                reordered.append(rule)
+                used.insert(id)
+            }
+        }
+        for rule in state.rules where !used.contains(rule.id) {
+            reordered.append(rule)
+        }
+        state.rules = reordered
+        return (state, [ruleSetPush(state)])
+    }
+
+    /// 启用/停用指定规则(规则仍留在表里)。命中就翻转 `isEnabled` 并按老路推整表;
+    /// 未知 id 是 no-op、不推送(和 `removeMatchRule` 的守卫一致)。
+    static func setMatchRuleEnabled(id: RuleID, enabled: Bool, _ state: AppState) -> (AppState, [Effect]) {
+        var state = state
+        guard let index = state.rules.firstIndex(where: { $0.id == id }) else { return (state, []) }
+        state.rules[index].isEnabled = enabled
+        return (state, [ruleSetPush(state)])
     }
 }
 

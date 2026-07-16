@@ -1,4 +1,6 @@
 import Foundation
+import Network
+@preconcurrency import NetworkExtension
 import EngineKit
 import IPCContract
 
@@ -65,34 +67,118 @@ extension ProxyExtensionProvider {
     private func resolveDecision(
         sourceID: String, sourcePath: String?, host: String?, port: UInt16?
     ) -> (TCPFlowDecision, String) {
-        // 转发环硬化(按来源):我们自己组件(app/扩展)+ app 动态查到的本地代理进程发起的连接
-        // 不接管——无关目的地,先判。签名标识、可执行文件路径两路信号独立判定。
-        if ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourceID, ownIdentifiers: ownIdentifiers) {
-            return (.bypass, "bypass:own-identifier")
+        // ①② 硬边界:自身组件 + 地址类(回环/私网/上游)—— 一律 .bypass,不接管、活动栏不可见。
+        if let reason = hardBypassReason(sourceID: sourceID, sourcePath: sourcePath, host: host, port: port) {
+            return (.bypass, reason)
+        }
+        // ③ 解出动作:细粒度规则表(首个命中)优先于每进程规则;都没有 → 默认 .direct(策略 A:
+        //    默认就接管并直连计量,活动栏能看到每条连接,含本地代理自己的出站)。
+        let (action, ruleSource) = resolveAction(sourceID: sourceID, host: host, port: port)
+        // ④ 防环唯一约束:本地代理(xray/yunti)的流量**绝不能再代理回它**——解出 .proxied 就降级
+        //    成 .direct(照常接管+直连+展示,只是不转发去上游)。其余动作(direct/block/observe)原样生效。
+        if action == .proxied, isLocalProxyOrigin(sourceID: sourceID, sourcePath: sourcePath) {
+            return (.handle(.direct), "handle:local-proxy-direct(downgraded from proxied)")
+        }
+        switch action {
+        case .observe:
+            return (.observe, "observe:\(ruleSource)")
+        case .direct, .proxied, .block:
+            return (.handle(action), "handle:\(ruleSource)(\(action))")
+        }
+    }
+
+    /// 硬边界:命中就永远 `.bypass`(返回原因标签),不受任何规则影响。
+    /// - 自身组件(app/扩展本体):接管自己必然自套死循环。只比对静态的 `selfXxx`,**不含**本地代理
+    ///   (后者在策略 A 下要接管展示,只是禁止代理出去,见 `resolveDecision` ④)。
+    /// - 回环 / 私网 / 上游:基础设施噪声 + 防环,与来源无关。
+    private func hardBypassReason(sourceID: String, sourcePath: String?, host: String?, port: UInt16?) -> String? {
+        if ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourceID, ownIdentifiers: selfIdentifiers) {
+            return "bypass:self-identifier"
         }
         if let sourcePath,
-           ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourcePath, ownIdentifiers: ownExecutablePaths) {
-            return (.bypass, "bypass:own-path(\(sourcePath))")
+           ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourcePath, ownIdentifiers: selfExecutablePaths) {
+            return "bypass:self-path(\(sourcePath))"
         }
-        if let host, let port {
-            if LoopbackDetector.isLoopback(host: host) { return (.bypass, "bypass:loopback") }
-            // 私网段/link-local 目的地址强制直连(本地/局域网服务不该走代理),与回环正交、互补。
-            if PrivateNetworkExclusion.isPrivateNetwork(host: host) { return (.bypass, "bypass:private-network") }
-            let upstreams = Set((proxyConfig?.servers ?? []).map { UpstreamEndpoint(host: $0.host, port: $0.port) })
-            if UpstreamExclusion.isUpstream(host: host, port: port, upstreams: upstreams) {
-                return (.bypass, "bypass:upstream")
+        guard let host, let port else { return nil }
+        if LoopbackDetector.isLoopback(host: host) { return "bypass:loopback" }
+        if PrivateNetworkExclusion.isPrivateNetwork(host: host) { return "bypass:private-network" }
+        let upstreams = Set((proxyConfig?.servers ?? []).map { UpstreamEndpoint(host: $0.host, port: $0.port) })
+        return UpstreamExclusion.isUpstream(host: host, port: port, upstreams: upstreams) ? "bypass:upstream" : nil
+    }
+
+    /// 规则表(首个命中)→ 每进程规则 → 默认 `.direct`(策略 A)。
+    private func resolveAction(sourceID: String, host: String?, port: UInt16?) -> (ProxyRuleDTO, String) {
+        if let host, let port,
+           let matched = RuleMatcher.firstMatch(matchRules, app: sourceID, host: host, port: port) {
+            return (matched, "matchRule")
+        }
+        if let perProcess = perProcessRules[sourceID] { return (perProcess, "perProcess") }
+        return (.direct, "default")
+    }
+
+    /// 来源是不是 app 动态查到的本地代理进程(签名标识或可执行文件路径任一命中)。
+    private func isLocalProxyOrigin(sourceID: String, sourcePath: String?) -> Bool {
+        if ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourceID, ownIdentifiers: localProxyIdentifiers) {
+            return true
+        }
+        if let sourcePath,
+           ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourcePath, ownIdentifiers: localProxyExecutablePaths) {
+            return true
+        }
+        return false
+    }
+
+    /// 观测(B):不接管数据通路,只投一条连接事件(0 字节),让它以"观测"胶囊出现在活动栏。
+    /// 拿不到目的地(极少数解析不出)就跳过——没有 host 的观测行没有意义。
+    func emitObservedFlow(processID: ProcessIdentifierDTO, displayName: String?, host: String?, port: UInt16?) {
+        guard let host, let port, let transport else { return }
+        let event = ConnectionEventDTO(
+            id: UUID().uuidString, processID: processID, targetHost: host, targetPort: port,
+            rule: .observe, proxyKind: nil, phase: .closed, bytesUp: 0, bytesDown: 0,
+            openedAt: Date(), processDisplayName: displayName
+        )
+        Task { await transport.deliver(.connectionEvent(event)) }
+    }
+
+    /// `.proxied` → 按 ``ProxyRouteResolver`` 解析出的路由拨上游、做隧道握手,返回已就绪、可直接
+    /// pump 的连接;`.direct`(含 proxied 但没配上游的 fail-open、以及本地代理被降级的那一路)则
+    /// 直连目的地。实际拨号交给无状态的 ``ProxyDialer``。目标地址经 ``ProxyTargetSelector`` 优先取
+    /// 原始主机名(DNS-over-proxy,让代理去解析)。
+    func openRemote(
+        to endpoint: Network.NWEndpoint, remoteHostname: String?, rule: ProxyRuleDTO
+    ) async throws -> NWConnection {
+        guard rule == .proxied, let (endpointHost, port) = ProxyDialer.hostPort(from: endpoint) else {
+            return try await ProxyDialer.openDirect(to: endpoint)
+        }
+        let config = proxyConfig
+        let route = ProxyRouteResolver.resolve(
+            mode: routingMode, servers: config?.servers ?? [], activeServerID: config?.activeServerID
+        )
+        let target = ProxyTargetSelector.selectTarget(
+            remoteHostname: remoteHostname, endpointHost: endpointHost, port: port
+        )
+        return try await ProxyDialer.open(
+            route: route, to: target, directEndpoint: endpoint, roundRobin: roundRobinSelector
+        )
+    }
+
+    /// 接管(A):`.proxied` 走上游、`.direct` 自己拨号直连、`.block` 拒绝——都进 pump、可计量。
+    func beginHandledFlow(
+        tcpFlow: NEAppProxyTCPFlow, origin: FlowOrigin,
+        to remoteEndpoint: Network.NWEndpoint, remoteHostname: String?, router: FlowRouter
+    ) {
+        tcpFlow.open(withLocalFlowEndpoint: nil) { [weak self] error in
+            guard let self, error == nil else {
+                tcpFlow.closeReadWithError(error)
+                tcpFlow.closeWriteWithError(error)
+                return
             }
-            // 细粒度规则表(进程 × 主机 × 端口)优先于每进程粗粒度规则;命中即用其动作,
-            // 但命中的动作本身是 .direct 时同样不接管(见上面的回退说明)。
-            if let matched = RuleMatcher.firstMatch(matchRules, app: sourceID, host: host, port: port) {
-                return matched == .direct
-                    ? (.bypass, "bypass:matchRule-direct")
-                    : (.handle(matched), "handle:matchRule(\(matched))")
+            Task {
+                await self.beginFlow(
+                    tcpFlow: tcpFlow, to: remoteEndpoint, remoteHostname: remoteHostname,
+                    origin: origin, router: router
+                )
             }
         }
-        let resolved = perProcessRules[sourceID] ?? .direct
-        return resolved == .direct
-            ? (.bypass, "bypass:perProcess-direct(hasRule=\(perProcessRules[sourceID] != nil))")
-            : (.handle(resolved), "handle:perProcess(\(resolved))")
     }
 }

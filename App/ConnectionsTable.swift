@@ -68,6 +68,7 @@ struct ConnectionsTable: View {
                 Section("为 \(first.host):\(first.port) 建规则") {
                     Button("走代理") { makeRules(targets, .proxied) }
                     Button("直连") { makeRules(targets, .direct) }
+                    Button("观测") { makeRules(targets, .observe) }
                     Button("拦截", role: .destructive) { makeRules(targets, .block) }
                 }
             }
@@ -125,6 +126,7 @@ struct RouteChip: View {
         case .direct: "arrow.right"
         case .proxied: "arrow.triangle.branch"
         case .block: "hand.raised"
+        case .observe: "eye"
         }
     }
 
@@ -146,6 +148,7 @@ enum RouteText {
         switch (rule, kind) {
         case (.direct, _): "直连"
         case (.block, _): "拦截"
+        case (.observe, _): "观测"
         case (.proxied, .some(.socks5)): "代理 · SOCKS5"
         case (.proxied, .some(.httpConnect)): "代理 · HTTP"
         case (.proxied, .none): "代理（回落直连）"
@@ -159,6 +162,7 @@ enum RouteText {
         case .direct: .green
         case .proxied: .accentColor
         case .block: .red
+        case .observe: .orange
         }
     }
 }

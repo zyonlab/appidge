@@ -1,5 +1,4 @@
 public struct AppState: Sendable, Equatable {
-    public var isGlobalProxyEnabled: Bool
     public var isEngineHealthy: Bool
     public var processes: [ProcessID: MonitoredProcess]
     public var catalog: [ProcessID: DirectoryEntry]
@@ -31,7 +30,6 @@ public struct AppState: Sendable, Equatable {
     public static let connectionLogCap = 500
 
     public init(
-        isGlobalProxyEnabled: Bool = false,
         isEngineHealthy: Bool = true,
         processes: [ProcessID: MonitoredProcess] = [:],
         catalog: [ProcessID: DirectoryEntry] = [:],
@@ -48,7 +46,6 @@ public struct AppState: Sendable, Equatable {
         extensionActivation: ExtensionActivation = .inactive,
         dynamicOriginExclusion: OriginExclusionDiscovery = OriginExclusionDiscovery()
     ) {
-        self.isGlobalProxyEnabled = isGlobalProxyEnabled
         self.isEngineHealthy = isEngineHealthy
         self.processes = processes
         self.catalog = catalog

@@ -8,9 +8,9 @@ public enum Effect: Sendable, Equatable {
     case applyProxyConfig(servers: [ProxyServer], activeID: ProxyServerID?)
     /// 代理路由模式变了,推给扩展(单独一条消息,不和 applyProxyConfig 混)。
     case applyRoutingMode(ProxyRoutingMode)
-    /// 路由相关状态变了（全局开关 / 每进程规则 / 细粒度规则表），把完整规则集推给扩展。
+    /// 路由相关状态变了（每进程规则 / 细粒度规则表），把完整规则集推给扩展。
     /// `assignments` 只含非默认（非 `.direct`）的每进程规则；扩展对未知进程回落 `.direct`。
-    case applyRuleSet(globalProxyEnabled: Bool, assignments: [ProcessID: ProxyRule], matchRules: [ProxyMatchRule])
+    case applyRuleSet(assignments: [ProcessID: ProxyRule], matchRules: [ProxyMatchRule])
     /// 抓包开关变了,推给扩展。
     case applyPacketCapture(Bool)
     /// UDP 策略变了,推给扩展。
@@ -18,4 +18,7 @@ public enum Effect: Sendable, Equatable {
     /// 动态发现的本地代理进程签名标识集合变了,推给扩展跟自身 app/扩展的标识合并,扩展侧命中
     /// 即强制直连(转发环硬化的「来源进程自动排除」，见 `EngineKit.ProcessOriginExclusion`)。
     case applyProcessOriginExclusions(OriginExclusionDiscovery)
+    /// 用户手动清空了连接日志,app 侧 effectHandler 据此把磁盘上的 `connections.log.jsonl`
+    /// 也清空——不然下次启动 `restoreRecentConnectionLog` 又把刚清掉的记录读回来。
+    case clearConnectionLogFile
 }

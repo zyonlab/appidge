@@ -15,47 +15,53 @@ let flowLogger = Logger(subsystem: "com.appidge.app.ProxyExtension", category: "
 /// 零并发警告，`@retroactive` 避免了「未来 Apple 自己加 Sendable 会冲突」的警告）。
 extension NEAppProxyTCPFlow: @retroactive @unchecked Sendable {}
 
-/// `effectiveRuleSync` 对一条 TCP flow 的判定结论。`.bypass` 是转发环硬化的安全边界(见类型
-/// 注释四道闸)**以及** rule 最终解出是 `.direct` 的情形——一律不接管;`.handle` 只覆盖
-/// `.proxied`/`.block`。`.direct` 曾短暂改成"接管但自己直连",真机验证发现本地代理软件常有
-/// 多个进程、签名标识因进程而异,现有排除只精确匹配了其中一个,已回退,详见 `effectiveRuleSync`。
+/// `effectiveRuleSync` 对一条 TCP flow 的判定结论。
 enum TCPFlowDecision: Equatable {
+    /// 完全不碰:返回 false 让系统原生处理,活动栏看不到(自身组件 / 回环 / 私网 / 上游)。
     case bypass
+    /// 接管数据通路:`.proxied` 走上游、`.direct` 自己拨号直连、`.block` 拒绝——都在活动栏可见、可计量。
     case handle(ProxyRuleDTO)
+    /// 观测(B):不接管数据通路,但在活动栏记一条连接事件(进程+目的地),随即返回 false 放行。
+    /// 看得见"连了哪里"、零转发开销,代价是没有逐连接速率/字节。
+    case observe
 }
 
 /// NETransparentProxyProvider 的真实实现（E1）：接管每条 flow，真实双向转发字节（不是空壳），
 /// 计量经 ``FlowRouter`` 批量上报，诊断经 ``DiagnosticsRunner``。
 ///
-/// 路由决策（``effectiveRuleSync``），从强到弱:
-/// 1. **来源进程排除**（``ProcessOriginExclusion``）：发起方是我们自己组件或 app 动态查到的
-///    本地代理进程（如 xray/yunti）→ `.bypass`（强制直连、不接管），与下面的地址判定正交，
-///    见 PROGRESS.md「防环设计定论」。**两路独立信号**:签名标识（`sourceAppSigningIdentifier`）
-///    + 可执行文件路径（``ProcessPathResolver`` 从 flow 的 audit token 解出，照抄开源
-///    ProxyBridge 的做法）——未签名本地代理软件常有多个进程、签名标识因进程而异，路径是更稳的
-///    第二信号，任一命中即 `.bypass`。
-/// 2. **回环排除**（``LoopbackDetector``）：目的地是 127.0.0.0/8 / ::1 / localhost → `.bypass`。
-/// 3. **私网段排除**（``PrivateNetworkExclusion``）：目的地是 10/8、172.16/12、192.168/16、
-///    169.254/16、fc00::/7 → `.bypass`（本地/局域网服务不该走代理）。
-/// 4. **上游排除**（``UpstreamExclusion``）：目的地正是配置的某台上游代理 → `.bypass`，
-///    否则"扩展连上游"这一跳会被自己再抓一次，形成转发环。
-/// 5. 细粒度规则表（``RuleMatcher``），再不命中则用该进程分配的粗粒度规则（``AppliedRuleSetStore``）；
-///    解出的结果只要是 `.direct` 也一律 `.bypass`——只有 `.proxied`/`.block` 才 `.handle`(见
-///    `TCPFlowDecision` 的说明,这条是回退过一次的边界,别再放开)。
+/// 路由决策（``effectiveRuleSync``）——**策略 A(默认全量接管展示)**,从强到弱:
+/// 1. **硬边界 → `.bypass`**(见 `hardBypassReason`,不受任何规则影响):
+///    - **自身组件**:发起方是我们 app/扩展本体(静态标识/路径)——接管自己必然自套死循环。
+///      注意这里**不含**本地代理:后者在策略 A 下要接管展示(见第 3 条)。
+///    - **回环**（``LoopbackDetector``）/ **私网段**（``PrivateNetworkExclusion``）/
+///      **上游**（``UpstreamExclusion``）:基础设施噪声 + 防环("扩展连上游"这一跳若被自己再抓
+///      一次就成环)。
+/// 2. **解出动作**:细粒度规则表（``RuleMatcher``,首个命中)→ 每进程规则 → **默认 `.direct`**。
+///    默认即接管+自己拨号直连+计量,活动栏因此能对**所有**进程显示真实速率/流量(含本地代理
+///    自己的出站),不再局限于走代理的进程。用户新建的规则插在表首、优先级最高(见
+///    `Core.Reducer.addMatchRule`),手动改的策略必定生效。
+/// 3. **本地代理防环(唯一约束)**:发起方是 app 动态查到的本地代理(如 xray/yunti,签名标识 +
+///    可执行文件路径**两路独立信号**,路径这一路照抄开源 ProxyBridge、对未签名多进程更稳)时,
+///    解出的动作若是 `.proxied` 一律**降级成 `.direct`**——照常接管、直连、展示,只是绝不把它的
+///    流量再转发回它自己(那才是转发环)。其余动作(direct/block/observe)原样生效。
+/// 4. **`.observe`(策略 B)**:不接管数据通路,只记一条连接事件让它在活动栏可见后放行——零转发
+///    开销,代价是没有逐连接速率/字节。用户可对任意进程/规则显式选用。
 ///
 /// 转发（``openRemote``）：`.proxied` 且有 active 上游 → 经 ``SOCKS5Connector`` 隧道；
 /// 否则直连目的地（``ProxyDialer/openDirect(to:)`` 显式清空代理配置，避免重蹈 5a7ad53 的覆辙）。
 /// 拨号/握手失败 fail-open：关掉这条 flow，不阻塞其它流量。
 final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Sendable {
     private var router: FlowRouter?
-    private var transport: XPCFlowTransport?
+    // 非 private:`emitObservedFlow` 在同类型的跨文件 extension 里投递观测事件(同 beginFlow 的先例)。
+    var transport: XPCFlowTransport?
     // 不是 private:makeDiagnosticsRunner 拆到同 target 的 ProxyExtensionProviderRouting.swift。
     var diagnosticsRunner: DiagnosticsRunner?
     private let appGroup = "group.com.appidge"
     let appliedRuleSetStore = AppliedRuleSetStore()
     let routingHistoryTracker = RoutingHistoryTracker()
     // 负载均衡的游标要跨 flow 存活才能真的轮转,所以 selector 是 provider 级的单例。
-    private let roundRobinSelector = RoundRobinSelector()
+    // 非 private:`openRemote` 在同类型的跨文件 extension 里用(同 beginFlow/transport 的先例)。
+    let roundRobinSelector = RoundRobinSelector()
 
     /// 我们自己组件(扩展 + 主 app)的进程身份集合,用于按来源做转发环硬化:这些身份发起的
     /// 连接强制直连,不再被自己抓回来代理(见 ``ProcessOriginExclusion``,与基于地址的
@@ -130,22 +136,27 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         configLock.withLock { storedMatchRules }
     }
 
-    private var routingMode: ProxyRoutingModeDTO {
+    var routingMode: ProxyRoutingModeDTO {
         configLock.withLock { storedRoutingMode }
     }
 
-    /// 「来源进程自动排除」的完整集合(签名标识维度):自身组件(静态,启动时定)∪ app 动态
-    /// 查到的本地代理进程(运行时可变,随 applyProcessOriginExclusions 更新)。两路来源都命中
-    /// 即强制直连。
-    var ownIdentifiers: Set<String> {
-        Self.ownProcessIdentifiers.union(configLock.withLock { storedDynamicOriginExclusions })
-    }
+    /// **自身组件**(app/扩展本体)的标识/路径——静态、启动时定。这一类**永远 `.bypass`**,
+    /// 绝不接管自己的连接(否则必然自套死循环)。与"本地代理"区分开:后者在策略 A 下要**接管+直连+
+    /// 展示**(不是 bypass),只是禁止把它代理出去(那才会转发环)。
+    var selfIdentifiers: Set<String> { Self.ownProcessIdentifiers }
+    var selfExecutablePaths: Set<String> { Self.ownProcessExecutablePaths }
 
-    /// 同上,但按可执行文件路径维度——与 `ownIdentifiers` 是两个独立的排除信号,各自判一次
-    /// `ProcessOriginExclusion.shouldBypass`,任一命中就够(见 `effectiveRuleSync`)。
-    var ownExecutablePaths: Set<String> {
-        Self.ownProcessExecutablePaths.union(configLock.withLock { storedDynamicOriginExclusionPaths })
-    }
+    /// **本地代理进程**(如 xray/yunti)的标识/路径——app 动态查到、运行时可变。策略 A 下这类
+    /// **照常接管并直连计量、在活动栏展示**;唯一的防环约束是:解出的动作若是 `.proxied` 一律
+    /// 降级成 `.direct`(不能把本地代理的流量再转发回它)。
+    var localProxyIdentifiers: Set<String> { configLock.withLock { storedDynamicOriginExclusions } }
+    var localProxyExecutablePaths: Set<String> { configLock.withLock { storedDynamicOriginExclusionPaths } }
+
+    /// 自身 ∪ 本地代理的并集——UDP 路径仍用这个"全排除"语义(UDP 没有"观测"通道,本地代理的
+    /// UDP 一律放行直连即可,不需要像 TCP 那样接管展示)。TCP 的 `resolveDecision` 用上面分开的
+    /// `selfXxx`/`localProxyXxx`,不用这两个。
+    var ownIdentifiers: Set<String> { selfIdentifiers.union(localProxyIdentifiers) }
+    var ownExecutablePaths: Set<String> { selfExecutablePaths.union(localProxyExecutablePaths) }
 
     override func startProxy(options: [String: Any]?, completionHandler: @escaping (Error?) -> Void) {
         ExtDiag.log("startProxy called")
@@ -195,7 +206,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
                 return "[\(rule.appPattern)/\(rule.hostPattern)/\(port)->\(rule.rule)]"
             }.joined(separator: ",")
             ExtDiag.log(
-                "applyRuleSet received: global=\(ruleSet.globalProxyEnabled) "
+                "applyRuleSet received: "
                 + "perProcess=\(snapshot.map { "\($0.key)->\($0.value)" }.joined(separator: ",")) "
                 + "matchRules=\(matchRulesSummary)"
             )
@@ -251,42 +262,39 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         let remoteHostname = tcpFlow.remoteHostname
         let hostPort = ProxyDialer.hostPort(from: remoteEndpoint)
 
-        // 转发环硬化的四道闸(自身来源×2 信号/回环/私网段/上游排除)—— .bypass 绝不接管,让系统
-        // 原生处理,这是 CPU 死转事故(5a7ad53)划定的安全边界,不能碰。除此之外一律 .handle(rule)
-        // 接管——包括 rule == .direct:现在"直连"也由我们自己拨号(见 ProxyDialer.openDirect 的
-        // 显式 no-proxy NWParameters),只是不走代理、原样连到原目的地,这样"应用"页才能对所有
-        // 进程显示真实速率/流量,不再局限于走代理的进程。
-        // effectiveRuleSync 内部会把每条 flow 的判定原因记进 ExtDiag(不只是被接管的)——
-        // 定位"配置没生效 vs 压根没拦截到"的关键证据,见该函数的文档注释。
-        guard case .handle(let rule) = effectiveRuleSync(
+        // 策略 A(默认):除了自身组件 / 回环 / 私网 / 上游这几道硬边界 `.bypass`,其余一律接管——
+        // 含 `.direct`(自己拨号直连,不走代理),这样活动栏能对**所有**进程(含本地代理自己的出站)
+        // 显示真实速率/流量。`.observe`(B)是例外:记一条连接事件让它可见,随即放行、不接管数据通路。
+        // effectiveRuleSync 内部把每条 flow 的判定原因记进 ExtDiag(不只是被接管的)——定位
+        // "配置没生效 vs 压根没拦截到"的关键证据,见该函数的文档注释。
+        let decision = effectiveRuleSync(
             sourceID: sourceID, sourcePath: sourcePath, host: hostPort?.0, port: hostPort?.1
-        ) else {
-            return false
-        }
-
-        flowLogger.log("""
-        handleNewTCPFlow INTERCEPT src=\(sourceID, privacy: .public) rule=\(String(describing: rule), privacy: .public) \
-        host=\(hostPort?.0 ?? "-", privacy: .public)
-        """)
+        )
         let name = sourcePath.flatMap(ProcessPathResolver.displayName(fromExecutablePath:))
-        let origin = FlowOrigin(processID: processID, displayName: name, rule: rule)
-        tcpFlow.open(withLocalFlowEndpoint: nil) { [weak self] error in
-            guard let self, error == nil else {
-                tcpFlow.closeReadWithError(error)
-                tcpFlow.closeWriteWithError(error)
-                return
-            }
-            Task {
-                await self.beginFlow(
-                    tcpFlow: tcpFlow, to: remoteEndpoint, remoteHostname: remoteHostname,
-                    origin: origin, router: router
-                )
-            }
+        switch decision {
+        case .bypass:
+            return false
+        case .observe:
+            // 不接管数据通路:记一条"观测"连接事件(0 字节)让活动栏看得到"这进程连了哪里",随即放行。
+            emitObservedFlow(processID: processID, displayName: name, host: hostPort?.0, port: hostPort?.1)
+            return false
+        case .handle(let rule):
+            flowLogger.log("""
+            handleNewTCPFlow INTERCEPT src=\(sourceID, privacy: .public) \
+            rule=\(String(describing: rule), privacy: .public) host=\(hostPort?.0 ?? "-", privacy: .public)
+            """)
+            beginHandledFlow(
+                tcpFlow: tcpFlow,
+                origin: FlowOrigin(processID: processID, displayName: name, rule: rule),
+                to: remoteEndpoint, remoteHostname: remoteHostname, router: router
+            )
+            return true
         }
-        return true
     }
 
-    private func beginFlow(
+    /// 非 private:`beginHandledFlow` 在同类型的跨文件 extension(`ProxyExtensionProviderRouting`)里
+    /// 调用它——同 `matchRules`/`effectiveRuleSync` 的既有先例(拆文件压 lint 阈值)。
+    func beginFlow(
         tcpFlow: NEAppProxyTCPFlow,
         to remoteEndpoint: Network.NWEndpoint,
         remoteHostname: String?,
@@ -367,28 +375,6 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         guard context.markClosedOnce() else { return }
         context.capture?.close() // 抓包文件随连接结束落盘关闭。
         emitConnectionEvent(context, phase: failed ? .failed : .closed)
-    }
-
-    /// `.proxied` → 按 ``ProxyRouteResolver`` 解析出的路由拨上游、做隧道握手,返回已就绪、可直接
-    /// pump 的连接;解析为 `.direct`(含 proxied 但没配上游的 fail-open)则直连目的地。实际拨号
-    /// 交给无状态的 ``ProxyDialer``。目标地址经 ``ProxyTargetSelector`` 优先取原始主机名
-    /// (DNS-over-proxy,让代理去解析)。
-    private func openRemote(
-        to endpoint: Network.NWEndpoint, remoteHostname: String?, rule: ProxyRuleDTO
-    ) async throws -> NWConnection {
-        guard rule == .proxied, let (endpointHost, port) = ProxyDialer.hostPort(from: endpoint) else {
-            return try await ProxyDialer.openDirect(to: endpoint)
-        }
-        let config = proxyConfig
-        let route = ProxyRouteResolver.resolve(
-            mode: routingMode, servers: config?.servers ?? [], activeServerID: config?.activeServerID
-        )
-        let target = ProxyTargetSelector.selectTarget(
-            remoteHostname: remoteHostname, endpointHost: endpointHost, port: port
-        )
-        return try await ProxyDialer.open(
-            route: route, to: target, directEndpoint: endpoint, roundRobin: roundRobinSelector
-        )
     }
 
 }

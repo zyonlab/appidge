@@ -20,8 +20,7 @@ struct CodableRoundTripTests {
             matchRules: [
                 MatchRuleDTO(id: "r1", appPattern: "*", hostPattern: "*.corp.net", portRange: 22...22, rule: .direct),
                 MatchRuleDTO(id: "r2", appPattern: "com.google.*", hostPattern: "*", portRange: nil, rule: .proxied)
-            ],
-            globalProxyEnabled: true
+            ]
         )
         #expect(try roundTrip(message) == message)
     }
@@ -70,7 +69,7 @@ struct CodableRoundTripTests {
     @Test("AppToExtensionMessage envelope round-trips both cases")
     func appToExtensionEnvelope() throws {
         let ruleSet = AppToExtensionMessage.applyRuleSet(
-            RuleSetMessage(assignments: [], globalProxyEnabled: false)
+            RuleSetMessage(assignments: [])
         )
         #expect(try roundTrip(ruleSet) == ruleSet)
 

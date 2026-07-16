@@ -4,17 +4,6 @@ import Testing
 @Suite("Reducer pure function")
 struct ReducerTests {
 
-    @Test("global proxy toggle flips state and pushes the rule set to the extension")
-    func globalToggle() {
-        let state = AppState()
-        let (next, effects) = Reducer.reduce(state, .setGlobalProxyEnabled(true))
-        #expect(next.isGlobalProxyEnabled == true)
-        #expect(effects == [.applyRuleSet(globalProxyEnabled: true, assignments: [:], matchRules: [])])
-
-        let (next2, _) = Reducer.reduce(next, .setGlobalProxyEnabled(false))
-        #expect(next2.isGlobalProxyEnabled == false)
-    }
-
     @Test("discovering a process inserts it once, idempotent on rediscovery")
     func addProcess() {
         let id = ProcessID("com.example.curl")
@@ -49,7 +38,7 @@ struct ReducerTests {
         #expect(next.processes[a]?.rule == .proxied)
         #expect(next.processes[b]?.rule == .direct)
         // only the non-direct assignment is pushed; the extension defaults unknowns to direct
-        #expect(effects == [.applyRuleSet(globalProxyEnabled: false, assignments: [a: .proxied], matchRules: [])])
+        #expect(effects == [.applyRuleSet(assignments: [a: .proxied], matchRules: [])])
     }
 
     @Test("flowStatsDelta accumulates onto existing per-process stats")
@@ -139,15 +128,14 @@ struct ReducerTests {
         #expect(next.processes[a]?.rateDownPerSec == 0)
     }
 
-    @Test("engine failure fails open: proxy disabled, all rules forced direct, logged")
+    @Test("engine failure fails open: all rules forced direct, logged")
     func engineFailureFailsOpen() {
         let a = ProcessID("a")
-        var state = AppState(isGlobalProxyEnabled: true, isEngineHealthy: true)
+        var state = AppState(isEngineHealthy: true)
         state.processes[a] = MonitoredProcess(id: a, displayName: "A", executablePath: "/a", rule: .proxied)
 
         let (next, effects) = Reducer.reduce(state, .engineFailure(reason: "transport crashed"))
 
-        #expect(next.isGlobalProxyEnabled == false)
         #expect(next.isEngineHealthy == false)
         #expect(next.processes[a]?.rule == .direct)
         #expect(effects.contains(.log("engine failure, fail-open to direct: transport crashed")))

@@ -30,15 +30,13 @@ public struct MatchRuleDTO: Sendable, Equatable, Codable {
 }
 
 /// 规则下发：app → extension。`matchRules` 是从上到下、首个命中生效的细粒度规则表;
-/// `assignments` 是每进程的粗粒度规则(只含非默认的);`globalProxyEnabled` 是全局开关。
+/// `assignments` 是每进程的粗粒度规则(只含非默认的)。
 public struct RuleSetMessage: Sendable, Equatable, Codable {
     public let assignments: [RuleAssignmentDTO]
     public let matchRules: [MatchRuleDTO]
-    public let globalProxyEnabled: Bool
 
-    public init(assignments: [RuleAssignmentDTO], matchRules: [MatchRuleDTO] = [], globalProxyEnabled: Bool) {
+    public init(assignments: [RuleAssignmentDTO], matchRules: [MatchRuleDTO] = []) {
         self.assignments = assignments
         self.matchRules = matchRules
-        self.globalProxyEnabled = globalProxyEnabled
     }
 }

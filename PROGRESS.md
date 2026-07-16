@@ -947,3 +947,57 @@ PROGRESS 里记过但没修)。**改用 App Group `UserDefaults`**(`NEFlowTransp
 **转发环防护的"自动排除"信号覆盖不全**,不是"接管流量"这个方向错了。下次再想放开 `.direct`
 接管前,先确认两路信号(签名标识 + 可执行文件路径)在真机上确实兜住了本地代理软件的全部进程,
 用新增的 `ExtDiag` 详细日志直接验证,不用再靠"装上跑一段时间看有没有异常流量"这种滞后的方式发现。
+
+---
+
+## Phase 13(0.2.15–0.2.19):规则持久化 + 去重 + 活动清理 + **配置同步自愈(根治"活动栏空白")**
+
+一次会话里连着修了四组问题,前三组是增量改进,第四组是这一轮真正的大 bug(真机 ExtDiag 实锤)。
+
+### A. 规则表持久化(0.2.17)
+`PersistedConfiguration` 之前**根本没有 `matchRules` 字段**——细粒度规则表重启即丢(WeChat 改
+"代理"重启被打回"直连"、手动加的 a.out 精确规则重启消失,都是这个)。补 `matchRules` 进 schema +
+`init(from:)`(手写解码兼容老 config.json 缺 key,`decodeIfPresent ?? []`,否则整份配置读不出来)+
+`restorationActions()` 逐条 `addMatchRule` 重建。落盘时机也从"仅 scenePhase 切后台"改成
+`Store.onAction` 钩子 + 400ms 防抖,规则/代理/目录类 action 后自动落盘,不再靠切后台这个偶然时机。
+
+### B. 规则去重(0.2.18)
+右键"为这条连接建规则"每次拿新 RuleID 追加,规则持久化后重复规则会攒下来(真机见 3×a.out、
+3×CrossOver)。`addMatchRule` reducer 加去重键(进程×主机×端口):完全重复 no-op;同键不同动作
+就地更新动作(保留 id/isEnabled/位置),不再追加一条永远排在原规则后、赢不了首个命中的新规则。
+
+### C. 活动栏清理(0.2.18)
+① 重启回灌历史连接日志时,`ConnectionLogEntry.normalizedForRestore()` 把仍停在 `opened` 阶段的
+记录统一改判 `closed`——上一次进程生命周期的 flow 不可能还活着,原样回灌会显示一堆永不消失的绿色
+"活动"圆点。② 「活动」页工具栏加"清除记录"按钮(确认对话框),`.clearConnectionLog` action 清内存表
++ `.clearConnectionLogFile` effect 删磁盘 JSONL,不碰 processes 的累计流量/规则。
+
+### D. **配置同步自愈——这一轮的真 bug**(0.2.19)
+**症状**:活动栏一条连接都进不来,`*→*→代理` 通配规则形同虚设。
+**真机 ExtDiag 实锤**:每条 flow 都是 `decision=bypass:perProcess-direct(hasRule=false)`——扩展
+手里**一条规则都没有**。最后一次 `applyRuleSet received` 早于当前扩展进程启动:0.2.18 装机时扩展
+从旧版本**升级**,新扩展空规则起步,而 app **只在用户改 UI 时才推配置、重连后不重推**,新扩展就
+一直空转,每条 flow 回落默认直连、全 bypass。
+**还发现第二层竞态**:`Store.dispatch` 之前每个 effect 各起一个 `Task.detached`,启动恢复时十几个
+`applyRuleSet` 全量快照并发**乱序**到达扩展,最后落地的残缺中间态覆盖掉完整态(ExtDiag 里同一
+时间戳三条内容互相矛盾的 applyRuleSet:空 / 5 条 / 1 条)。
+
+**修法(三件一起)**:
+1. `Core.Action.resyncExtension`:纯重发,reducer 产出全部六类推送 effect(规则集+代理配置+路由+
+   抓包+UDP+排除名单)从当前 state,顺序固定。
+2. `Store` effect 执行改**单消费者串行**(FIFO,按 dispatch 顺序),消除同类推送乱序覆盖——最新状态
+   永远胜出。
+3. `XPCAppSideTransport` 加 `onConnect` 回调(新建连接时触发)+ 断线自动重连(延迟 1s 给扩展重启
+   窗口)。app 在 onConnect 与启动恢复完成后各 dispatch 一次 `.resyncExtension`。扩展升级/重启/
+   XPC 掉线重连 → app 自动重连 → 全量重推 → 扩展自愈,不再空转。
+
+**真机验证(0.2.19,扩展从 0.2.18 升级)**:`curl --noproxy '*' https://1.1.1.1` 从修复前的
+`provider rejected ... bypass:perProcess-direct(hasRule=false)` 变成
+`INTERCEPT src=com.apple.curl rule=proxied` + `provider accepted`——规则在扩展升级后成功送达。
+连接日志文件被重建、活动栏恢复接管。CPU 正常(扩展 0.0%、30s 仅 3 条接管),双信号排除仍兜住高流量
+的 xray(`a.out` 按路径 rejected),只有 yunti 低频控制连接被通配规则接住,无转发风暴。
+
+**5 包 90+169+... 测试全绿**,`swiftlint --strict` 0 违规,`xcodebuild` Debug 零警告。
+
+**遗留提醒**:`*→*→代理` 通配规则现在真正生效了,会接管 yunti 的控制连接(当前低频、无害)。若上游
+配置指向本地代理,仍建议收窄这条通配规则或确认本地代理进程已被排除(见"方案 A/B/C"讨论)。

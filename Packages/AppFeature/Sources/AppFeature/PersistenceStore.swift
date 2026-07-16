@@ -44,8 +44,8 @@ public struct PersistedProxyServer: Sendable, Equatable, Codable {
 }
 
 /// 跨启动持久化的「配置」子集：只包含用户设置过的东西（扫描到的目录、分配的规则、
-/// 配置过的上游代理、是否已完成引导），不包含运行时/瞬时状态（`isGlobalProxyEnabled`、
-/// `isEngineHealthy`、`diagnostics`、以及 `MonitoredProcess.stats` 里的实时流量——
+/// 配置过的上游代理、是否已完成引导），不包含运行时/瞬时状态（`isEngineHealthy`、
+/// `diagnostics`、以及 `MonitoredProcess.stats` 里的实时流量——
 /// 那些每次启动都应该重置）。代理密码也**不在**持久化范围（见 `PersistedProxyServer`）。
 public struct PersistedConfiguration: Sendable, Equatable, Codable {
     public var processes: [Core.ProcessID: Core.MonitoredProcess]
@@ -54,6 +54,10 @@ public struct PersistedConfiguration: Sendable, Equatable, Codable {
     public var activeProxyServerID: String?
     public var proxyRoutingMode: Core.ProxyRoutingMode
     public var hasCompletedOnboarding: Bool
+    /// 细粒度规则表(进程 × 主机 × 端口),按优先级排好序的数组——顺序本身就是语义(首个命中生效),
+    /// 所以是 `Array` 不是 `Set`/`Dictionary`。`ProxyMatchRule` 已经是 `Codable`,直接存整个结构体
+    /// (含 `isEnabled`),不用另外拆字段。
+    public var matchRules: [Core.ProxyMatchRule]
 
     public init(
         processes: [Core.ProcessID: Core.MonitoredProcess] = [:],
@@ -61,7 +65,8 @@ public struct PersistedConfiguration: Sendable, Equatable, Codable {
         proxyServers: [PersistedProxyServer] = [],
         activeProxyServerID: String? = nil,
         proxyRoutingMode: Core.ProxyRoutingMode = .single,
-        hasCompletedOnboarding: Bool = false
+        hasCompletedOnboarding: Bool = false,
+        matchRules: [Core.ProxyMatchRule] = []
     ) {
         self.processes = processes
         self.catalog = catalog
@@ -69,6 +74,22 @@ public struct PersistedConfiguration: Sendable, Equatable, Codable {
         self.activeProxyServerID = activeProxyServerID
         self.proxyRoutingMode = proxyRoutingMode
         self.hasCompletedOnboarding = hasCompletedOnboarding
+        self.matchRules = matchRules
+    }
+
+    /// 手写 `init(from:)`(而不是全靠合成):`matchRules` 是这轮新加的字段,老版本写在磁盘上的
+    /// `config.json` 没有这个 key——合成的 `Decodable` 会把缺 key 当解码失败,整份配置(进程/
+    /// 目录/代理服务器全部)都读不出来,等于把用户所有配置清空。`decodeIfPresent ?? []`
+    /// 让老文件照常解出来,只是 `matchRules` 为空(符合"老文件从没存过规则"的事实)。
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        processes = try container.decode([Core.ProcessID: Core.MonitoredProcess].self, forKey: .processes)
+        catalog = try container.decode([Core.ProcessID: Core.DirectoryEntry].self, forKey: .catalog)
+        proxyServers = try container.decode([PersistedProxyServer].self, forKey: .proxyServers)
+        activeProxyServerID = try container.decodeIfPresent(String.self, forKey: .activeProxyServerID)
+        proxyRoutingMode = try container.decode(Core.ProxyRoutingMode.self, forKey: .proxyRoutingMode)
+        hasCompletedOnboarding = try container.decode(Bool.self, forKey: .hasCompletedOnboarding)
+        matchRules = try container.decodeIfPresent([Core.ProxyMatchRule].self, forKey: .matchRules) ?? []
     }
 }
 
@@ -85,16 +106,20 @@ public extension PersistedConfiguration {
                 .map(PersistedProxyServer.init(stripping:)),
             activeProxyServerID: state.activeProxyServerID?.value,
             proxyRoutingMode: state.proxyRoutingMode,
-            hasCompletedOnboarding: state.hasCompletedOnboarding
+            hasCompletedOnboarding: state.hasCompletedOnboarding,
+            // state.rules 已经是按优先级排好的数组(reducer 的 addMatchRule 追加、reorderMatchRules
+            // 就地重排),原样带走——不排序,顺序本身就是"首个命中生效"的语义。
+            matchRules: state.rules
         )
     }
 
     /// 把持久化的配置还原成一串要在启动时 dispatch 给 store 的 `Core.Action`，顺序确定
-    /// （按 `ProcessID.value` 排序），方便单测断言、也让重复启动可重现。
+    /// （按 `ProcessID.value` 排序，`matchRules` 保持原数组序），方便单测断言、也让重复启动可重现。
     ///
     /// 只用 `Core.Action` 里已经存在的 case 组装——`directoryScanned` 一次性批量灌回目录，
     /// 每个进程先 `processDiscovered`（默认落地为 `.direct`），规则不是默认值才追加
-    /// `assignRule`；最后如果引导已完成，追加一个 `onboardingCompleted`。没有新增任何
+    /// `assignRule`；`matchRules` 逐条 `addMatchRule`(reducer 就是 `state.rules.append`，
+    /// 原数组序原样重建)；最后如果引导已完成，追加一个 `onboardingCompleted`。没有新增任何
     /// `Core.Action` case。
     func restorationActions() -> [Core.Action] {
         var actions: [Core.Action] = []
@@ -111,6 +136,13 @@ public extension PersistedConfiguration {
             if process.rule != .direct {
                 actions.append(.assignRule(processID: process.id, rule: process.rule))
             }
+        }
+
+        // addMatchRule 现在**插到表首**(见 Reducer.addMatchRule 的"新规则置顶"语义)。持久化的
+        // matchRules 已按优先级排好(index 0 = 最高),所以**倒序**重放:最后一条先插、第一条最后插,
+        // 每次置顶正好把原顺序原样重建回来。正序重放会把整表颠倒。
+        for rule in matchRules.reversed() {
+            actions.append(.addMatchRule(rule))
         }
 
         // proxyServers 已经在 init(from:) 里按 id 排好；密码持久化时被剥离，还原出来

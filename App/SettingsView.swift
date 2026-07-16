@@ -10,10 +10,6 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("代理") {
-                Toggle("全局代理", isOn: Binding(
-                    get: { store.state.isGlobalProxyEnabled },
-                    set: { store.dispatch(.setGlobalProxyEnabled($0)) }
-                ))
                 LabeledContent("系统扩展") {
                     HStack(spacing: 8) {
                         let a = Self.activation(store.state.extensionActivation)

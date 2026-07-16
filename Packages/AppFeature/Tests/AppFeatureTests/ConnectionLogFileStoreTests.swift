@@ -86,6 +86,30 @@ struct ConnectionLogFileStoreTests {
         #expect(lines.count == 3)
     }
 
+    /// 滚动检查是**摊还**的(每 maxLines/4 条查一次),所以文件可以临时超出上限——但绝不会无界增长,
+    /// 而且 `loadRecent(limit:)` 永远只返回最后 N 条。策略 A 全量接管后连接事件量级暴涨,这条
+    /// (原本每次 append 都读全文件重写)是把 app 烧到 100% CPU 的元凶,故意换成摊还。
+    @Test("大量 append 后文件被限制在上限附近(摊还滚动),loadRecent 仍只给最后 N 条")
+    func amortizedRotationKeepsFileBounded() async throws {
+        let url = makeTempFileURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        let maxLines = 100
+        let store = ConnectionLogFileStore(fileURL: url, maxLines: maxLines)
+        for i in 1...400 { await store.append(makeEntry(id: "\(i)")) }
+
+        let data = try #require(try? Data(contentsOf: url))
+        let content = try #require(String(bytes: data, encoding: .utf8))
+        let lines = content.split(separator: "\n", omittingEmptySubsequences: true)
+        // 摊还:允许临时超出,但必须被压在 maxLines * 1.25 的量级内(不是无界增长到 400)。
+        #expect(lines.count <= maxLines + maxLines / 4)
+        #expect(lines.count >= 1)
+
+        // 不管文件里剩多少行,读出来永远是最新的那批、顺序 oldest→newest。
+        let loaded = await store.loadRecent(limit: 10)
+        #expect(loaded.map(\.id) == (391...400).map(String.init))
+    }
+
     @Test("文件不存在(首次启动)时 loadRecent 返回空数组,不崩溃")
     func missingFileReturnsEmpty() async {
         let url = makeTempFileURL()   // 父目录都不存在
@@ -133,6 +157,33 @@ struct ConnectionLogFileStoreTests {
         for line in lines {
             #expect((try? decoder.decode(ConnectionLogEntry.self, from: Data(line.utf8))) != nil)
         }
+    }
+
+    @Test("clear() deletes the file; loadRecent afterwards returns empty, and append after clear starts a fresh file")
+    func clearDeletesFileAndAppendStartsFresh() async {
+        let url = makeTempFileURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        let store = ConnectionLogFileStore(fileURL: url)
+        await store.append(makeEntry(id: "1"))
+        await store.append(makeEntry(id: "2"))
+        #expect(await store.loadRecent(limit: 10).count == 2)
+
+        await store.clear()
+        #expect(FileManager.default.fileExists(atPath: url.path) == false)
+        #expect(await store.loadRecent(limit: 10).isEmpty)
+
+        let fresh = makeEntry(id: "3")
+        await store.append(fresh)
+        #expect(await store.loadRecent(limit: 10) == [fresh])
+    }
+
+    @Test("clear() on a store whose file was never created is a harmless no-op")
+    func clearOnMissingFileIsNoOp() async {
+        let url = makeTempFileURL()
+        let store = ConnectionLogFileStore(fileURL: url)
+        await store.clear()
+        #expect(await store.loadRecent(limit: 10).isEmpty)
     }
 
     @Test("defaultFileURL 落在 Application Support/appidge 下,文件名是 connections.log.jsonl")

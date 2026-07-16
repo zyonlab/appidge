@@ -60,6 +60,7 @@ public enum ExtensionMessageHandling {
         case .direct: .direct
         case .proxied: .proxied
         case .block: .block
+        case .observe: .observe
         }
     }
 

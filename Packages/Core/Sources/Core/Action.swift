@@ -1,5 +1,4 @@
 public enum Action: Sendable, Equatable {
-    case setGlobalProxyEnabled(Bool)
     case processDiscovered(id: ProcessID, displayName: String, executablePath: String)
     case assignRule(processID: ProcessID, rule: ProxyRule)
     /// 一批流量增量 + 这一批覆盖的真实时间窗(秒)。reducer 据此更新累计字节,并算出每进程瞬时速率
@@ -22,6 +21,8 @@ public enum Action: Sendable, Equatable {
     /// 启用/停用一条规则(保留在表里,不删除)。禁用的规则下发前被过滤,永不参与匹配。
     case setMatchRuleEnabled(id: RuleID, enabled: Bool)
     case connectionEventReceived(ConnectionLogEntry)
+    /// 用户在「活动」页手动清空连接日志(不影响 `processes` 的累计流量/规则——只清这张表)。
+    case clearConnectionLog
     /// 扩展主动检测到疑似转发环(signature = 命中目标)。
     case loopWarningRaised(String)
     /// 用户关闭环告警。
@@ -38,4 +39,9 @@ public enum Action: Sendable, Equatable {
     /// App 侧查到了本地代理进程(如 xray/yunti)的签名标识集合(libproc 查监听端口 PID + SecCode
     /// 取签名),用于转发环硬化的「来源进程自动排除」。何时查询由 AppFeature 编排,这里只回灌结果。
     case proxyProcessIdentitiesResolved(OriginExclusionDiscovery)
+    /// 把当前完整配置**全量重推**给扩展(规则表 + 每进程规则 + 代理配置 + 路由模式 + 抓包 +
+    /// UDP 策略 + 排除名单)。用途:app↔扩展的 XPC(重)连上时、或启动恢复完成后触发一次,
+    /// 保证扩展手里的配置永远是最新的——不然扩展升级/重启/XPC 掉线重连后,它会一直空转
+    /// (每条 flow 回落默认直连、什么都不接管)。纯粹的"重发",不改任何 state。
+    case resyncExtension
 }

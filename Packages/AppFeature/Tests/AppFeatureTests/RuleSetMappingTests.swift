@@ -6,10 +6,9 @@ import IPCContract
 @Suite("RuleSetMapping — Core rule state → IPCContract RuleSetMessage")
 struct RuleSetMappingTests {
 
-    @Test("maps global flag, sorted assignments, and match rules into applyRuleSet")
+    @Test("maps sorted assignments and match rules into applyRuleSet")
     func mapsEverything() {
         let message = RuleSetMapping.ruleSetMessage(
-            globalProxyEnabled: true,
             assignments: [Core.ProcessID("b"): .proxied, Core.ProcessID("a"): .direct],
             matchRules: [
                 Core.ProxyMatchRule(id: Core.RuleID("r1"), appPattern: "*", hostPattern: "*.corp", portRange: 22...22, action: .direct)
@@ -22,15 +21,14 @@ struct RuleSetMappingTests {
             ],
             matchRules: [
                 MatchRuleDTO(id: "r1", appPattern: "*", hostPattern: "*.corp", portRange: 22...22, rule: .direct)
-            ],
-            globalProxyEnabled: true
+            ]
         )))
     }
 
     @Test("empty state maps to an empty rule set")
     func empty() {
-        let message = RuleSetMapping.ruleSetMessage(globalProxyEnabled: false, assignments: [:], matchRules: [])
-        #expect(message == .applyRuleSet(RuleSetMessage(assignments: [], matchRules: [], globalProxyEnabled: false)))
+        let message = RuleSetMapping.ruleSetMessage(assignments: [:], matchRules: [])
+        #expect(message == .applyRuleSet(RuleSetMessage(assignments: [], matchRules: [])))
     }
 
     @Test(
@@ -43,7 +41,7 @@ struct RuleSetMappingTests {
     )
     func ruleMapping(core: Core.ProxyRule, dto: ProxyRuleDTO) {
         let message = RuleSetMapping.ruleSetMessage(
-            globalProxyEnabled: false, assignments: [Core.ProcessID("p"): core], matchRules: []
+            assignments: [Core.ProcessID("p"): core], matchRules: []
         )
         guard case .applyRuleSet(let ruleSet) = message else { Issue.record("expected applyRuleSet"); return }
         #expect(ruleSet.assignments.first?.rule == dto)
@@ -55,7 +53,7 @@ struct RuleSetMappingTests {
             Core.ProxyMatchRule(id: Core.RuleID("1"), appPattern: "*", hostPattern: "a", portRange: nil, action: .direct),
             Core.ProxyMatchRule(id: Core.RuleID("2"), appPattern: "*", hostPattern: "b", portRange: nil, action: .proxied)
         ]
-        let message = RuleSetMapping.ruleSetMessage(globalProxyEnabled: false, assignments: [:], matchRules: rules)
+        let message = RuleSetMapping.ruleSetMessage(assignments: [:], matchRules: rules)
         guard case .applyRuleSet(let ruleSet) = message else { Issue.record("expected applyRuleSet"); return }
         #expect(ruleSet.matchRules.map(\.id) == ["1", "2"])
     }
@@ -71,7 +69,7 @@ struct RuleSetMappingTests {
             id: Core.RuleID("proxyAll"), appPattern: "*", hostPattern: "*", portRange: nil, action: .proxied
         )
         let message = RuleSetMapping.ruleSetMessage(
-            globalProxyEnabled: false, assignments: [:], matchRules: [disabled, catchAll]
+            assignments: [:], matchRules: [disabled, catchAll]
         )
         guard case .applyRuleSet(let ruleSet) = message else { Issue.record("expected applyRuleSet"); return }
         #expect(ruleSet.matchRules.map(\.id) == ["proxyAll"])
@@ -85,7 +83,7 @@ struct RuleSetMappingTests {
             id: Core.RuleID("2"), appPattern: "*", hostPattern: "y", portRange: nil, action: .proxied, isEnabled: false
         )
         let r3 = Core.ProxyMatchRule(id: Core.RuleID("3"), appPattern: "*", hostPattern: "z", portRange: nil, action: .block)
-        let message = RuleSetMapping.ruleSetMessage(globalProxyEnabled: false, assignments: [:], matchRules: [r1, r2, r3])
+        let message = RuleSetMapping.ruleSetMessage(assignments: [:], matchRules: [r1, r2, r3])
         guard case .applyRuleSet(let ruleSet) = message else { Issue.record("expected applyRuleSet"); return }
         #expect(ruleSet.matchRules.map(\.id) == ["1", "3"])
     }

@@ -73,6 +73,55 @@ struct PersistenceRestorationTests {
         ])
     }
 
+    /// `addMatchRule` 是"插到表首"语义(新规则优先级最高),所以恢复时必须**倒序**重放,
+    /// 每次置顶正好把持久化的优先级顺序原样重建。正序重放会把整表颠倒。
+    @Test("matchRules become addMatchRule actions in reverse order, so insert-at-top rebuilds the saved priority order")
+    func matchRulesBecomeAddMatchRuleActionsInReverseOrder() {
+        let r1 = ProxyMatchRule(id: RuleID("r1"), appPattern: "a.out", hostPattern: "1.2.3.4", portRange: nil, action: .direct)
+        let r2 = ProxyMatchRule(
+            id: RuleID("r2"), appPattern: "*", hostPattern: "*.example.com",
+            portRange: 443...443, action: .block, isEnabled: false
+        )
+        let config = PersistedConfiguration(matchRules: [r1, r2])
+        let actions = config.restorationActions()
+        #expect(actions == [.addMatchRule(r2), .addMatchRule(r1)])
+    }
+
+    /// 端到端的那条才是真正的契约:倒序重放 + 置顶插入,重建出来的 `state.rules` 必须和存盘时**完全一致**。
+    @Test("replaying restored matchRules through the real reducer reproduces the saved priority order exactly")
+    func replayingMatchRulesReproducesSavedOrder() {
+        let saved = [
+            ProxyMatchRule(id: RuleID("top"), appPattern: "a.out", hostPattern: "1.2.3.4", portRange: nil, action: .direct),
+            ProxyMatchRule(id: RuleID("mid"), appPattern: "b", hostPattern: "*", portRange: nil, action: .observe),
+            ProxyMatchRule(id: RuleID("wild"), appPattern: "*", hostPattern: "*", portRange: nil, action: .proxied)
+        ]
+        var state = AppState()
+        for action in PersistedConfiguration(matchRules: saved).restorationActions() {
+            let (next, _) = Reducer.reduce(state, action)
+            state = next
+        }
+        #expect(state.rules == saved)
+    }
+
+    @Test("matchRules are restored after process discovery/rule assignment, before proxy servers")
+    func matchRulesOrderedBetweenProcessesAndProxyServers() {
+        let processID = ProcessID("x")
+        let rule = ProxyMatchRule(id: RuleID("r1"), appPattern: "x", hostPattern: "*", portRange: nil, action: .block)
+        let config = PersistedConfiguration(
+            processes: [processID: MonitoredProcess(id: processID, displayName: "X", executablePath: "/x", rule: .proxied)],
+            proxyServers: [PersistedProxyServer(id: "s1", host: "h", port: 1080, kind: .socks5, username: nil)],
+            matchRules: [rule]
+        )
+        let actions = config.restorationActions()
+        #expect(actions == [
+            .processDiscovered(id: processID, displayName: "X", executablePath: "/x"),
+            .assignRule(processID: processID, rule: .proxied),
+            .addMatchRule(rule),
+            .addProxyServer(PersistedProxyServer(id: "s1", host: "h", port: 1080, kind: .socks5, username: nil).toProxyServer()),
+            .setActiveProxyServer(nil)
+        ])
+    }
+
     @Test("hasCompletedOnboarding true appends a trailing onboardingCompleted action")
     func onboardingCompletedIsAppendedLast() {
         let config = PersistedConfiguration(hasCompletedOnboarding: true)
@@ -97,7 +146,10 @@ struct PersistenceRestorationTests {
             catalog: [
                 a: DirectoryEntry(id: a, displayName: "A", executablePath: "/a", industryTag: .technology)
             ],
-            hasCompletedOnboarding: true
+            hasCompletedOnboarding: true,
+            matchRules: [ProxyMatchRule(
+                id: RuleID("r1"), appPattern: "a.out", hostPattern: "1.2.3.4", portRange: nil, action: .direct
+            )]
         )
 
         var state = AppState()
@@ -112,8 +164,8 @@ struct PersistenceRestorationTests {
         #expect(state.processes[b]?.displayName == "B")
         #expect(state.processes[b]?.rule == .direct)
         #expect(state.hasCompletedOnboarding == true)
+        #expect(state.rules == config.matchRules)
         // Runtime/ephemeral fields untouched by restore, still at their fresh-launch defaults.
-        #expect(state.isGlobalProxyEnabled == false)
         #expect(state.isEngineHealthy == true)
     }
 }

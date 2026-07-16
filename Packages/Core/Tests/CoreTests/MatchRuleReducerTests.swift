@@ -4,23 +4,30 @@ import Testing
 @Suite("Reducer — match-rule list (add / remove / reorder) + rule-set push")
 struct MatchRuleReducerTests {
 
-    private func rule(_ id: String, host: String = "*", _ action: ProxyRule = .proxied) -> ProxyMatchRule {
-        ProxyMatchRule(id: RuleID(id), appPattern: "*", hostPattern: host, portRange: nil, action: action)
+    /// `host` 留空时按 `id` 派生一个独一无二的主机模式(`"*.<id>"`)——大多数用例只关心
+    /// 增/删/排序的列表操作,不关心主机字面量;派生保证同一测试里不同 id 的规则不会撞上新加的
+    /// 去重逻辑(同 app/host/port 视为同一条规则)。真正要测"同 host 命中去重"的用例显式传 `host`。
+    private func rule(_ id: String, host: String = "", _ action: ProxyRule = .proxied) -> ProxyMatchRule {
+        ProxyMatchRule(
+            id: RuleID(id), appPattern: "*", hostPattern: host.isEmpty ? "*.\(id)" : host,
+            portRange: nil, action: action
+        )
     }
 
-    @Test("addMatchRule appends to the ordered list and pushes the rule set")
+    @Test("addMatchRule inserts the rule and pushes the rule set")
     func addMatchRule() {
         let r = rule("1", host: "*.corp")
         let (next, effects) = Reducer.reduce(AppState(), .addMatchRule(r))
         #expect(next.rules == [r])
-        #expect(effects == [.applyRuleSet(globalProxyEnabled: false, assignments: [:], matchRules: [r])])
+        #expect(effects == [.applyRuleSet(assignments: [:], matchRules: [r])])
     }
 
-    @Test("addMatchRule preserves insertion order")
-    func addPreservesOrder() {
+    @Test("addMatchRule puts the newest rule on top (highest priority, newest-first)")
+    func addPutsNewestOnTop() {
         var (state, _) = Reducer.reduce(AppState(), .addMatchRule(rule("1")))
         (state, _) = Reducer.reduce(state, .addMatchRule(rule("2")))
-        #expect(state.rules.map(\.id) == [RuleID("1"), RuleID("2")])
+        // 最新添加的排最上 → 首个命中生效时它最优先(修"手动规则被通配规则遮蔽"的核心)。
+        #expect(state.rules.map(\.id) == [RuleID("2"), RuleID("1")])
     }
 
     @Test("removeMatchRule drops by id, keeps the rest in order")
@@ -28,14 +35,15 @@ struct MatchRuleReducerTests {
         var (state, _) = Reducer.reduce(AppState(), .addMatchRule(rule("1")))
         (state, _) = Reducer.reduce(state, .addMatchRule(rule("2")))
         (state, _) = Reducer.reduce(state, .addMatchRule(rule("3")))
+        // 新规则置顶 → 加完是 [3, 2, 1];删掉 2 后剩 [3, 1]。
         let (next, effects) = Reducer.reduce(state, .removeMatchRule(RuleID("2")))
-        #expect(next.rules.map(\.id) == [RuleID("1"), RuleID("3")])
-        #expect(effects == [.applyRuleSet(globalProxyEnabled: false, assignments: [:], matchRules: next.rules)])
+        #expect(next.rules.map(\.id) == [RuleID("3"), RuleID("1")])
+        #expect(effects == [.applyRuleSet(assignments: [:], matchRules: next.rules)])
     }
 
     @Test("removeMatchRule for an unknown id is a no-op with no push")
     func removeUnknown() {
-        var (state, _) = Reducer.reduce(AppState(), .addMatchRule(rule("1")))
+        let (state, _) = Reducer.reduce(AppState(), .addMatchRule(rule("1")))
         let (next, effects) = Reducer.reduce(state, .removeMatchRule(RuleID("ghost")))
         #expect(next.rules.map(\.id) == [RuleID("1")])
         #expect(effects.isEmpty)
@@ -48,7 +56,7 @@ struct MatchRuleReducerTests {
         (state, _) = Reducer.reduce(state, .addMatchRule(rule("3")))
         let (next, effects) = Reducer.reduce(state, .reorderMatchRules([RuleID("3"), RuleID("1"), RuleID("2")]))
         #expect(next.rules.map(\.id) == [RuleID("3"), RuleID("1"), RuleID("2")])
-        #expect(effects == [.applyRuleSet(globalProxyEnabled: false, assignments: [:], matchRules: next.rules)])
+        #expect(effects == [.applyRuleSet(assignments: [:], matchRules: next.rules)])
     }
 
     @Test("reorderMatchRules ignores unknown ids and appends any rules the order omitted")
@@ -60,17 +68,74 @@ struct MatchRuleReducerTests {
         #expect(next.rules.map(\.id) == [RuleID("2"), RuleID("1")])
     }
 
-    @Test("the rule-set push carries global flag, non-direct assignments, and the current rules together")
+    @Test("the rule-set push carries non-direct assignments and the current rules together")
     func pushCarriesEverything() {
-        var state = AppState(isGlobalProxyEnabled: true)
+        var state = AppState()
         let a = ProcessID("a")
         state.processes[a] = MonitoredProcess(id: a, displayName: "A", executablePath: "/a", rule: .proxied)
         let (_, effects) = Reducer.reduce(state, .addMatchRule(rule("r1", host: "*.x")))
         #expect(effects == [.applyRuleSet(
-            globalProxyEnabled: true,
             assignments: [a: .proxied],
             matchRules: [rule("r1", host: "*.x")]
         )])
+    }
+
+    // MARK: - dedup on add
+
+    @Test("re-adding an identical rule doesn't duplicate it — the existing one moves to the top")
+    func addExactDuplicateMovesExistingToTop() {
+        var (state, _) = Reducer.reduce(AppState(), .addMatchRule(rule("1", host: "*.corp", .proxied)))
+        (state, _) = Reducer.reduce(state, .addMatchRule(rule("2", host: "*.other", .proxied)))
+        // 同 app/host/port/action、不同 id(用户对同一条连接又点了一次"建规则")。
+        let (next, effects) = Reducer.reduce(state, .addMatchRule(rule("3", host: "*.corp", .proxied)))
+        // 不新增第二条同键规则;原来那条(id=1)被移到表首。
+        #expect(next.rules.map(\.id) == [RuleID("1"), RuleID("2")])
+        #expect(effects == [.applyRuleSet(assignments: [:], matchRules: next.rules)])
+    }
+
+    @Test("re-adding the same app/host/port with a different action updates the action and moves it to the top")
+    func addSameKeyDifferentActionUpdatesAndMovesToTop() {
+        var (state, _) = Reducer.reduce(AppState(), .addMatchRule(rule("1", host: "*.corp", .proxied)))
+        (state, _) = Reducer.reduce(state, .addMatchRule(rule("2", host: "*.other", .proxied)))
+        // 此时表是 [2, 1]。对 *.corp 改判成 .direct → 更新动作并置顶。
+        let (next, _) = Reducer.reduce(state, .addMatchRule(rule("3", host: "*.corp", .direct)))
+        #expect(next.rules.map(\.id) == [RuleID("1"), RuleID("2")])
+        #expect(next.rules[0].action == .direct)
+        #expect(next.rules[1].action == .proxied)
+    }
+
+    @Test("updating a rule's action preserves its isEnabled state")
+    func updatePreservesIsEnabled() {
+        var (state, _) = Reducer.reduce(AppState(), .addMatchRule(rule("1", host: "*.corp", .proxied)))
+        (state, _) = Reducer.reduce(state, .setMatchRuleEnabled(id: RuleID("1"), enabled: false))
+        let (next, _) = Reducer.reduce(state, .addMatchRule(rule("2", host: "*.corp", .block)))
+        #expect(next.rules.map(\.id) == [RuleID("1")])
+        #expect(next.rules[0].action == .block)
+        #expect(next.rules[0].isEnabled == false)
+    }
+
+    @Test("a rule with a different app/host/port combo is inserted on top, keeping the rest in order")
+    func addDifferentComboGoesOnTop() {
+        var (state, _) = Reducer.reduce(AppState(), .addMatchRule(rule("1", host: "*.corp", .proxied)))
+        (state, _) = Reducer.reduce(state, .addMatchRule(rule("2", host: "*.other", .direct)))
+        #expect(state.rules.map(\.id) == [RuleID("2"), RuleID("1")])
+    }
+
+    @Test("a newly added specific rule outranks a pre-existing catch-all — the shadowing bug that made manual rules dead")
+    func newRuleOutranksExistingWildcard() {
+        // 先有一条"通配一切 → 代理"(用户配置里真实存在的那条)。
+        let wildcard = ProxyMatchRule(
+            id: RuleID("wild"), appPattern: "*", hostPattern: "*", portRange: nil, action: .proxied
+        )
+        var (state, _) = Reducer.reduce(AppState(), .addMatchRule(wildcard))
+        // 用户右键某条 a.out 连接 → 建"直连"规则。
+        let specific = ProxyMatchRule(
+            id: RuleID("specific"), appPattern: "a.out", hostPattern: "1.2.3.4",
+            portRange: 443...443, action: .direct
+        )
+        (state, _) = Reducer.reduce(state, .addMatchRule(specific))
+        // 新规则必须排在通配规则**之前**,否则永远轮不到(首个命中生效)。
+        #expect(state.rules.map(\.id) == [RuleID("specific"), RuleID("wild")])
     }
 
     // MARK: - per-rule enable/disable
@@ -89,7 +154,7 @@ struct MatchRuleReducerTests {
         let (next, effects) = Reducer.reduce(state, .setMatchRuleEnabled(id: RuleID("1"), enabled: false))
         #expect(next.rules.first(where: { $0.id == RuleID("1") })?.isEnabled == false)
         #expect(next.rules.first(where: { $0.id == RuleID("2") })?.isEnabled == true)
-        #expect(effects == [.applyRuleSet(globalProxyEnabled: false, assignments: [:], matchRules: next.rules)])
+        #expect(effects == [.applyRuleSet(assignments: [:], matchRules: next.rules)])
     }
 
     @Test("disabling keeps the rule in the table (disable is not delete); re-enabling restores it")

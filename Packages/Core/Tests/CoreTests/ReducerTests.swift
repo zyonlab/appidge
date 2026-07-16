@@ -128,16 +128,58 @@ struct ReducerTests {
         #expect(next.processes[a]?.rateDownPerSec == 0)
     }
 
-    @Test("engine failure fails open: all rules forced direct, logged")
+    @Test("engine failure fails open AT THE EXTENSION: pushes an empty rule set, keeps user config intact")
     func engineFailureFailsOpen() {
         let a = ProcessID("a")
         var state = AppState(isEngineHealthy: true)
         state.processes[a] = MonitoredProcess(id: a, displayName: "A", executablePath: "/a", rule: .proxied)
+        state.rules = [ProxyMatchRule(
+            id: RuleID("r"), appPattern: "*", hostPattern: "*", portRange: nil, action: .proxied
+        )]
 
         let (next, effects) = Reducer.reduce(state, .engineFailure(reason: "transport crashed"))
 
         #expect(next.isEngineHealthy == false)
-        #expect(next.processes[a]?.rule == .direct)
+        // 用户配置(每进程规则/规则表)不被破坏——fail-open 靠"推空规则集"实现,不靠清写持久化配置。
+        #expect(next.processes[a]?.rule == .proxied)
+        #expect(next.rules == state.rules)
+        // 真正在路由的是扩展:必须把 fail-open 推下去(空 assignments + 空 matchRules = 全部默认直连)。
+        #expect(effects.contains(.applyRuleSet(assignments: [:], matchRules: [])))
         #expect(effects.contains(.log("engine failure, fail-open to direct: transport crashed")))
+    }
+
+    @Test("while the engine is unhealthy every rule-set push stays fail-open (empty), including resync")
+    func unhealthyPushesStayFailOpen() {
+        var state = AppState(isEngineHealthy: false)
+        let a = ProcessID("a")
+        state.processes[a] = MonitoredProcess(id: a, displayName: "A", executablePath: "/a", rule: .proxied)
+
+        let (_, effects) = Reducer.reduce(state, .addMatchRule(ProxyMatchRule(
+            id: RuleID("r"), appPattern: "*", hostPattern: "*", portRange: nil, action: .proxied
+        )))
+        #expect(effects == [.applyRuleSet(assignments: [:], matchRules: [])])
+
+        let (_, resyncEffects) = Reducer.reduce(state, .resyncExtension)
+        #expect(resyncEffects.first == .applyRuleSet(assignments: [:], matchRules: []))
+    }
+
+    @Test("extension becoming active again restores engine health and re-pushes the real rule set")
+    func activationRecoversEngineHealth() {
+        var state = AppState(isEngineHealthy: false)
+        let a = ProcessID("a")
+        state.processes[a] = MonitoredProcess(id: a, displayName: "A", executablePath: "/a", rule: .proxied)
+
+        let (next, effects) = Reducer.reduce(state, .extensionActivationChanged(.active))
+
+        #expect(next.isEngineHealthy == true)
+        #expect(effects == [.applyRuleSet(assignments: [a: .proxied], matchRules: [])])
+    }
+
+    @Test("activation changes that are not .active do not touch engine health and push nothing")
+    func nonActiveActivationLeavesHealthAlone() {
+        let state = AppState(isEngineHealthy: false)
+        let (next, effects) = Reducer.reduce(state, .extensionActivationChanged(.needsApproval))
+        #expect(next.isEngineHealthy == false)
+        #expect(effects.isEmpty)
     }
 }

@@ -87,7 +87,14 @@ public enum Reducer {
 
     /// 路由相关状态变了就产出"把完整规则集推给扩展"的 effect：非默认的每进程规则
     /// + 细粒度规则表。app 侧 effectHandler 翻成 RuleSetMessage 发出。
+    ///
+    /// **fail-open 感知**:引擎不健康(`isEngineHealthy == false`)时推**空规则集**——扩展对
+    /// 未知进程/无规则命中一律回落默认直连,这才是把"异常时恢复直连"落到真正在路由的组件上;
+    /// 用户配置(state 里的规则)原样保留,恢复健康后按老路重推(见 `extensionActivationChanged`)。
     private static func ruleSetPush(_ state: AppState) -> Effect {
+        guard state.isEngineHealthy else {
+            return .applyRuleSet(assignments: [:], matchRules: [])
+        }
         let assignments = state.processes.compactMapValues { $0.rule == .direct ? nil : $0.rule }
         return .applyRuleSet(
             assignments: assignments,
@@ -127,13 +134,16 @@ public enum Reducer {
         return (state, [])
     }
 
+    /// 引擎异常 → fail-open:标记不健康并**把空规则集推给扩展**(一切回落默认直连)。
+    /// 不清写 state 里的每进程规则/规则表——那是用户的持久化配置,破坏性清写会在下次落盘时
+    /// 把配置永久丢掉;fail-open 由 `ruleSetPush` 的健康度守卫实现,恢复后原配置重推即可。
     private static func engineFailure(reason: String, _ state: AppState) -> (AppState, [Effect]) {
         var state = state
         state.isEngineHealthy = false
-        for id in state.processes.keys {
-            state.processes[id]?.rule = .direct
-        }
-        return (state, [.log("engine failure, fail-open to direct: \(reason)")])
+        return (state, [
+            ruleSetPush(state),
+            .log("engine failure, fail-open to direct: \(reason)")
+        ])
     }
 
     private static func directoryScanned(_ entries: [DirectoryEntry], _ state: AppState) -> (AppState, [Effect]) {
@@ -363,6 +373,13 @@ private extension Reducer {
         case .extensionActivationChanged(let activation):
             var state = state
             state.extensionActivation = activation
+            // 扩展(重新)跑起来 = 新的引擎会话:之前 fail-open 标记的不健康态就此翻篇,恢复健康
+            // 并把真实规则集重推下去(不健康期间推的是空规则集)。只在「不健康 → active」这个
+            // 转变沿推一次,平时的 activation 回报不产生多余推送。
+            if case .active = activation, !state.isEngineHealthy {
+                state.isEngineHealthy = true
+                return (state, [ruleSetPush(state)])
+            }
             return (state, [])
         case .proxyProcessIdentitiesResolved(let discovery):
             // 未变化就不推(和 applyProxyConfig 等其它下发一致的幂等守卫)。

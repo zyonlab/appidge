@@ -48,7 +48,7 @@ enum TCPFlowDecision: Equatable {
 /// 拨号/握手失败 fail-open：关掉这条 flow，不阻塞其它流量。
 final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Sendable {
     private var router: FlowRouter?
-    private var transport: NEFlowTransport?
+    private var transport: XPCFlowTransport?
     // 不是 private:makeDiagnosticsRunner 拆到同 target 的 ProxyExtensionProviderRouting.swift。
     var diagnosticsRunner: DiagnosticsRunner?
     private let appGroup = "group.com.appidge"
@@ -149,7 +149,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
 
     override func startProxy(options: [String: Any]?, completionHandler: @escaping (Error?) -> Void) {
         ExtDiag.log("startProxy called")
-        let transport = NEFlowTransport(upstreamHost: "127.0.0.1", upstreamPort: 1080, appGroup: appGroup)
+        let transport = XPCFlowTransport(upstreamHost: "127.0.0.1", upstreamPort: 1080)
         self.transport = transport
         router = FlowRouter(transport: transport, flushInterval: 0.5, now: Date())
         diagnosticsRunner = makeDiagnosticsRunner(upstreamHost: "127.0.0.1", upstreamPort: 1080)
@@ -175,7 +175,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         completionHandler()
     }
 
-    private func handleAppMessage(_ message: AppToExtensionMessage, transport: NEFlowTransport) async {
+    private func handleAppMessage(_ message: AppToExtensionMessage, transport: XPCFlowTransport) async {
         switch message {
         case .applyRuleSet(let ruleSet):
             await appliedRuleSetStore.apply(ruleSet)

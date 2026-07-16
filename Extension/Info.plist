@@ -20,10 +20,15 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NetworkExtension</key>
 	<dict>
-		<!-- 刻意没有 NEMachServiceName:①我们的 app↔扩展 IPC 走 Darwin 通知 + App Group 文件,
-		     不用 mach 服务;②若声明它,值必须以 entitlements 里的某个 App Group 为前缀
-		     (Proxifier: group=NXELXU5YLW.…,machSvc 以它开头),之前用 TeamID 前缀不满足该规则,
-		     正是 network_extension 类别校验 code 9 的一个成因。不用就不声明。 -->
+		<!-- App Group UserDefaults + Darwin 通知在这套 root 系统扩展上被真机验证证实不通
+		     (扩展以 root 身份跑,解析到 /var/root/...;App 以登录用户身份跑,解析到 ~/...,
+		     两边互相读不到——Apple DTS 论坛确认是 macOS System Extension 的已知限制)。
+		     换回 NEMachServiceName + XPC。值必须以 entitlements 里的某个 App Group 为前缀
+		     (Proxifier: group=NXELXU5YLW.…,machSvc 以它开头;之前用 TeamID 前缀导致
+		     network_extension 类别校验 code 9,见 git log b92b35b)——我们唯一的 App Group 是
+		     group.com.appidge,这里必须原样对应 IPCContract.XPCTransportConfig.machServiceName。 -->
+		<key>NEMachServiceName</key>
+		<string>group.com.appidge.xpc</string>
 		<key>NEProviderClasses</key>
 		<dict>
 			<key>com.apple.networkextension.app-proxy</key>

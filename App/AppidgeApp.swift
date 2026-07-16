@@ -16,7 +16,7 @@ struct AppidgeApp: App {
     private let connectionLogFileStore: ConnectionLogFileStore
 
     init() {
-        let transport = AppGroupAppSideTransport(appGroup: "group.com.appidge")
+        let transport = XPCAppSideTransport()
         let connectionLogFileStore = ConnectionLogFileStore()
         self.connectionLogFileStore = connectionLogFileStore
         // 本地代理进程(如 xray/yunti)签名标识查询：libproc 查监听端口 + SecCode 取签名标识，

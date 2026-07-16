@@ -98,4 +98,3 @@ public final class XPCFlowTransport: NSObject, Transport, ExtensionXPCProtocol, 
         handler?(message)
     }
 }
-

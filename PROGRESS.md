@@ -1001,3 +1001,41 @@ PROGRESS 里记过但没修)。**改用 App Group `UserDefaults`**(`NEFlowTransp
 
 **遗留提醒**:`*→*→代理` 通配规则现在真正生效了,会接管 yunti 的控制连接(当前低频、无害)。若上游
 配置指向本地代理,仍建议收窄这条通配规则或确认本地代理进程已被排除(见"方案 A/B/C"讨论)。
+
+---
+
+## Phase 14:按核心 user case 的系统性 bug 修复 + 「断网只能重启电脑」根因治理
+
+对照核心 user case(全接管 → 默认走代理 → 活动可见 → 点进程改规则立即生效 → 优先级时间倒排 →
+自动防 loop)逐条审计,串行修了 7 项(每项独立 commit,全绿后提交):
+
+1. **移除 `globalProxyEnabled`(产品决策:整体去掉)**——扩展路由从未读过这个标志,开≠默认走代理、
+   关≠全部直连,是纯假开关。State/Action/Effect/wire/三处 UI 全部移除,路由语义完全由规则表表达。
+2. **engineFailure 的 fail-open 真正下发**:ruleSetPush 感知 isEngineHealthy,不健康推空规则集
+   (扩展全回落直连);不再破坏性清写用户持久化配置;扩展重新 active 时恢复健康并重推。
+3. **每进程规则收编进规则表**:assignRule 派生「进程 × * × *」规则 upsert 到表首——「应用」表
+   的修改从此能压过更早的连接级规则(跨入口时间倒排),显式「直连」可表达可下发。
+4. **UDP/QUIC 决策补规则表 app 维度**(RuleMatcher.firstAppLevelMatch):经规则表 proxied 的
+   进程 UDP 不再被当"无规则"放行,QUIC 泄漏堵住,block-QUIC 默认止漏真正生效。
+5. **TCP 匹配 + 防环硬闸同时评估 remoteHostname 与 endpoint host**:从连接现拼的规则不再因
+   域名/IP 不一致或 IP 轮换而时灵时不灵。
+6. **数据面两处热路径地雷**(「Chrome 断网」直接放大器):XPCFlowTransport.forward 每个 64KB
+   chunk 都新建一条上游探活 TCP(一次大下载=数千次 connect,耗尽端口/fd)→ 改纯计量钩子;
+   ExtDiag 每条 flow 全量重写 2000 行 UserDefaults 数组 → 改内存缓冲 + 1s 节流合并落盘。
+7. **网络接管恢复出口**(「是否需要重置功能」→ 需要,且此前完全没有):
+   - TransparentProxyController.stop() 修成先 loadAllFromPreferences 再停;新增 reset()
+     (停会话 + removeFromPreferences,拦截彻底解除、立即恢复联网,无需重启电脑);
+   - 菜单栏「紧急恢复直连(重置接管)」一键出口;设置页「网络接管」分组(停止/重置);
+   - AppDelegate.applicationWillTerminate 同步停会话:UI 不在,接管就不该在。
+
+「装完后 Chrome 无法联网、每次重启电脑才恢复」的调研结论:catch-all 拦截全系统出站 TCP+UDP,
+默认 .direct 也是接管+扩展自拨,所有应用联网都过扩展;第 6 项的两处热路径地雷把扩展拖垮后
+全系统断网;而会话独立于 app 存活、stop() 是死代码、没有任何恢复出口 → 只能重启电脑(开机后
+没人 startVPNTunnel 才"修好")。第 6+7 项分别治因与建出口。
+
+4 包 SPM 测试全绿(Core 96 / IPCContract 15 / EngineKit 212 / AppFeature 171),
+xcodebuild Debug BUILD SUCCEEDED,swiftlint --strict 0 违规。
+
+**待人工回填(真机)**:① 装上 0.2.20 复现原 Chrome 断网场景,确认第 6 项后不再出现;
+② 断网时点菜单栏「紧急恢复直连」,确认无需重启电脑即恢复;③ app 退出后确认全系统联网正常;
+④ TCP 走代理的应用确认 QUIC(HTTP/3)不再直连泄漏(Wireshark 看 UDP 443)。

@@ -22,6 +22,7 @@ extension ProxyExtensionProvider {
         let disposition = UDPFlowPolicy.disposition(
             sourceIdentifier: sourceID,
             ownIdentifiers: ownIdentifiers,
+            matchRules: matchRules,
             perProcessRule: perProcessRules[sourceID],
             udpPolicy: udpPolicy,
             upstreamIsSOCKS5: active?.kind == .socks5

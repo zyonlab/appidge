@@ -18,6 +18,17 @@ public enum RuleMatcher {
         }
         return nil
     }
+
+    /// **app 维度**的首个命中:只考虑「主机 `*` 且端口任意」的 host-agnostic 规则(含 `assignRule`
+    /// 派生的「进程 × * × *」规则)。UDP flow 没有单一目的地,host/port 特定的规则对它没意义,
+    /// 直接跳过——命中与否只看进程 glob。给 ``UDPFlowPolicy`` 用。
+    public static func firstAppLevelMatch(_ rules: [MatchRuleDTO], app: String) -> ProxyRuleDTO? {
+        for rule in rules where rule.hostPattern == "*" && rule.portRange == nil
+            && Glob.matches(pattern: rule.appPattern, text: app) {
+            return rule.rule
+        }
+        return nil
+    }
 }
 
 /// 极简 glob:只支持 `*`(匹配任意长度任意字符,含点),大小写不敏感。经典贪心回溯,零依赖。

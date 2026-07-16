@@ -19,18 +19,23 @@ public enum UDPFlowPolicy {
     /// - Parameters:
     ///   - sourceIdentifier: flow 的来源进程身份(`sourceAppSigningIdentifier`)。
     ///   - ownIdentifiers: 我们自己组件的身份集合;命中则放行(转发环硬化,同 TCP)。
+    ///   - matchRules: 细粒度规则表——只有 **host-agnostic**(主机 `*`、端口任意)的规则参与
+    ///     UDP 决策(``RuleMatcher/firstAppLevelMatch(_:app:)``),host/port 特定的规则对没有
+    ///     单一目的地的 UDP flow 没意义。命中时**优先于**每进程规则(同 TCP 的求值顺序,规则表
+    ///     的置顶序即时间倒排)。修复:经规则表 proxied 的进程(UI 的主要入口)此前在这里被当作
+    ///     "无规则"直接放行,QUIC/UDP 绕过代理泄漏。
     ///   - perProcessRule: 该进程的每进程规则(nil = 无显式规则,按 direct)。
     ///   - udpPolicy: 全局 UDP 策略(仅对 `.proxied` 进程生效)。
     ///   - upstreamIsSOCKS5: 当前 active 上游是否 SOCKS5(只有 SOCKS5 能代理 UDP)。
     /// - Returns:
     ///   - 我们自己组件 / `.direct` / 无规则 → `.allowDirect`;
-    ///   - 每进程 `.block` → 永远 `.block`;
-    ///   - 每进程 `.proxied` → 按 `udpPolicy`:block→`.block`,direct→`.allowDirect`,
+    ///   - `.block` → 永远 `.block`;
+    ///   - `.proxied` → 按 `udpPolicy`:block→`.block`,direct→`.allowDirect`,
     ///     proxySOCKS5→上游是 SOCKS5 则 `.proxy`,否则 `.block`(没法代理就止漏)。
-    ///   UDP 无固定目的地,这里**不**评估 host/port 细粒度规则,只按每进程规则。
     public static func disposition(
         sourceIdentifier: String,
         ownIdentifiers: Set<String>,
+        matchRules: [MatchRuleDTO] = [],
         perProcessRule: ProxyRuleDTO?,
         udpPolicy: UDPPolicyDTO,
         upstreamIsSOCKS5: Bool
@@ -38,7 +43,8 @@ public enum UDPFlowPolicy {
         if ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourceIdentifier, ownIdentifiers: ownIdentifiers) {
             return .allowDirect
         }
-        switch perProcessRule {
+        let effectiveRule = RuleMatcher.firstAppLevelMatch(matchRules, app: sourceIdentifier) ?? perProcessRule
+        switch effectiveRule {
         case .some(.block):
             return .block
         case .some(.proxied):

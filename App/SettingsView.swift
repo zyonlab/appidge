@@ -35,6 +35,23 @@ struct SettingsView: View {
                 }
             }
 
+            Section("网络接管") {
+                LabeledContent("恢复出口") {
+                    HStack(spacing: 8) {
+                        Button("停止接管") {
+                            Task { await TransparentProxyController.stop() }
+                        }
+                        Button("重置（移除代理配置）", role: .destructive) {
+                            Task { await TransparentProxyController.reset() }
+                        }
+                    }
+                    .controlSize(.small)
+                }
+                Text("网络出问题时的恢复出口，无需重启电脑：「停止接管」结束当前会话，所有应用立即恢复原生直连；「重置」进一步把系统网络设置里的 appidge 代理配置整个移除（系统扩展保持安装）。重新开启接管：重启 app，或点上方「启用」。")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             Section("UDP / QUIC") {
                 Picker("代理进程的 UDP", selection: Binding(
                     get: { store.state.udpPolicy },

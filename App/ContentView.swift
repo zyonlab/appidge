@@ -118,7 +118,20 @@ struct MenuBarView: View {
 
             Divider()
 
-            // 5. 页脚:设置 + 退出。
+            // 5. 紧急恢复:浏览器等断网时的一键出口(停止会话 + 移除代理配置,全部应用立即恢复
+            //    原生直连,无需重启电脑)。放菜单栏是因为主窗口此时可能根本打不开/没人想找设置。
+            Button {
+                Task { await TransparentProxyController.reset() }
+            } label: {
+                Label("紧急恢复直连（重置接管）", systemImage: "exclamationmark.arrow.circlepath")
+            }
+            .buttonStyle(.borderless)
+            .font(.callout)
+            .help("停止接管并移除系统里的代理配置——浏览器等应用断网时的恢复出口，无需重启电脑。重启 app 可重新开启接管。")
+
+            Divider()
+
+            // 6. 页脚:设置 + 退出。
             HStack {
                 SettingsLink { Label("设置…", systemImage: "gearshape") }
                 Spacer()

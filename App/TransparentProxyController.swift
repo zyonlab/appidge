@@ -33,10 +33,56 @@ enum TransparentProxyController {
         }
     }
 
-    /// 停止会话(不删配置)。
+    /// 停止会话(不删配置)。没有活动会话 = 扩展不再收到任何 flow,所有应用立即恢复原生联网。
+    /// 之前只停缓存的 manager,本会话没 start 过(比如上次 app 异常退出后重开)就停了个寂寞——
+    /// 现在先 load 系统偏好里的配置再停,保证停的是真正在跑的那个会话。
     static func stop() async {
+        do {
+            let managers = try await NETransparentProxyManager.loadAllFromPreferences()
+            for mgr in managers {
+                mgr.connection.stopVPNTunnel()
+            }
+            if let cached = manager, managers.isEmpty {
+                cached.connection.stopVPNTunnel()
+            }
+            emit("stopVPNTunnel() called on \(managers.count) manager(s)")
+        } catch {
+            manager?.connection.stopVPNTunnel()
+            emit("stop: loadAllFromPreferences failed (\(error.localizedDescription)), stopped cached session only")
+        }
+    }
+
+    /// **紧急恢复(重置)**:停止会话并把 appidge 的透明代理配置从系统网络偏好里整个移除——
+    /// 拦截彻底解除,所有应用立即恢复原生联网,**无需重启电脑**(重启电脑"能修好"正是因为
+    /// 开机后没人再 startVPNTunnel;这里把同样的效果做成一个按钮,并且清掉配置本身)。
+    /// 系统扩展保持安装;重新开启接管 = 重启 app 或点「启用」(会重建配置,首次重建可能再弹一次
+    /// "添加 VPN/代理配置"授权)。
+    static func reset() async {
+        do {
+            let managers = try await NETransparentProxyManager.loadAllFromPreferences()
+            guard !managers.isEmpty else {
+                manager?.connection.stopVPNTunnel()
+                manager = nil
+                emit("reset: no saved managers; stopped cached session if any")
+                return
+            }
+            for mgr in managers {
+                mgr.connection.stopVPNTunnel()
+                try await mgr.removeFromPreferences()
+            }
+            manager = nil
+            emit("reset: stopped and removed \(managers.count) manager(s) — interception fully torn down")
+        } catch {
+            emit("RESET FAILED: \(error.localizedDescription)")
+        }
+    }
+
+    /// app 退出路径的同步兜底(`applicationWillTerminate` 里没法 await):直接停本会话缓存的
+    /// manager 的会话。宗旨:**UI 不在,接管就不该在**——规则没人管、出问题没人能停,catch-all
+    /// 拦截挂在系统上直到重启,正是"Chrome 断网只能重启电脑"的处境。配置保留,下次启动照常接管。
+    static func stopCachedSessionForTermination() {
         manager?.connection.stopVPNTunnel()
-        emit("stopVPNTunnel() called")
+        emit("stopVPNTunnel() on app termination")
     }
 
     /// 当前会话是否在跑(UI 可据此显示是否真正在接管流量)。

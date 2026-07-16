@@ -3,8 +3,19 @@ import Core
 import IPCContract
 import AppFeature
 
+/// 只为一件事存在:app 退出时同步停掉透明代理会话(SwiftUI 生命周期没有等价钩子)。
+/// UI 不在,接管就不该在——否则 catch-all 拦截挂在系统上没人能管,扩展一异常全系统断网,
+/// 用户只能重启电脑(见 TransparentProxyController.stopCachedSessionForTermination)。
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillTerminate(_ notification: Notification) {
+        TransparentProxyController.stopCachedSessionForTermination()
+    }
+}
+
 @main
 struct AppidgeApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var store: Store
     @State private var ipcReceiver: IPCReceiver
     @State private var profilesModel: ProfilesModel

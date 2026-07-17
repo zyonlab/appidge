@@ -14,6 +14,9 @@ public struct AppState: Sendable, Equatable {
     public var connectionLog: [ConnectionLogEntry]
     /// 主动环检测的当前告警(命中的目标标识);nil = 无告警。UI 据此弹提示,用户可 dismiss。
     public var loopWarning: String?
+    /// 用户已「忽略」过的环告警 signature——同一 signature 不再重复弹(运行时状态,不持久化;
+    /// 重启后同一问题若还在,再提醒一次是合理的)。
+    public var dismissedLoopSignatures: Set<String>
     /// 是否逐连接抓包落 `.dmp`(默认关——抓包占磁盘且涉隐私,显式开)。开关下发给扩展。
     public var isPacketCaptureEnabled: Bool
     /// proxied 进程的 UDP/QUIC 怎么处理(默认 `.block` 止漏)。下发给扩展。
@@ -41,6 +44,7 @@ public struct AppState: Sendable, Equatable {
         rules: [ProxyMatchRule] = [],
         connectionLog: [ConnectionLogEntry] = [],
         loopWarning: String? = nil,
+        dismissedLoopSignatures: Set<String> = [],
         isPacketCaptureEnabled: Bool = false,
         udpPolicy: UDPPolicy = .block,
         extensionActivation: ExtensionActivation = .inactive,
@@ -57,6 +61,7 @@ public struct AppState: Sendable, Equatable {
         self.rules = rules
         self.connectionLog = connectionLog
         self.loopWarning = loopWarning
+        self.dismissedLoopSignatures = dismissedLoopSignatures
         self.isPacketCaptureEnabled = isPacketCaptureEnabled
         self.udpPolicy = udpPolicy
         self.extensionActivation = extensionActivation

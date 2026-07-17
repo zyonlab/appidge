@@ -88,14 +88,19 @@ extension ProxyExtensionProvider {
         if let reason = hardBypassReason(sourceID: sourceID, sourcePath: sourcePath, hosts: candidates, port: port) {
             return (.bypass, reason)
         }
-        // ③ 解出动作:细粒度规则表(首个命中)优先于每进程规则;都没有 → 默认 .direct(策略 A:
-        //    默认就接管并直连计量,活动栏能看到每条连接,含本地代理自己的出站)。
-        let (action, ruleSource) = resolveAction(sourceID: sourceID, hosts: candidates, port: port)
-        // ④ 防环唯一约束:本地代理(xray/yunti)的流量**绝不能再代理回它**——解出 .proxied 就降级
-        //    成 .direct(照常接管+直连+展示,只是不转发去上游)。其余动作(direct/block/observe)原样生效。
-        if action == .proxied, isLocalProxyOrigin(sourceID: sourceID, sourcePath: sourcePath) {
-            return (.handle(.direct), "handle:local-proxy-direct(downgraded from proxied)")
+        // ③ 本地代理(xray/yunti)的流量**硬 bypass,完全不接管**。曾经的做法是"接管+降级直连"
+        //    (为了活动栏可见),真机第三次实锤这条路走不通:本地代理承载着全系统的代理流量,
+        //    它的每一字节都被扩展 pump 二次转发 = 全量放大——xray 高扇出时扩展 fd/临时端口/CPU
+        //    被放大耗尽,拨号开始失败,xray 重试风暴(同目标每秒上百条新连接,活动栏刷屏、
+        //    环检测器报警),最终扩展堵死、全系统断网,只能紧急恢复。可见性让位于稳定性:
+        //    看本地代理的吞吐,去「应用」表看聚合统计就够了(0.2.12 流量放大、0.2.14 双信号
+        //    排除、本次 0.2.24 三次事故同一根因,别再试第四次)。
+        if isLocalProxyOrigin(sourceID: sourceID, sourcePath: sourcePath) {
+            return (.bypass, "bypass:local-proxy-origin")
         }
+        // ④ 解出动作:细粒度规则表(首个命中)优先于每进程规则;都没有 → 默认 .direct(策略 A:
+        //    默认就接管并直连计量,活动栏能看到每条连接)。
+        let (action, ruleSource) = resolveAction(sourceID: sourceID, hosts: candidates, port: port)
         switch action {
         case .observe:
             return (.observe, "observe:\(ruleSource)")

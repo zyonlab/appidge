@@ -305,13 +305,9 @@ private extension Reducer {
     static func reduceSettings(_ state: AppState, _ action: Action) -> (AppState, [Effect])? {
         switch action {
         case .loopWarningRaised(let signature):
-            var state = state
-            state.loopWarning = signature
-            return (state, [])
+            return loopWarningRaised(signature, state)
         case .dismissLoopWarning:
-            var state = state
-            state.loopWarning = nil
-            return (state, [])
+            return dismissLoopWarning(state)
         case .resetState:
             return (AppState(), [])
         case .setPacketCaptureEnabled(let enabled):
@@ -342,6 +338,24 @@ private extension Reducer {
         default:
             return nil
         }
+    }
+
+    /// 用户已「忽略」过的 signature 不再重复弹(扩展侧检测器每次命中都会投递,不去重)。
+    static func loopWarningRaised(_ signature: String, _ state: AppState) -> (AppState, [Effect]) {
+        guard !state.dismissedLoopSignatures.contains(signature) else { return (state, []) }
+        var state = state
+        state.loopWarning = signature
+        return (state, [])
+    }
+
+    /// 关闭当前告警并记住它的 signature——同一问题不再打扰;重启后清零(运行时状态)。
+    static func dismissLoopWarning(_ state: AppState) -> (AppState, [Effect]) {
+        var state = state
+        if let signature = state.loopWarning {
+            state.dismissedLoopSignatures.insert(signature)
+        }
+        state.loopWarning = nil
+        return (state, [])
     }
 }
 

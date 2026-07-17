@@ -110,8 +110,13 @@ struct IPCReceiverTests {
             try? await Task.sleep(nanoseconds: 2_000_000)
         }
         #expect(loaded.map(\.id) == ["c1"])
-        // 同时确认既有内存链路没被影响:它也进了 store.state.connectionLog。
-        let inState = await MainActor.run { store.state.connectionLog.map(\.id) }
+        // 连接事件走 ~250ms 合并窗口(压连接表重渲染频率),轮询等它 flush 进内存日志。
+        var inState: [String] = []
+        for _ in 0..<200 {
+            inState = await MainActor.run { store.state.connectionLog.map(\.id) }
+            if !inState.isEmpty { break }
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
         #expect(inState == ["c1"])
     }
 

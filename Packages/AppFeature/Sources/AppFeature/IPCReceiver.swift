@@ -20,36 +20,73 @@ public final class IPCReceiver {
     /// nil 则只走内存(既有行为),现有测试不受影响。
     private let connectionLogFileStore: ConnectionLogFileStore?
 
+    /// 连接事件合并窗口:代理流量稳定时扩展每秒投很多条连接事件,逐条 dispatch 会让昂贵的
+    /// 连接表(500 行 filter+sort+layout)每条都重渲染(真机采样实锤 app CPU 大头)。这里
+    /// 按 `coalesceWindow` 攒一批、一次性 `.connectionEventsReceived` 落地——Table 重渲染频率
+    /// 与事件速率解耦(与扩展侧 flowStats 批量推送同一套架构思路)。其余消息类型立即 dispatch。
+    private let coalesceWindow: Duration
+    private var pendingConnectionEntries: [Core.ConnectionLogEntry] = []
+    private var flushTask: Task<Void, Never>?
+
     public init(
         store: Store,
         transport: any AppSideTransport,
-        connectionLogFileStore: ConnectionLogFileStore? = nil
+        connectionLogFileStore: ConnectionLogFileStore? = nil,
+        coalesceWindow: Duration = .milliseconds(250)
     ) {
         self.store = store
         self.transport = transport
         self.connectionLogFileStore = connectionLogFileStore
+        self.coalesceWindow = coalesceWindow
     }
 
     public func start() async {
         let dispatch: @MainActor (Core.Action) -> Void = { [weak self] action in
             self?.store.dispatch(action)
         }
+        let enqueue: @MainActor (Core.ConnectionLogEntry) -> Void = { [weak self] entry in
+            self?.enqueueConnectionEntry(entry)
+        }
         let fileStore = connectionLogFileStore
         await transport.startListening { message in
             let actions = ExtensionMessageHandling.actions(for: message)
             Task {
                 for action in actions {
-                    await dispatch(action)
-                    // 连接事件除了进内存日志,也落盘一份,好让重启后能 loadRecent 回灌。
+                    // 连接事件走合并窗口(降低连接表重渲染频率);其余立即 dispatch。
                     if case .connectionEventReceived(let entry) = action {
+                        await enqueue(entry)
                         await fileStore?.append(entry)
+                    } else {
+                        await dispatch(action)
                     }
                 }
             }
         }
     }
 
+    /// 攒入一条连接事件,并确保有一个在窗口末尾统一 flush 的任务在跑(已在跑就不重排)。
+    private func enqueueConnectionEntry(_ entry: Core.ConnectionLogEntry) {
+        pendingConnectionEntries.append(entry)
+        guard flushTask == nil else { return }
+        flushTask = Task { [weak self] in
+            try? await Task.sleep(for: self?.coalesceWindow ?? .milliseconds(250))
+            self?.flushPendingConnectionEntries()
+        }
+    }
+
+    /// 把攒下的连接事件作为**一个**批量 action 落地(一次 state 变更 → 连接表只重渲染一次)。
+    private func flushPendingConnectionEntries() {
+        flushTask = nil
+        guard !pendingConnectionEntries.isEmpty else { return }
+        let batch = pendingConnectionEntries
+        pendingConnectionEntries.removeAll(keepingCapacity: true)
+        store.dispatch(.connectionEventsReceived(batch))
+    }
+
     public func stop() async {
+        flushTask?.cancel()
+        flushTask = nil
+        flushPendingConnectionEntries()
         await transport.stopListening()
     }
 }

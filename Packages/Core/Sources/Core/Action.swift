@@ -21,6 +21,9 @@ public enum Action: Sendable, Equatable {
     /// 启用/停用一条规则(保留在表里,不删除)。禁用的规则下发前被过滤,永不参与匹配。
     case setMatchRuleEnabled(id: RuleID, enabled: Bool)
     case connectionEventReceived(ConnectionLogEntry)
+    /// 一批连接事件一次落地(IPCReceiver 按 ~250ms 合并推来,压掉连接表的高频重渲染)。
+    /// 语义等价于逐条 `connectionEventReceived`,只是单次 state 变更。
+    case connectionEventsReceived([ConnectionLogEntry])
     /// 用户在「活动」页手动清空连接日志(不影响 `processes` 的累计流量/规则——只清这张表)。
     case clearConnectionLog
     /// 扩展主动检测到疑似转发环(signature = 命中目标;processID/executablePath = 触发那条 flow

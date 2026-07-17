@@ -27,8 +27,16 @@ public enum UDPFlowPolicy {
     ///   - perProcessRule: 该进程的每进程规则(nil = 无显式规则,按 direct)。
     ///   - udpPolicy: 全局 UDP 策略(仅对 `.proxied` 进程生效)。
     ///   - upstreamIsSOCKS5: 当前 active 上游是否 SOCKS5(只有 SOCKS5 能代理 UDP)。
+    ///   - host/port: flow 的初始远端(`handleNewUDPFlow(_:initialRemoteFlowEndpoint:)` 给的;
+    ///     解析不出时为 nil,跳过目的地类硬闸)。**目的地硬闸先于一切规则**(真机实锤 0.2.20):
+    ///     - **端口 53(DNS)永远放行直连**——`mDNSResponder` 是全系统共享的解析器,一条
+    ///       `*→*→代理` 通配规则(user case 的"默认全走代理"就是它)会命中它,UDP 默认
+    ///       「拦截止漏」就把全系统 DNS 静默丢包,所有应用一律 timeout,系统直接残废。
+    ///       DNS 防泄漏该走"TCP 侧 DNS-over-proxy(域名交给代理解析)",不该靠掐死系统解析器。
+    ///     - 回环 / 私网&链路本地 / 组播&广播:本地基础设施(mDNS/SSDP/DHCP/局域网),与 TCP 侧
+    ///       hardBypassReason 的地址类硬闸对称。
     /// - Returns:
-    ///   - 我们自己组件 / `.direct` / 无规则 → `.allowDirect`;
+    ///   - 我们自己组件 / 目的地硬闸 / `.direct` / 无规则 → `.allowDirect`;
     ///   - `.block` → 永远 `.block`;
     ///   - `.proxied` → 按 `udpPolicy`:block→`.block`,direct→`.allowDirect`,
     ///     proxySOCKS5→上游是 SOCKS5 则 `.proxy`,否则 `.block`(没法代理就止漏)。
@@ -38,10 +46,18 @@ public enum UDPFlowPolicy {
         matchRules: [MatchRuleDTO] = [],
         perProcessRule: ProxyRuleDTO?,
         udpPolicy: UDPPolicyDTO,
-        upstreamIsSOCKS5: Bool
+        upstreamIsSOCKS5: Bool,
+        host: String? = nil,
+        port: UInt16? = nil
     ) -> Disposition {
         if ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourceIdentifier, ownIdentifiers: ownIdentifiers) {
             return .allowDirect
+        }
+        if port == 53 { return .allowDirect }
+        if let host {
+            if LoopbackDetector.isLoopback(host: host) { return .allowDirect }
+            if PrivateNetworkExclusion.isPrivateNetwork(host: host) { return .allowDirect }
+            if NonUnicastExclusion.isNonUnicast(host: host) { return .allowDirect }
         }
         let effectiveRule = RuleMatcher.firstAppLevelMatch(matchRules, app: sourceIdentifier) ?? perProcessRule
         switch effectiveRule {

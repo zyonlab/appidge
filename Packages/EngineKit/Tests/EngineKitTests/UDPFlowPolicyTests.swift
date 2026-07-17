@@ -95,4 +95,40 @@ struct UDPFlowPolicyTests {
     func ownBypassBeatsMatchRules() {
         #expect(d(nil, .block, source: "com.appidge.app", matchRules: [rule("*", .proxied)]) == .allowDirect)
     }
+
+    // MARK: - 目的地硬闸(真机 0.2.20:通配代理规则 + block 策略把系统 DNS 丢包,全网 timeout)
+
+    /// 通配「走代理」规则 + block 策略下,对给定目的地的判定——目的地硬闸就是在这种最严酷的
+    /// 配置下也必须放行本地基础设施。
+    private func dst(_ host: String?, _ port: UInt16?) -> UDPFlowPolicy.Disposition {
+        UDPFlowPolicy.disposition(
+            sourceIdentifier: "com.apple.mDNSResponder", ownIdentifiers: own,
+            matchRules: [rule("*", .proxied)], perProcessRule: nil, udpPolicy: .block, upstreamIsSOCKS5: true,
+            host: host, port: port
+        )
+    }
+
+    @Test("DNS(端口 53)永远放行直连——即便通配代理规则 + block 策略命中,系统解析器不能死")
+    func dnsAlwaysAllowedDirect() {
+        #expect(dst("8.8.8.8", 53) == .allowDirect)
+        #expect(dst("192.168.1.1", 53) == .allowDirect)
+        // 没有 host 也一样:端口足以判定。
+        #expect(dst(nil, 53) == .allowDirect)
+    }
+
+    @Test("回环 / 私网&链路本地 / 组播&广播目的地放行直连(本地基础设施,同 TCP 侧地址硬闸)")
+    func localInfrastructureAllowedDirect() {
+        #expect(dst("127.0.0.1", 5000) == .allowDirect)
+        #expect(dst("192.168.1.20", 137) == .allowDirect)   // NetBIOS/局域网
+        #expect(dst("169.254.10.10", 5353) == .allowDirect)
+        #expect(dst("224.0.0.251", 5353) == .allowDirect)   // mDNS
+        #expect(dst("255.255.255.255", 67) == .allowDirect) // DHCP
+        #expect(dst("ff02::fb", 5353) == .allowDirect)
+    }
+
+    @Test("公网非 53 端口不受目的地硬闸豁免——QUIC 443 照样按规则/策略拦截止漏")
+    func publicQUICStillBlocked() {
+        #expect(dst("142.250.0.1", 443) == .block)
+        #expect(dst(nil, nil) == .block) // 解析不出目的地时按规则/策略走(保守不豁免)
+    }
 }

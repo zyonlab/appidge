@@ -1039,3 +1039,28 @@ xcodebuild Debug BUILD SUCCEEDED,swiftlint --strict 0 违规。
 **待人工回填(真机)**:① 装上 0.2.20 复现原 Chrome 断网场景,确认第 6 项后不再出现;
 ② 断网时点菜单栏「紧急恢复直连」,确认无需重启电脑即恢复;③ app 退出后确认全系统联网正常;
 ④ TCP 走代理的应用确认 QUIC(HTTP/3)不再直连泄漏(Wireshark 看 UDP 443)。
+
+---
+
+## Phase 15(0.2.22):真机三连修——UDP 掐死系统 DNS / 规则页与活动页失联 / 扩展停用时 app 空转
+
+真机 0.2.21 反馈的三个问题,全部实锤修复:
+
+1. **Chrome 全网 timeout,关掉扩展就好(最严重)**:`*→*→代理` 通配规则命中 `mDNSResponder`,
+   UDP 默认「拦截止漏」把系统 DNS(UDP 53)接管后静默丢包 → 全系统解析失败。UDP 路径此前没有
+   任何目的地类硬闸。修:conform `NEAppProxyUDPFlowHandling`(macOS 15 overlay,注意**不是
+   override**,是协议 conformance)拿到 initialRemoteFlowEndpoint;UDPFlowPolicy 目的地硬闸
+   先于一切规则——端口 53 永远直连、回环/私网&链路本地/组播&广播(新增 NonUnicastExclusion)
+   放行、UDP 发往上游豁免(防环)。
+2. **规则页删规则,应用表不同步**:MonitoredProcess.rule 快照既做展示又做 assignments 下发,
+   删掉派生规则后扩展兜底仍按旧快照路由。修:规则表 = 唯一路由真相(assignments 恒为空);
+   「应用」表规则列经 Core.EffectiveAppRule 从规则表推导(glob 是 EngineKit.Glob 的镜像,
+   两侧测试互相钉住,B2 不变量禁止互相依赖所以不是复用)。
+3. **扩展在系统设置停用后 app 本体 101% CPU**(上一小节 0.2.21 已修,本轮验证):XPC 重连
+   指数退避(1s→…→30s 封顶)+ 冷却期丢弃发送 + 收到扩展消息即归零;启动 propertiesRequest
+   查真实状态,新增 ExtensionActivation.disabled,三处 UI 显示「扩展已停用 · 系统设置里开启」。
+
+**待人工回填(真机 0.2.22)**:① 保持 *→*→代理 通配规则 + 扩展启用,确认网页正常打开、
+`dig example.com` 正常;② TCP 走代理的应用 QUIC(UDP 443)仍被拦截止漏(Wireshark);
+③ 规则页删规则/停用规则,「应用」表立刻回落;④ 系统设置停用扩展,app CPU 归零、状态栏显示
+「扩展已停用」;重新启用后 ≤30s 自动恢复接管。

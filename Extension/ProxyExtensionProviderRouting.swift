@@ -99,13 +99,14 @@ extension ProxyExtensionProvider {
         if let reason = addressBypassReason(hosts: candidates, port: port) {
             return (.bypass, reason)
         }
-        // ④ 本地代理(xray/yunti,直连档):**接管 + 强制直连**——活动栏可见、有真实字节数
-        //    (对齐 Proxifier 的 auto-created Direct 规则),但绝不代理回它自己(那才是环)。
-        //    历史教训(0.2.12/0.2.24):早年两次"接管本地代理"事故的真凶是当时数据面的
-        //    热路径地雷(逐 chunk 上游探活、逐 flow UserDefaults 全量重写)+ 升级窗口的真环,
-        //    如今都已根治;若仍有环,②的自愈档会把它降到完全旁路(LoopDetector → app 回推)。
+        // ④ 本地代理(xray/yunti):**观测**——登记连接让活动栏可见(它连了哪里),但**绝不接管
+        //    数据通路**。这不是保守,是架构决定的硬约束:本地代理是全系统代理流量的**汇聚点**,
+        //    「接管+直连」意味着所有经它代理的应用的每一字节都要被我们的 pump 二次读写 =
+        //    把全系统代理吞吐翻倍过一遍扩展进程(0.2.12/0.2.24/0.2.30 三次同根因事故都是这个;
+        //    Proxifier 能显示 xray「Direct」是注入式拦截、Direct 零开销,与我们重写字节的语义不同)。
+        //    可见性用零开销的观测通道拿,字节吞吐去「应用」表看聚合统计。
         if isLocalProxyOrigin(sourceID: sourceID, sourcePath: sourcePath) {
-            return (.handle(.direct), "handle:local-proxy-direct")
+            return (.observe, "observe:local-proxy-origin")
         }
         // ⑤ 解出动作:细粒度规则表(首个命中)优先于每进程规则;都没有 → 默认 .direct(策略 A:
         //    默认就接管并直连计量,活动栏能看到每条连接)。

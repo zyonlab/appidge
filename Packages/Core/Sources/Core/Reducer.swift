@@ -230,17 +230,20 @@ public enum Reducer {
     }
 
     /// 全量重推当前配置给扩展——state 原样不动,只产出一串"把现状推下去"的 effect。
-    /// 顺序固定(便于测试断言 + 确定性):规则集 → 代理配置 → 路由模式 → 抓包 → UDP 策略 → 排除名单。
+    /// 顺序固定(便于测试断言 + 确定性):**排除名单 → 代理配置 → 路由模式 → 抓包 → UDP 策略
+    /// → 规则集(最后)**。排除名单必须先落地、规则集最后放行:扩展升级/重启后的第一波 flow
+    /// 若在排除缺席时先收到通配「走代理」规则,本地代理的出站会被短暂代理回它自己——真机实锤的
+    /// 秒级真环窗口(活动栏里 xray 走「代理·SOCKS5」那批)。
     /// 每一条都用现有的推送 effect(和用户改动时走的是同一批),扩展侧幂等接收。
     /// 用途见 `Action.resyncExtension`:XPC(重)连上、或启动恢复完成后触发一次。
     private static func resyncExtension(_ state: AppState) -> (AppState, [Effect]) {
         (state, [
-            ruleSetPush(state),
+            .applyProcessOriginExclusions(state.combinedOriginExclusions),
             proxyConfigPush(state),
             .applyRoutingMode(state.proxyRoutingMode),
             .applyPacketCapture(state.isPacketCaptureEnabled),
             .applyUDPPolicy(state.udpPolicy),
-            .applyProcessOriginExclusions(state.combinedOriginExclusions)
+            ruleSetPush(state)
         ])
     }
 
@@ -353,7 +356,10 @@ private extension Reducer {
         var effects: [Effect] = []
 
         var exclusions = state.loopAutoExclusions
-        if let processID { exclusions.identifiers.insert(processID.value) }
+        // a.out 一类无法区分软件的标识不进 identifier 集(会连坐所有未签名 CLI),只收路径信号。
+        if let processID, !OriginExclusionDiscovery.isAmbiguousIdentifier(processID.value) {
+            exclusions.identifiers.insert(processID.value)
+        }
         if let executablePath { exclusions.executablePaths.insert(executablePath) }
         if exclusions != state.loopAutoExclusions {
             state.loopAutoExclusions = exclusions

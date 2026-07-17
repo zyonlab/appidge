@@ -14,4 +14,13 @@ public struct OriginExclusionDiscovery: Sendable, Equatable {
         self.identifiers = identifiers
         self.executablePaths = executablePaths
     }
+
+    /// 这个"签名标识"是否**无法区分具体软件**:未签名/ad-hoc 二进制在
+    /// `sourceAppSigningIdentifier` 上常报成链接器默认的 `a.out`——xray 和任何未签名 CLI
+    /// (node/npx、自编译工具)共享这个标识。拿它进 identifier 排除集会把无关进程一起旁路
+    /// (真机实锤:xray 被排除后,npx 因同为 a.out 而被连坐、从活动里消失且不走代理)。
+    /// 这类标识**只能**靠可执行文件路径那一路信号做排除;发现器与环自愈在建集合时都要过这道滤。
+    public static func isAmbiguousIdentifier(_ value: String) -> Bool {
+        value.isEmpty || value == "a.out"
+    }
 }

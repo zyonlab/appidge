@@ -84,21 +84,30 @@ extension ProxyExtensionProvider {
         sourceID: String, sourcePath: String?, host: String?, hostname: String?, port: UInt16?
     ) -> (TCPFlowDecision, String) {
         let candidates = hostCandidates(host: host, hostname: hostname)
-        // ①② 硬边界:自身组件 + 地址类(回环/私网/上游)—— 一律 .bypass,不接管、活动栏不可见。
-        if let reason = hardBypassReason(sourceID: sourceID, sourcePath: sourcePath, hosts: candidates, port: port) {
+        // ① 自身组件硬 bypass(接管自己必然自套死循环),连观测都不做。
+        if let reason = selfBypassReason(sourceID: sourceID, sourcePath: sourcePath) {
             return (.bypass, reason)
         }
-        // ③ 本地代理(xray/yunti)的流量**硬 bypass,完全不接管**。曾经的做法是"接管+降级直连"
-        //    (为了活动栏可见),真机第三次实锤这条路走不通:本地代理承载着全系统的代理流量,
-        //    它的每一字节都被扩展 pump 二次转发 = 全量放大——xray 高扇出时扩展 fd/临时端口/CPU
-        //    被放大耗尽,拨号开始失败,xray 重试风暴(同目标每秒上百条新连接,活动栏刷屏、
-        //    环检测器报警),最终扩展堵死、全系统断网,只能紧急恢复。可见性让位于稳定性:
-        //    看本地代理的吞吐,去「应用」表看聚合统计就够了(0.2.12 流量放大、0.2.14 双信号
-        //    排除、本次 0.2.24 三次事故同一根因,别再试第四次)。
-        if isLocalProxyOrigin(sourceID: sourceID, sourcePath: sourcePath) {
-            return (.bypass, "bypass:local-proxy-origin")
+        // ② 回环 × 配置过的上游端口 = 有进程在直接使用本地代理(终端里 HTTP_PROXY 环境变量下的
+        //    curl/npx 就是这形态)——数据通路绝不能接管(那是本地代理的入口,接管即二次转发),
+        //    但记一条**观测**事件让活动栏看得见"谁在用代理"(Proxifier 的 Localhost 规则同样
+        //    在 Connections 里可见)。其余回环/私网/上游流量仍是安静的硬 bypass(基础设施噪声)。
+        if let port, candidates.contains(where: { LoopbackDetector.isLoopback(host: $0) }),
+           configuredUpstreamPorts.contains(port) {
+            return (.observe, "observe:loopback-upstream")
         }
-        // ④ 解出动作:细粒度规则表(首个命中)优先于每进程规则;都没有 → 默认 .direct(策略 A:
+        // ③ 地址类硬闸(回环/私网/上游)—— 一律 .bypass,不接管、活动栏不可见。
+        if let reason = addressBypassReason(hosts: candidates, port: port) {
+            return (.bypass, reason)
+        }
+        // ④ 本地代理(xray/yunti)的流量:**观测**——不接管数据通路(它承载全系统代理流量,
+        //    接管即全量二次转发放大,真机三次实锤会把扩展拖死:0.2.12 流量放大、0.2.14 双信号
+        //    排除、0.2.24 断网,同一根因),但记观测事件让它在活动栏可见(用户明确要求:
+        //    Proxifier 一直看得到 xray)。零转发开销,只有每连接一条事件。
+        if isLocalProxyOrigin(sourceID: sourceID, sourcePath: sourcePath) {
+            return (.observe, "observe:local-proxy-origin")
+        }
+        // ⑤ 解出动作:细粒度规则表(首个命中)优先于每进程规则;都没有 → 默认 .direct(策略 A:
         //    默认就接管并直连计量,活动栏能看到每条连接)。
         let (action, ruleSource) = resolveAction(sourceID: sourceID, hosts: candidates, port: port)
         switch action {
@@ -109,12 +118,14 @@ extension ProxyExtensionProvider {
         }
     }
 
-    /// 硬边界:命中就永远 `.bypass`(返回原因标签),不受任何规则影响。
-    /// - 自身组件(app/扩展本体):接管自己必然自套死循环。只比对静态的 `selfXxx`,**不含**本地代理
-    ///   (后者在策略 A 下要接管展示,只是禁止代理出去,见 `resolveDecision` ④)。
-    /// - 回环 / 私网 / 上游:基础设施噪声 + 防环,与来源无关。hostname/endpoint host 两个候选
-    ///   各判一次(任一命中即 bypass):上游若按域名配置、flow 端点却是 IP(或反之)也兜得住。
-    private func hardBypassReason(sourceID: String, sourcePath: String?, hosts: [String], port: UInt16?) -> String? {
+    /// 配置过的上游端口集合(回环 × 上游端口 → 观测,见 `resolveDecision` ②)。
+    private var configuredUpstreamPorts: Set<UInt16> {
+        Set((proxyConfig?.servers ?? []).map(\.port))
+    }
+
+    /// 自身组件(app/扩展本体)硬边界:接管自己必然自套死循环。只比对静态的 `selfXxx`,
+    /// **不含**本地代理(后者观测展示,见 `resolveDecision` ④)。
+    private func selfBypassReason(sourceID: String, sourcePath: String?) -> String? {
         if ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourceID, ownIdentifiers: selfIdentifiers) {
             return "bypass:self-identifier"
         }
@@ -122,6 +133,12 @@ extension ProxyExtensionProvider {
            ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourcePath, ownIdentifiers: selfExecutablePaths) {
             return "bypass:self-path(\(sourcePath))"
         }
+        return nil
+    }
+
+    /// 地址类硬边界:回环 / 私网 / 上游——基础设施噪声 + 防环,与来源无关。hostname/endpoint host
+    /// 两个候选各判一次(任一命中即 bypass):上游若按域名配置、flow 端点却是 IP(或反之)也兜得住。
+    private func addressBypassReason(hosts: [String], port: UInt16?) -> String? {
         guard let port, !hosts.isEmpty else { return nil }
         let upstreams = Set((proxyConfig?.servers ?? []).map { UpstreamEndpoint(host: $0.host, port: $0.port) })
         for host in hosts {

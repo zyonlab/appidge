@@ -48,8 +48,12 @@ public enum LocalProxyOriginDiscovery {
             return Core.OriginExclusionDiscovery()
         }
 
+        // `a.out` 一类无法区分软件的标识不进 identifier 集(会连坐所有未签名 CLI,
+        // 见 `OriginExclusionDiscovery.isAmbiguousIdentifier`),路径信号照常保留。
+        let identifier = identity.signingIdentifier
+            .flatMap { Core.OriginExclusionDiscovery.isAmbiguousIdentifier($0) ? nil : $0 }
         return Core.OriginExclusionDiscovery(
-            identifiers: identity.signingIdentifier.map { [$0] } ?? [],
+            identifiers: identifier.map { [$0] } ?? [],
             executablePaths: identity.executablePath.map { [$0] } ?? []
         )
     }

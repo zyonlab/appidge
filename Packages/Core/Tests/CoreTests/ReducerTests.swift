@@ -162,7 +162,8 @@ struct ReducerTests {
         #expect(effects == [.applyRuleSet(assignments: [:], matchRules: [])])
 
         let (_, resyncEffects) = Reducer.reduce(state, .resyncExtension)
-        #expect(resyncEffects.first == .applyRuleSet(assignments: [:], matchRules: []))
+        // resync 顺序契约:规则集在末位(排除名单先行,见 resyncExtension 注释)。
+        #expect(resyncEffects.last == .applyRuleSet(assignments: [:], matchRules: []))
     }
 
     @Test("extension becoming active again restores engine health and re-pushes the real rule set")

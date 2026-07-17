@@ -221,9 +221,9 @@ struct AppidgeApp: App {
         case .applyUDPPolicy(let policy):
             await transport.send(ProxyConfigMapping.udpPolicyMessage(policy))
             return nil // 纯下发，扩展据此在拦截/直连/SOCKS5 代理之间切换 UDP 处理
-        case .applyProcessOriginExclusions(let discovery):
-            await transport.send(ProxyConfigMapping.processOriginExclusionsMessage(discovery))
-            return nil // 纯下发，扩展据此把这些签名标识/可执行文件路径并进「来源进程自动排除」集合
+        case .applyProcessOriginExclusions(let direct, let hardBypass):
+            await transport.send(ProxyConfigMapping.processOriginExclusionsMessage(direct: direct, hardBypass: hardBypass))
+            return nil // 纯下发，扩展据此更新两档来源排除(直连档 / 完全旁路档)
         case .clearConnectionLogFile:
             await connectionLogFileStore.clear()
             return nil // 内存里的 connectionLog 已经在 reducer 里清空了,这里只清磁盘那份

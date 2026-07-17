@@ -38,11 +38,14 @@ public enum ProxyConfigMapping {
     /// 把动态发现的本地代理进程身份(签名标识 + 可执行文件路径)翻成 `applyProcessOriginExclusions`
     /// 消息。`Set` 无序,wire 上用 `[String]` 承载(和其它列表型 DTO 一致),顺序不作约定。
     public static func processOriginExclusionsMessage(
-        _ discovery: Core.OriginExclusionDiscovery
+        direct: Core.OriginExclusionDiscovery,
+        hardBypass: Core.OriginExclusionDiscovery
     ) -> IPCContract.AppToExtensionMessage {
         .applyProcessOriginExclusions(IPCContract.ProcessOriginExclusionMessage(
-            identifiers: Array(discovery.identifiers),
-            executablePaths: Array(discovery.executablePaths)
+            identifiers: Array(direct.identifiers),
+            executablePaths: Array(direct.executablePaths),
+            hardBypassIdentifiers: Array(hardBypass.identifiers),
+            hardBypassExecutablePaths: Array(hardBypass.executablePaths)
         ))
     }
 

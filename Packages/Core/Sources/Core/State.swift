@@ -30,16 +30,14 @@ public struct AppState: Sendable, Equatable {
     public var dynamicOriginExclusion: OriginExclusionDiscovery
     /// **环检测自愈**加入的排除:扩展报告疑似转发环时,把触发 flow 的来源进程双信号自动收进来
     /// (对齐 Proxifier「检测到环 → 自动建该进程 Direct 置顶规则」的行为)。与 `dynamicOriginExclusion`
-    /// 分开存——后者每次 applyProxyConfig 都会被发现结果**整体替换**,自愈加的不能被冲掉。
-    /// 下发时两者取并集(见 `combinedOriginExclusions`)。运行时状态,不持久化。
+    /// 分开存——后者每次 applyProxyConfig 都会被发现结果**整体替换**,自愈加的不能被冲掉;
+    /// 语义也不同档:发现档 = 接管+强制直连(可见),自愈档 = 完全旁路(最保守,当场断环)。
+    /// 运行时状态,不持久化。
     public var loopAutoExclusions: OriginExclusionDiscovery
 
-    /// 下发给扩展的完整来源排除 = 端口发现的 ∪ 环检测自愈的。
-    public var combinedOriginExclusions: OriginExclusionDiscovery {
-        OriginExclusionDiscovery(
-            identifiers: dynamicOriginExclusion.identifiers.union(loopAutoExclusions.identifiers),
-            executablePaths: dynamicOriginExclusion.executablePaths.union(loopAutoExclusions.executablePaths)
-        )
+    /// 下发给扩展的两档排除(直连档 = 端口发现;完全旁路档 = 环自愈)。
+    public var originExclusionsPush: Effect {
+        .applyProcessOriginExclusions(direct: dynamicOriginExclusion, hardBypass: loopAutoExclusions)
     }
 
     /// 连接日志保留的最大条数;超出丢最旧。

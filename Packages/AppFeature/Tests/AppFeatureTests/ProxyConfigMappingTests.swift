@@ -95,18 +95,21 @@ struct ProxyConfigMappingTests {
             identifiers: ["com.example.xray", "com.example.v2ray"],
             executablePaths: ["/usr/local/bin/xray"]
         )
-        let message = ProxyConfigMapping.processOriginExclusionsMessage(discovery)
+        let message = ProxyConfigMapping.processOriginExclusionsMessage(
+            direct: discovery, hardBypass: Core.OriginExclusionDiscovery(executablePaths: ["/opt/loop"])
+        )
         guard case .applyProcessOriginExclusions(let payload) = message else {
             Issue.record("expected applyProcessOriginExclusions envelope")
             return
         }
         #expect(Set(payload.identifiers) == ["com.example.xray", "com.example.v2ray"])
         #expect(Set(payload.executablePaths) == ["/usr/local/bin/xray"])
+        #expect(Set(payload.hardBypassExecutablePaths) == ["/opt/loop"])
     }
 
     @Test("processOriginExclusionsMessage on an empty discovery maps to empty lists")
     func processOriginExclusionsMappingEmpty() {
-        let message = ProxyConfigMapping.processOriginExclusionsMessage(Core.OriginExclusionDiscovery())
+        let message = ProxyConfigMapping.processOriginExclusionsMessage(direct: Core.OriginExclusionDiscovery(), hardBypass: Core.OriginExclusionDiscovery())
         #expect(message == .applyProcessOriginExclusions(ProcessOriginExclusionMessage(identifiers: [], executablePaths: [])))
     }
 

@@ -19,7 +19,7 @@ struct LoopWarningReducerTests {
         #expect(state.loopWarning == "1.2.3.4:443")
         #expect(state.loopAutoExclusions.identifiers == ["com.example.yunti"])
         #expect(state.loopAutoExclusions.executablePaths == ["/opt/xray"])
-        #expect(effects == [.applyProcessOriginExclusions(state.combinedOriginExclusions)])
+        #expect(effects == [state.originExclusionsPush])
     }
 
     @Test("同一来源重复上报:排除已收录,不重推(幂等)")
@@ -50,7 +50,7 @@ struct LoopWarningReducerTests {
         (state, effects) = raise(state, processID: "another", path: "/opt/other")
         #expect(state.loopWarning == nil)
         #expect(state.loopAutoExclusions.identifiers.contains("another"))
-        #expect(effects == [.applyProcessOriginExclusions(state.combinedOriginExclusions)])
+        #expect(effects == [state.originExclusionsPush])
 
         // 新 signature 是新问题,照常提醒。
         (state, _) = raise(state, signature: "5.6.7.8:443", processID: nil, path: nil)
@@ -65,18 +65,21 @@ struct LoopWarningReducerTests {
         (state, effects) = Reducer.reduce(state, .proxyProcessIdentitiesResolved(discovery))
         #expect(state.dynamicOriginExclusion == discovery)
         #expect(state.loopAutoExclusions.identifiers == ["com.example.yunti"])
-        #expect(effects == [.applyProcessOriginExclusions(OriginExclusionDiscovery(
-            identifiers: ["com.example.yunti"],
-            executablePaths: ["/opt/yunti", "/opt/xray"]
-        ))])
+        // 两档分开下发:发现档整体替换,自愈档独立保留。
+        #expect(effects == [.applyProcessOriginExclusions(
+            direct: discovery,
+            hardBypass: OriginExclusionDiscovery(
+                identifiers: ["com.example.yunti"], executablePaths: ["/opt/xray"]
+            )
+        )])
     }
 
     @Test("resync 下发的排除名单也是并集,且排在首位(防环信号先行)")
     func resyncPushesCombined() {
         let (state, _) = raise(AppState())
         let (_, effects) = Reducer.reduce(state, .resyncExtension)
-        #expect(effects.first == .applyProcessOriginExclusions(state.combinedOriginExclusions))
-        #expect(state.combinedOriginExclusions.identifiers.contains("com.example.yunti"))
+        #expect(effects.first == state.originExclusionsPush)
+        #expect(state.loopAutoExclusions.identifiers.contains("com.example.yunti"))
     }
 
     @Test("a.out 一类无法区分软件的标识不进 identifier 排除集(避免连坐未签名 CLI),路径照常")
@@ -84,7 +87,7 @@ struct LoopWarningReducerTests {
         let (state, effects) = raise(AppState(), processID: "a.out", path: "/opt/xray/xray")
         #expect(state.loopAutoExclusions.identifiers.isEmpty)
         #expect(state.loopAutoExclusions.executablePaths == ["/opt/xray/xray"])
-        #expect(effects == [.applyProcessOriginExclusions(state.combinedOriginExclusions)])
+        #expect(effects == [state.originExclusionsPush])
     }
 
     @Test("无告警时 dismiss 是纯 no-op(不误记任何 signature)")

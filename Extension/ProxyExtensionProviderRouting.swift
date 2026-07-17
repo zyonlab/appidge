@@ -84,28 +84,28 @@ extension ProxyExtensionProvider {
         sourceID: String, sourcePath: String?, host: String?, hostname: String?, port: UInt16?
     ) -> (TCPFlowDecision, String) {
         let candidates = hostCandidates(host: host, hostname: hostname)
-        // ① 自身组件硬 bypass(接管自己必然自套死循环),连观测都不做。
+        // ① 自身组件硬 bypass(接管自己必然自套死循环)。
         if let reason = selfBypassReason(sourceID: sourceID, sourcePath: sourcePath) {
             return (.bypass, reason)
         }
-        // ② 回环 × 配置过的上游端口 = 有进程在直接使用本地代理(终端里 HTTP_PROXY 环境变量下的
-        //    curl/npx 就是这形态)——数据通路绝不能接管(那是本地代理的入口,接管即二次转发),
-        //    但记一条**观测**事件让活动栏看得见"谁在用代理"(Proxifier 的 Localhost 规则同样
-        //    在 Connections 里可见)。其余回环/私网/上游流量仍是安静的硬 bypass(基础设施噪声)。
-        if let port, candidates.contains(where: { LoopbackDetector.isLoopback(host: $0) }),
-           configuredUpstreamPorts.contains(port) {
-            return (.observe, "observe:loopback-upstream")
+        // ② 完全旁路档(环检测自愈加入的进程):数据通路彻底不接管——环命中过,说明对它
+        //    直连接管也不安全(或识别有漏),降到最保守,当场断环并保持断开。
+        if isHardBypassOrigin(sourceID: sourceID, sourcePath: sourcePath) {
+            return (.bypass, "bypass:loop-hard-bypass")
         }
         // ③ 地址类硬闸(回环/私网/上游)—— 一律 .bypass,不接管、活动栏不可见。
+        //    注:回环流量实测**从不**到达 transparent proxy provider(平台限制,ExtDiag 实证
+        //    loopback 判定 0 命中),这里的回环分支只是防御性兜底。
         if let reason = addressBypassReason(hosts: candidates, port: port) {
             return (.bypass, reason)
         }
-        // ④ 本地代理(xray/yunti)的流量:**观测**——不接管数据通路(它承载全系统代理流量,
-        //    接管即全量二次转发放大,真机三次实锤会把扩展拖死:0.2.12 流量放大、0.2.14 双信号
-        //    排除、0.2.24 断网,同一根因),但记观测事件让它在活动栏可见(用户明确要求:
-        //    Proxifier 一直看得到 xray)。零转发开销,只有每连接一条事件。
+        // ④ 本地代理(xray/yunti,直连档):**接管 + 强制直连**——活动栏可见、有真实字节数
+        //    (对齐 Proxifier 的 auto-created Direct 规则),但绝不代理回它自己(那才是环)。
+        //    历史教训(0.2.12/0.2.24):早年两次"接管本地代理"事故的真凶是当时数据面的
+        //    热路径地雷(逐 chunk 上游探活、逐 flow UserDefaults 全量重写)+ 升级窗口的真环,
+        //    如今都已根治;若仍有环,②的自愈档会把它降到完全旁路(LoopDetector → app 回推)。
         if isLocalProxyOrigin(sourceID: sourceID, sourcePath: sourcePath) {
-            return (.observe, "observe:local-proxy-origin")
+            return (.handle(.direct), "handle:local-proxy-direct")
         }
         // ⑤ 解出动作:细粒度规则表(首个命中)优先于每进程规则;都没有 → 默认 .direct(策略 A:
         //    默认就接管并直连计量,活动栏能看到每条连接)。
@@ -118,13 +118,8 @@ extension ProxyExtensionProvider {
         }
     }
 
-    /// 配置过的上游端口集合(回环 × 上游端口 → 观测,见 `resolveDecision` ②)。
-    private var configuredUpstreamPorts: Set<UInt16> {
-        Set((proxyConfig?.servers ?? []).map(\.port))
-    }
-
     /// 自身组件(app/扩展本体)硬边界:接管自己必然自套死循环。只比对静态的 `selfXxx`,
-    /// **不含**本地代理(后者观测展示,见 `resolveDecision` ④)。
+    /// **不含**本地代理(后者直连接管展示,见 `resolveDecision` ④)。
     private func selfBypassReason(sourceID: String, sourcePath: String?) -> String? {
         if ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourceID, ownIdentifiers: selfIdentifiers) {
             return "bypass:self-identifier"
@@ -162,13 +157,25 @@ extension ProxyExtensionProvider {
         return (.direct, "default")
     }
 
-    /// 来源是不是 app 动态查到的本地代理进程(签名标识或可执行文件路径任一命中)。
+    /// 来源是不是 app 动态查到的本地代理进程(签名标识或可执行文件路径任一命中,直连档)。
     private func isLocalProxyOrigin(sourceID: String, sourcePath: String?) -> Bool {
         if ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourceID, ownIdentifiers: localProxyIdentifiers) {
             return true
         }
         if let sourcePath,
            ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourcePath, ownIdentifiers: localProxyExecutablePaths) {
+            return true
+        }
+        return false
+    }
+
+    /// 来源是不是环检测自愈加入的完全旁路进程(签名标识或可执行文件路径任一命中,旁路档)。
+    private func isHardBypassOrigin(sourceID: String, sourcePath: String?) -> Bool {
+        if ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourceID, ownIdentifiers: hardBypassIdentifiers) {
+            return true
+        }
+        if let sourcePath,
+           ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourcePath, ownIdentifiers: hardBypassPaths) {
             return true
         }
         return false
@@ -226,5 +233,25 @@ extension ProxyExtensionProvider {
                 )
             }
         }
+    }
+
+    /// 发一条连接生命周期事件给 app(取当前累计字节)。非 private:beginFlow(主文件)与
+    /// emitClose(本文件/TCPFlowPump)共用——从主文件挪来压 file_length,同既有拆文件先例。
+    func emitConnectionEvent(_ context: ConnectionContext, phase: ConnectionPhaseDTO) {
+        guard let transport else { return }
+        let bytes = context.snapshotBytes()
+        let event = ConnectionEventDTO(
+            id: context.id, processID: context.processID, targetHost: context.host, targetPort: context.port,
+            rule: context.rule, proxyKind: context.proxyKind, phase: phase, bytesUp: bytes.up, bytesDown: bytes.down,
+            openedAt: context.openedAt, processDisplayName: context.processDisplayName
+        )
+        Task { await transport.deliver(.connectionEvent(event)) }
+    }
+
+    /// 结束事件只发一次(两个 pump 都可能触发 teardown)。
+    func emitClose(_ context: ConnectionContext, failed: Bool) {
+        guard context.markClosedOnce() else { return }
+        context.capture?.close() // 抓包文件随连接结束落盘关闭。
+        emitConnectionEvent(context, phase: failed ? .failed : .closed)
     }
 }

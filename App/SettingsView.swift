@@ -93,22 +93,30 @@ struct SettingsView: View {
                     .font(.callout).foregroundStyle(.secondary)
                 // 对齐 Proxifier 检测到环后 auto-created 规则的「可见性」:自动旁路不是黑盒,
                 // 在这里如实列出(端口发现 + 环检测自愈两个来源的并集)。
-                let excluded = store.state.combinedOriginExclusions
-                if !excluded.identifiers.isEmpty || !excluded.executablePaths.isEmpty {
+                let direct = store.state.dynamicOriginExclusion
+                let bypass = store.state.loopAutoExclusions
+                if !direct.identifiers.isEmpty || !direct.executablePaths.isEmpty {
                     Label {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("已自动旁路的本地代理进程（完全不接管，防转发环；运行时自动识别）：")
-                            Text(
-                                (excluded.identifiers.sorted() + excluded.executablePaths.sorted())
-                                    .joined(separator: "  ·  ")
-                            )
-                            .monospaced()
-                            .textSelection(.enabled)
+                            Text("识别到的本地代理进程（接管并强制直连，绝不代理回它自己）：")
+                            Text((direct.identifiers.sorted() + direct.executablePaths.sorted())
+                                .joined(separator: "  ·  "))
+                                .monospaced().textSelection(.enabled)
                         }
                         .font(.callout)
-                    } icon: {
-                        Image(systemName: "arrow.uturn.right.circle")
-                    }
+                    } icon: { Image(systemName: "arrow.right.circle") }
+                    .foregroundStyle(.secondary)
+                }
+                if !bypass.identifiers.isEmpty || !bypass.executablePaths.isEmpty {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("环检测自愈加入的完全旁路（数据通路彻底不接管，本次运行内有效）：")
+                            Text((bypass.identifiers.sorted() + bypass.executablePaths.sorted())
+                                .joined(separator: "  ·  "))
+                                .monospaced().textSelection(.enabled)
+                        }
+                        .font(.callout)
+                    } icon: { Image(systemName: "arrow.uturn.right.circle") }
                     .foregroundStyle(.secondary)
                 }
             }

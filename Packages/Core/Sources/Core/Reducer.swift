@@ -238,7 +238,7 @@ public enum Reducer {
     /// 用途见 `Action.resyncExtension`:XPC(重)连上、或启动恢复完成后触发一次。
     private static func resyncExtension(_ state: AppState) -> (AppState, [Effect]) {
         (state, [
-            .applyProcessOriginExclusions(state.combinedOriginExclusions),
+            state.originExclusionsPush,
             proxyConfigPush(state),
             .applyRoutingMode(state.proxyRoutingMode),
             .applyPacketCapture(state.isPacketCaptureEnabled),
@@ -338,7 +338,7 @@ private extension Reducer {
             guard state.dynamicOriginExclusion != discovery else { return (state, []) }
             var state = state
             state.dynamicOriginExclusion = discovery
-            return (state, [.applyProcessOriginExclusions(state.combinedOriginExclusions)])
+            return (state, [state.originExclusionsPush])
         default:
             return nil
         }
@@ -363,7 +363,7 @@ private extension Reducer {
         if let executablePath { exclusions.executablePaths.insert(executablePath) }
         if exclusions != state.loopAutoExclusions {
             state.loopAutoExclusions = exclusions
-            effects.append(.applyProcessOriginExclusions(state.combinedOriginExclusions))
+            effects.append(state.originExclusionsPush)
         }
 
         if !state.dismissedLoopSignatures.contains(signature) {

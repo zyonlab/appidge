@@ -15,9 +15,10 @@ public enum Effect: Sendable, Equatable {
     case applyPacketCapture(Bool)
     /// UDP 策略变了,推给扩展。
     case applyUDPPolicy(UDPPolicy)
-    /// 动态发现的本地代理进程签名标识集合变了,推给扩展跟自身 app/扩展的标识合并,扩展侧命中
-    /// 即强制直连(转发环硬化的「来源进程自动排除」，见 `EngineKit.ProcessOriginExclusion`)。
-    case applyProcessOriginExclusions(OriginExclusionDiscovery)
+    /// 来源进程排除名单变了,推给扩展。两档语义(见 `IPCContract.ProcessOriginExclusionMessage`):
+    /// `direct` = 端口发现的本地代理 → 接管+强制直连(可见、有字节数);
+    /// `hardBypass` = 环检测自愈加入 → 数据通路彻底不接管(最保守,当场断环)。
+    case applyProcessOriginExclusions(direct: OriginExclusionDiscovery, hardBypass: OriginExclusionDiscovery)
     /// 用户手动清空了连接日志,app 侧 effectHandler 据此把磁盘上的 `connections.log.jsonl`
     /// 也清空——不然下次启动 `restoreRecentConnectionLog` 又把刚清掉的记录读回来。
     case clearConnectionLogFile

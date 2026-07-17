@@ -44,7 +44,7 @@ struct ResyncExtensionReducerTests {
         // 顺序契约:排除名单先落地、规则集最后放行——扩展升级后的第一波 flow 不能在排除
         // 缺席时先撞上通配「走代理」规则(那是秒级真环窗口,真机实锤)。
         #expect(effects == [
-            .applyProcessOriginExclusions(state.dynamicOriginExclusion),
+            .applyProcessOriginExclusions(direct: state.dynamicOriginExclusion, hardBypass: OriginExclusionDiscovery()),
             .applyProxyConfig(servers: [server], activeID: server.id),
             .applyRoutingMode(.single),
             .applyPacketCapture(true),
@@ -61,7 +61,7 @@ struct ResyncExtensionReducerTests {
         let (_, effects) = Reducer.reduce(AppState(), .resyncExtension)
         #expect(effects.count == 6)
         // 第一条一定是排除名单(空发现)——防环信号先行。
-        #expect(effects.first == .applyProcessOriginExclusions(OriginExclusionDiscovery()))
+        #expect(effects.first == .applyProcessOriginExclusions(direct: OriginExclusionDiscovery(), hardBypass: OriginExclusionDiscovery()))
         // 最后一条一定是规则集推送(空规则、空 assignment)——判定最后放行。
         #expect(effects.last == .applyRuleSet(assignments: [:], matchRules: []))
     }

@@ -17,7 +17,7 @@ struct ProcessOriginExclusionReducerTests {
         )
         let (state, effects) = Reducer.reduce(AppState(), .proxyProcessIdentitiesResolved(discovery))
         #expect(state.dynamicOriginExclusion == discovery)
-        #expect(effects == [.applyProcessOriginExclusions(discovery)])
+        #expect(effects == [.applyProcessOriginExclusions(direct: discovery, hardBypass: OriginExclusionDiscovery())])
     }
 
     @Test("resolving the same discovery again is a no-op, no duplicate push")
@@ -38,7 +38,7 @@ struct ProcessOriginExclusionReducerTests {
         let effects: [Effect]
         (state, effects) = Reducer.reduce(state, .proxyProcessIdentitiesResolved(OriginExclusionDiscovery()))
         #expect(state.dynamicOriginExclusion == OriginExclusionDiscovery())
-        #expect(effects == [.applyProcessOriginExclusions(OriginExclusionDiscovery())])
+        #expect(effects == [.applyProcessOriginExclusions(direct: OriginExclusionDiscovery(), hardBypass: OriginExclusionDiscovery())])
     }
 
     @Test("a discovery that only changes executablePaths still counts as changed and pushes")
@@ -50,6 +50,6 @@ struct ProcessOriginExclusionReducerTests {
         let effects: [Effect]
         (state, effects) = Reducer.reduce(state, .proxyProcessIdentitiesResolved(updated))
         #expect(state.dynamicOriginExclusion == updated)
-        #expect(effects == [.applyProcessOriginExclusions(updated)])
+        #expect(effects == [.applyProcessOriginExclusions(direct: updated, hardBypass: OriginExclusionDiscovery())])
     }
 }

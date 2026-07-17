@@ -2,6 +2,15 @@ import SwiftUI
 import Core
 import AppFeature
 
+/// 直达「系统设置 → 通用 → 登录项与扩展」——系统扩展批准/重新启用都在这个面板。
+/// 对齐 Proxifier 的引导顺滑度:告诉用户去哪不如直接带过去。
+enum SystemSettingsOpener {
+    static func openExtensionsPane() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") else { return }
+        NSWorkspace.shared.open(url)
+    }
+}
+
 /// 全局设置(苹果原生 `Settings` 场景,⌘, 打开)。分组 `Form`:代理总开关 / UDP 策略 / 抓包 /
 /// 内置规则说明。这些是「全局、少改」的项,从主窗口移到这里,让主窗口专注连接监视。
 struct SettingsView: View {
@@ -16,6 +25,8 @@ struct SettingsView: View {
                         Text(a.label).foregroundStyle(a.color)
                         if !store.state.extensionActivation.isRunning {
                             Button("启用") { SystemExtensionActivator.shared.activate() }
+                                .controlSize(.small)
+                            Button("打开系统设置") { SystemSettingsOpener.openExtensionsPane() }
                                 .controlSize(.small)
                         }
                     }

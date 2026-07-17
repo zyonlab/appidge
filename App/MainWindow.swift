@@ -35,6 +35,8 @@ struct MainWindow: View {
             .safeAreaInset(edge: .top, spacing: 0) {
                 if let warning = store.state.loopWarning {
                     LoopWarningBanner(signature: warning) { store.dispatch(.dismissLoopWarning) }
+                } else if let prompt = approvalPrompt {
+                    ExtensionApprovalBanner(text: prompt)
                 }
             }
             // 状态栏作为 VStack 同级子视图(而非 NavigationSplitView 的 .safeAreaInset)。用 bottom
@@ -93,6 +95,19 @@ struct MainWindow: View {
             Button("取消", role: .cancel) {}
         } message: {
             Text("只清空「活动」页显示的连接记录，不影响已生效的规则或累计流量统计。")
+        }
+    }
+
+    /// 扩展没在跑且需要用户去系统设置操作时,顶部给一条带直达按钮的横幅(对齐 Proxifier 的
+    /// 引导顺滑度:批准是 Apple 强制的一次性步骤,能做的是把人直接带到那个面板)。
+    private var approvalPrompt: String? {
+        switch store.state.extensionActivation {
+        case .needsApproval:
+            "系统扩展等待批准——在「登录项与扩展 → 网络扩展」里允许 appidge 后即开始接管。"
+        case .disabled:
+            "网络扩展已被停用——在「登录项与扩展 → 网络扩展」里重新打开后自动恢复接管。"
+        case .active, .inactive, .activating, .failed:
+            nil
         }
     }
 

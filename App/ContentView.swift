@@ -156,6 +156,23 @@ struct MenuBarView: View {
     }
 }
 
+/// 扩展待批准/被停用时的顶部引导条:一句话 + 直达系统设置按钮。橙色(需要用户行动,非错误)。
+struct ExtensionApprovalBanner: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.circle.fill")
+            Text(text).font(.callout)
+            Spacer()
+            Button("打开系统设置") { SystemSettingsOpener.openExtensionsPane() }
+        }
+        .foregroundStyle(.white)
+        .padding(8)
+        .background(Color.orange)
+    }
+}
+
 /// 主动环检测告警条:贴在主窗口顶部。`internal` 供 MainWindow 引用。
 struct LoopWarningBanner: View {
     let signature: String

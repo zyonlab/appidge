@@ -8,19 +8,24 @@ import AppFeature
 struct ConnectionsTable: View {
     var store: Store
     let filter: String
+    /// 只看仍在活动的连接(对齐 Proxifier:上表只有活跃连接,历史沉到日志)。
+    let showActiveOnly: Bool
     @Binding var selection: Set<ConnectionLogEntry.ID>
     @State private var sortOrder: [KeyPathComparator<ConnectionLogEntry>] = [
         KeyPathComparator(\.openedAt, order: .reverse)
     ]
 
-    /// 过滤(进程名/主机)后按当前列排序;默认按时间倒序(最新在前),点列头切换排序。
+    /// 过滤(进程名/主机 + 可选仅活动)后按当前列排序;默认按时间倒序(最新在前),点列头切换排序。
     private var rows: [ConnectionLogEntry] {
         let key = filter.trimmingCharacters(in: .whitespaces).lowercased()
-        let filtered = key.isEmpty
+        var filtered = key.isEmpty
             ? store.state.connectionLog
             : store.state.connectionLog.filter {
                 appName($0).lowercased().contains(key) || $0.host.lowercased().contains(key)
             }
+        if showActiveOnly {
+            filtered = filtered.filter { $0.phase == .opened }
+        }
         return filtered.sorted(using: sortOrder)
     }
 
@@ -40,27 +45,35 @@ struct ConnectionsTable: View {
 
     private var table: some View {
         Table(rows, selection: $selection, sortOrder: $sortOrder) {
+            // 应用:名字 + 淡显标识,对齐 Proxifier 的 `xray(a.out)`。
             TableColumn("应用", value: \.processID.value) { e in
-                AppLabel(name: appName(e), path: store.state.catalog[e.processID]?.executablePath)
-            }.width(min: 130, ideal: 190)
+                AppLabel(
+                    name: appName(e),
+                    path: store.state.catalog[e.processID]?.executablePath,
+                    identifier: e.processID.value
+                )
+            }.width(min: 150, ideal: 230)
 
             TableColumn("目标", value: \.host) { e in
                 Text("\(e.host):\(e.port)").monospaced().lineLimit(1)
             }.width(min: 150, ideal: 230)
 
-            TableColumn("状态") { e in statusCell(e.phase) }.width(min: 68, ideal: 90)
+            // 时长/状态(对齐 Proxifier 的 Time/Status):活动 → 存活时长每秒走动;
+            // 已关闭/失败 → 状态文案。
+            TableColumn("时长 / 状态", value: \.openedAt) { e in
+                statusCell(e)
+            }.width(min: 84, ideal: 100)
 
             TableColumn("规则 · 代理") { e in
                 RouteChip(rule: e.rule, kind: e.proxyKind)
             }.width(min: 110, ideal: 160)
 
-            TableColumn("时间", value: \.openedAt) { e in
-                Text(e.openedAt.formatted(date: .omitted, time: .standard))
-                    .monospacedDigit().foregroundStyle(.secondary)
-            }.width(92)
-
-            TableColumn("↑", value: \.bytesUp) { e in Text(TrafficFormat.bytes(e.bytesUp)).monospacedDigit() }.width(64)
-            TableColumn("↓", value: \.bytesDown) { e in Text(TrafficFormat.bytes(e.bytesDown)).monospacedDigit() }.width(64)
+            TableColumn("发送", value: \.bytesUp) { e in
+                Text(TrafficFormat.bytes(e.bytesUp)).monospacedDigit()
+            }.width(min: 64, ideal: 76)
+            TableColumn("接收", value: \.bytesDown) { e in
+                Text(TrafficFormat.bytes(e.bytesDown)).monospacedDigit()
+            }.width(min: 64, ideal: 76)
         }
         .contextMenu(forSelectionType: ConnectionLogEntry.ID.self) { ids in
             let targets = rows.filter { ids.contains($0.id) }
@@ -75,17 +88,26 @@ struct ConnectionsTable: View {
         }
     }
 
-    /// 状态列:SF Symbol + 语义色 + 文案一起呈现(不靠颜色单独区分,便于无障碍)。
-    /// 活动→绿实心圈、已关闭→灰对勾、失败→红八角叉。
+    /// 时长/状态列:SF Symbol + 语义色 + 文案一起呈现(不靠颜色单独区分,便于无障碍)。
+    /// 活动 → 绿实心圈 + **存活时长**(每秒走动,`TimelineView` 只包在活动行的这个格子里,
+    /// 可见行数量级,不构成全表刷新);已关闭 → 灰对勾;失败 → 红八角叉。
     @ViewBuilder
-    private func statusCell(_ phase: ConnectionPhase) -> some View {
-        switch phase {
+    private func statusCell(_ entry: ConnectionLogEntry) -> some View {
+        switch entry.phase {
         case .opened:
-            Label("活动", systemImage: "circle.fill")
-                .foregroundStyle(.green).help("活动")
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                Label(
+                    TrafficFormat.duration(context.date.timeIntervalSince(entry.openedAt)),
+                    systemImage: "circle.fill"
+                )
+                .monospacedDigit()
+                .foregroundStyle(.green)
+            }
+            .help("活动 · 自 \(entry.openedAt.formatted(date: .omitted, time: .standard)) 建立")
         case .closed:
             Label("已关闭", systemImage: "checkmark.circle")
-                .foregroundStyle(.secondary).help("已关闭")
+                .foregroundStyle(.secondary)
+                .help("已关闭 · \(entry.openedAt.formatted(date: .omitted, time: .standard)) 建立")
         case .failed:
             Label("失败", systemImage: "xmark.octagon")
                 .foregroundStyle(.red).help("失败 / 被拦截")

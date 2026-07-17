@@ -18,6 +18,8 @@ struct MainWindow: View {
     @State private var selection: Set<ConnectionLogEntry.ID> = []
     @State private var showInspector = true
     @State private var showingClearConfirmation = false
+    /// 连接表只看活动连接(对齐 Proxifier:上表活跃、历史沉底)。默认关(全部可见)。
+    @State private var showActiveOnly = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -62,7 +64,7 @@ struct MainWindow: View {
     /// 所以只在「活动」出现;全局代理开关挂在外层,任何区域都可见。
     private var activity: some View {
         VSplitView {
-            ConnectionsTable(store: store, filter: filter, selection: $selection)
+            ConnectionsTable(store: store, filter: filter, showActiveOnly: showActiveOnly, selection: $selection)
                 .frame(minHeight: 220)
             TrafficPane(store: store)
                 .frame(minHeight: 130, idealHeight: 170, maxHeight: 320)
@@ -74,6 +76,12 @@ struct MainWindow: View {
                 .inspectorColumnWidth(min: 260, ideal: 300, max: 420)
         }
         .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Toggle(isOn: $showActiveOnly) {
+                    Label("仅活动", systemImage: "circle.fill")
+                }
+                .help("只显示仍在活动的连接(隐藏已关闭 / 失败的历史记录)")
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button(role: .destructive) { showingClearConfirmation = true } label: {
                     Label("清除记录", systemImage: "trash")

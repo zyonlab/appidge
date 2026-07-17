@@ -24,12 +24,20 @@ enum AppIconCache {
 struct AppLabel: View {
     let name: String
     let path: String?
+    /// 可选的进程标识(签名标识),跟在名字后面淡显——对齐 Proxifier 的
+    /// `xray(a.out)` / `元宝(com.tencent.yuanbao)` 写法;与名字相同时不重复显示。
+    var identifier: String?
 
     var body: some View {
         HStack(spacing: 6) {
             icon.frame(width: 16, height: 16)
-            Text(name).lineLimit(1)
+            (Text(name) + identifierSuffix).lineLimit(1)
         }
+    }
+
+    private var identifierSuffix: Text {
+        guard let identifier, identifier != name else { return Text(verbatim: "") }
+        return Text("（\(identifier)）").foregroundStyle(.secondary)
     }
 
     @ViewBuilder private var icon: some View {

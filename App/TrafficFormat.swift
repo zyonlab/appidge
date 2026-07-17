@@ -11,4 +11,15 @@ enum TrafficFormat {
     static func rate(_ bytesPerSecond: Double) -> String {
         bytes(Int64(max(0, bytesPerSecond))) + "/s"
     }
+
+    /// 存活时长格式化成 Proxifier 风格的 `01:34` / `1:02:33`(小时只在需要时出现)。
+    static func duration(_ seconds: TimeInterval) -> String {
+        let total = Int(max(0, seconds))
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        let secs = total % 60
+        return hours > 0
+            ? String(format: "%d:%02d:%02d", hours, minutes, secs)
+            : String(format: "%02d:%02d", minutes, secs)
+    }
 }

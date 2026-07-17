@@ -34,6 +34,9 @@ public struct AppState: Sendable, Equatable {
     /// 语义也不同档:发现档 = 接管+强制直连(可见),自愈档 = 完全旁路(最保守,当场断环)。
     /// 运行时状态,不持久化。
     public var loopAutoExclusions: OriginExclusionDiscovery
+    /// 进入 / 场景激活时探测到的代理环境(系统代理 + 环境变量 + 额外 TUN)——UI 据此解释
+    /// "appidge 能管哪一层、哪些流量会绕过"。运行时状态,不持久化。见 ``ProxyEnvironment``。
+    public var proxyEnvironment: ProxyEnvironment
 
     /// 下发给扩展的两档排除(直连档 = 端口发现;完全旁路档 = 环自愈)。
     public var originExclusionsPush: Effect {
@@ -60,7 +63,8 @@ public struct AppState: Sendable, Equatable {
         udpPolicy: UDPPolicy = .block,
         extensionActivation: ExtensionActivation = .inactive,
         dynamicOriginExclusion: OriginExclusionDiscovery = OriginExclusionDiscovery(),
-        loopAutoExclusions: OriginExclusionDiscovery = OriginExclusionDiscovery()
+        loopAutoExclusions: OriginExclusionDiscovery = OriginExclusionDiscovery(),
+        proxyEnvironment: ProxyEnvironment = ProxyEnvironment()
     ) {
         self.isEngineHealthy = isEngineHealthy
         self.processes = processes
@@ -79,5 +83,6 @@ public struct AppState: Sendable, Equatable {
         self.extensionActivation = extensionActivation
         self.dynamicOriginExclusion = dynamicOriginExclusion
         self.loopAutoExclusions = loopAutoExclusions
+        self.proxyEnvironment = proxyEnvironment
     }
 }

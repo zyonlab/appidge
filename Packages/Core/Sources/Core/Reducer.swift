@@ -299,26 +299,40 @@ private extension Reducer {
             state.udpPolicy = policy
             return (state, [.applyUDPPolicy(policy)])
         case .extensionActivationChanged(let activation):
-            var state = state
-            state.extensionActivation = activation
-            // 扩展(重新)跑起来 = 新的引擎会话:之前 fail-open 标记的不健康态就此翻篇,恢复健康
-            // 并把真实规则集重推下去(不健康期间推的是空规则集)。只在「不健康 → active」这个
-            // 转变沿推一次,平时的 activation 回报不产生多余推送。
-            if case .active = activation, !state.isEngineHealthy {
-                state.isEngineHealthy = true
-                return (state, [ruleSetPush(state)])
-            }
-            return (state, [])
+            return extensionActivationChanged(activation, state)
         case .proxyProcessIdentitiesResolved(let discovery):
-            // 未变化就不推(和 applyProxyConfig 等其它下发一致的幂等守卫)。发现结果整体替换
-            // `dynamicOriginExclusion`;环自愈加的 `loopAutoExclusions` 独立保留,下发取并集。
-            guard state.dynamicOriginExclusion != discovery else { return (state, []) }
+            return proxyProcessIdentitiesResolved(discovery, state)
+        case .proxyEnvironmentDetected(let environment):
+            guard state.proxyEnvironment != environment else { return (state, []) }
             var state = state
-            state.dynamicOriginExclusion = discovery
-            return (state, [state.originExclusionsPush])
+            state.proxyEnvironment = environment
+            return (state, [])
         default:
             return nil
         }
+    }
+
+    /// 扩展(重新)跑起来 = 新的引擎会话:之前 fail-open 标记的不健康态就此翻篇,恢复健康并把
+    /// 真实规则集重推下去(不健康期间推的是空规则集)。只在「不健康 → active」转变沿推一次。
+    static func extensionActivationChanged(_ activation: ExtensionActivation, _ state: AppState) -> (AppState, [Effect]) {
+        var state = state
+        state.extensionActivation = activation
+        if case .active = activation, !state.isEngineHealthy {
+            state.isEngineHealthy = true
+            return (state, [ruleSetPush(state)])
+        }
+        return (state, [])
+    }
+
+    /// 端口发现结果整体替换 `dynamicOriginExclusion`(环自愈的 `loopAutoExclusions` 独立保留,
+    /// 下发取并集)。未变化就不推(幂等守卫,同其它下发)。
+    static func proxyProcessIdentitiesResolved(
+        _ discovery: OriginExclusionDiscovery, _ state: AppState
+    ) -> (AppState, [Effect]) {
+        guard state.dynamicOriginExclusion != discovery else { return (state, []) }
+        var state = state
+        state.dynamicOriginExclusion = discovery
+        return (state, [state.originExclusionsPush])
     }
 
     /// 环检测自愈 + 告警:

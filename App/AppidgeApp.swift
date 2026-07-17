@@ -80,6 +80,8 @@ struct AppidgeApp: App {
                 await restorePersistedConfiguration()
                 await restoreRecentConnectionLog()
                 await profilesModel.loadLibrary()
+                // 进入即探测代理环境(系统代理 + 环境变量 + 额外 TUN),UI 据此解释能管哪一层。
+                await detectProxyEnvironment()
                 // 接线放在两次 restore 之后：restore 本身就是靠重放 processDiscovered/assignRule/
                 // addMatchRule 等"值得存盘"的 action 来灌回状态的,提前接线只会导致启动时又把刚读出来
                 // 的东西原样存回去一次——浪费一次磁盘 I/O,不是错误,但没必要。
@@ -108,11 +110,12 @@ struct AppidgeApp: App {
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
-            // 简单的持久化触发点：场景失焦/进后台时落盘一次（覆盖"规则/目录被改过、
-            // app 被关闭或切到后台"的常见路径）。onboarding 完成那一下已经在
-            // OnboardingView 里单独存过一次，这里补的是之后规则/目录的变更，不做
-            // 全量响应式持久化管线（每次 dispatch 都存）——那超出了这一轮的范围。
-            if newPhase != .active {
+            if newPhase == .active {
+                // 回到前台重探一次代理环境:用户可能刚在系统设置里改了系统代理 / 开关了 yunti。
+                Task { await detectProxyEnvironment() }
+            } else {
+                // 简单的持久化触发点：场景失焦/进后台时落盘一次（覆盖"规则/目录被改过、
+                // app 被关闭或切到后台"的常见路径）。
                 persistCurrentConfiguration()
             }
         }
@@ -127,6 +130,13 @@ struct AppidgeApp: App {
         // .window 而非默认 .menu：内容是「仪表盘」(状态行 + Top-5 列表 + 开关),
         // 需要完整 SwiftUI 排版(语义色 / caption / 对齐),菜单渲染器会把这些收着。
         .menuBarExtraStyle(.window)
+    }
+
+    /// 探测代理环境并回灌 store(reducer 有差分守卫,未变化不产生多余通知)。
+    @MainActor
+    private func detectProxyEnvironment() async {
+        let environment = await SystemProxyEnvironmentProbe().probe()
+        store.dispatch(.proxyEnvironmentDetected(environment))
     }
 
     /// 启动时把上次保存的配置（扫描到的目录、分配过规则的进程、是否已完成引导）

@@ -26,6 +26,17 @@ struct OnboardingView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 360)
 
+            // 首次进入就把"我们能管哪一层"讲清楚(探测到的环境 + 盲区 + 诊断),避免用户以为
+            // "装了就全局接管"。滚动容器,内容较长。
+            ScrollView {
+                ProxyEnvironmentSection(env: store.state.proxyEnvironment)
+                    .padding(.horizontal, 4)
+            }
+            .frame(maxWidth: 420, maxHeight: 240)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(.quinary, in: RoundedRectangle(cornerRadius: 10))
+
             Button("开始使用") {
                 SystemExtensionActivator.shared.activate()
                 store.dispatch(.onboardingCompleted)

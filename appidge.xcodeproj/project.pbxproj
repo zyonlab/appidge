@@ -17,6 +17,7 @@
 		2B4575AB87D6B0C6AA17B41F /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA34ADCCFFBEA044937D573 /* OnboardingView.swift */; };
 		401C973E6AB7C68211194E7D /* ProxyExtensionProviderRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2AD25102F3D99F433F9C446 /* ProxyExtensionProviderRouting.swift */; };
 		439F0E52A0F140E10314798A /* RulesEditorPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3502285178386167CBDC5B8 /* RulesEditorPaneView.swift */; };
+		4C1EE24514C43608CEF0B1C8 /* ProxyEnvironmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 809242278F25BD53EB570961 /* ProxyEnvironmentView.swift */; };
 		53994341147E0E7B6A3F55AE /* TrafficPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06FF2EED709EE367FEA4A9A7 /* TrafficPane.swift */; };
 		552D5797BCE134EF6D6EE560 /* MainWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82D18B41BB8F2680C6E5F6B9 /* MainWindow.swift */; };
 		586E6945675466F5FAEDBCE6 /* ProcessPathResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D71AD68E0D673791D64826 /* ProcessPathResolver.swift */; };
@@ -90,6 +91,7 @@
 		6FE1FDE2601F854C4AB0FCB4 /* ExtDiag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtDiag.swift; sourceTree = "<group>"; };
 		7106009A56C24078709224DC /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		7AADB654447DCB49FB372FAE /* AppidgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppidgeApp.swift; sourceTree = "<group>"; };
+		809242278F25BD53EB570961 /* ProxyEnvironmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyEnvironmentView.swift; sourceTree = "<group>"; };
 		82D18B41BB8F2680C6E5F6B9 /* MainWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindow.swift; sourceTree = "<group>"; };
 		88C15509479EC265EC4FD6F2 /* ProxyExtension.systemextension */ = {isa = PBXFileReference; explicitFileType = "wrapper.system-extension"; includeInIndex = 0; path = ProxyExtension.systemextension; sourceTree = BUILT_PRODUCTS_DIR; };
 		8CAB3B3934E69313D52D6EE2 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
@@ -194,6 +196,7 @@
 				5DA34ADCCFFBEA044937D573 /* OnboardingView.swift */,
 				EEBD232B5EDEBEEDC598FA44 /* ProfilesModel.swift */,
 				9C2DCBF93F75AB530471B830 /* ProfilesPaneView.swift */,
+				809242278F25BD53EB570961 /* ProxyEnvironmentView.swift */,
 				5F32B133633BBB992A13D17D /* ProxyServersPaneView.swift */,
 				F3502285178386167CBDC5B8 /* RulesEditorPaneView.swift */,
 				956D1B4004113B63335A7518 /* SettingsView.swift */,
@@ -359,6 +362,7 @@
 				2B4575AB87D6B0C6AA17B41F /* OnboardingView.swift in Sources */,
 				96FF8A395FD13D05AD826E54 /* ProfilesModel.swift in Sources */,
 				FCBF4A432ECB3B5E94F88C26 /* ProfilesPaneView.swift in Sources */,
+				4C1EE24514C43608CEF0B1C8 /* ProxyEnvironmentView.swift in Sources */,
 				BF3C3EA1865EA2811E2CC3B8 /* ProxyServersPaneView.swift in Sources */,
 				439F0E52A0F140E10314798A /* RulesEditorPaneView.swift in Sources */,
 				AD71F038E2B6324B5D280B7C /* SettingsView.swift in Sources */,
@@ -388,7 +392,7 @@
 				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 34;
+				CURRENT_PROJECT_VERSION = 35;
 				DEVELOPMENT_TEAM = "$(DEVELOPMENT_TEAM)";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -398,7 +402,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.2.32;
+				MARKETING_VERSION = 0.2.34;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(EXT_BUNDLE_IDENTIFIER)";
 				PRODUCT_MODULE_NAME = ProxyExtension;
 				PRODUCT_NAME = "$(EXT_BUNDLE_IDENTIFIER)";
@@ -417,7 +421,7 @@
 				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 34;
+				CURRENT_PROJECT_VERSION = 35;
 				DEVELOPMENT_TEAM = "$(DEVELOPMENT_TEAM)";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -427,7 +431,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.2.32;
+				MARKETING_VERSION = 0.2.34;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_IDENTIFIER)";
 				PRODUCT_MODULE_NAME = appidge;
 				PRODUCT_NAME = appidge;
@@ -501,7 +505,7 @@
 				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 34;
+				CURRENT_PROJECT_VERSION = 35;
 				DEVELOPMENT_TEAM = "$(DEVELOPMENT_TEAM)";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -511,7 +515,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.2.32;
+				MARKETING_VERSION = 0.2.34;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(EXT_BUNDLE_IDENTIFIER)";
 				PRODUCT_MODULE_NAME = ProxyExtension;
 				PRODUCT_NAME = "$(EXT_BUNDLE_IDENTIFIER)";
@@ -530,7 +534,7 @@
 				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 34;
+				CURRENT_PROJECT_VERSION = 35;
 				DEVELOPMENT_TEAM = "$(DEVELOPMENT_TEAM)";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -540,7 +544,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.2.32;
+				MARKETING_VERSION = 0.2.34;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_IDENTIFIER)";
 				PRODUCT_MODULE_NAME = appidge;
 				PRODUCT_NAME = appidge;

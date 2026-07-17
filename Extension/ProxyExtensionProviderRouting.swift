@@ -184,10 +184,19 @@ extension ProxyExtensionProvider {
 
     /// 观测(B):不接管数据通路,只投一条连接事件(0 字节),让它以"观测"胶囊出现在活动栏。
     /// 拿不到目的地(极少数解析不出)就跳过——没有 host 的观测行没有意义。
+    ///
+    /// **合并 + 节流**(见 `ObserveCoalescer`):id 由 (进程×主机×端口) 确定性生成 → app 侧
+    /// upsert 同一行(不无限追加);同一目标 2s 内最多投一条 → 事件速率与连接洪流解耦。
+    /// 本地代理每秒上百条短连接因此只产生"每目的地每 2s 一次"的表更新,app CPU 不再被重排吃掉。
     func emitObservedFlow(processID: ProcessIdentifierDTO, displayName: String?, host: String?, port: UInt16?) {
         guard let host, let port, let transport else { return }
+        let id = ObserveCoalescer.stableID(processID: processID.value, host: host, port: port)
+        let shouldEmit = configLock.withLock {
+            storedObserveCoalescer.shouldEmit(key: id, now: Date().timeIntervalSince1970)
+        }
+        guard shouldEmit else { return }
         let event = ConnectionEventDTO(
-            id: UUID().uuidString, processID: processID, targetHost: host, targetPort: port,
+            id: id, processID: processID, targetHost: host, targetPort: port,
             rule: .observe, proxyKind: nil, phase: .closed, bytesUp: 0, bytesDown: 0,
             openedAt: Date(), processDisplayName: displayName
         )

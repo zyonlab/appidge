@@ -117,6 +117,10 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     // **完全旁路档**(环检测自愈加入):数据通路彻底不接管。环命中说明直连档不够,降到最保守。
     private var storedHardBypassIdentifiers: Set<String> = []
     private var storedHardBypassPaths: Set<String> = []
+    // 观测事件的合并+节流:本地代理的高频短连接观测按 (进程×目标) 确定性 id upsert + 同目标
+    // 每 2s 最多一条,避免 app 侧连接表被洪流驱动重排(见 EngineKit.ObserveCoalescer)。锁保护。
+    // 非 private:emitObservedFlow 在同 target 的跨文件 extension 里访问(同其它 stored 成员先例)。
+    var storedObserveCoalescer = ObserveCoalescer(interval: 2.0)
 
     private var packetCaptureEnabled: Bool {
         configLock.withLock { storedPacketCaptureEnabled }

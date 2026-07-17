@@ -10,6 +10,8 @@ struct RulesEditorPaneView: View {
 
     @State private var selection: ProxyMatchRule.ID?
     @State private var showingAdd = false
+    /// 正在编辑的规则(双击 / 右键「编辑」/ 工具栏铅笔打开编辑 sheet);nil = 不在编辑。
+    @State private var editingRule: ProxyMatchRule?
 
     private var rules: [ProxyMatchRule] { store.state.rules }
 
@@ -37,30 +39,28 @@ struct RulesEditorPaneView: View {
             .background(.bar)
         }
         .sheet(isPresented: $showingAdd) {
-            AddMatchRuleSheet(store: store)
+            MatchRuleSheet(store: store, editing: nil)
+        }
+        .sheet(item: $editingRule) { rule in
+            MatchRuleSheet(store: store, editing: rule)
         }
     }
 
     private var rulesTable: some View {
         Table(rules, selection: $selection) {
             TableColumn("启用") { r in enableToggle(for: r) }.width(40)
-            TableColumn("进程") { r in
-                Text(r.appPattern).monospaced().lineLimit(1).opacity(r.isEnabled ? 1 : 0.45)
-            }
-            TableColumn("主机") { r in
-                Text(r.hostPattern).monospaced().lineLimit(1).opacity(r.isEnabled ? 1 : 0.45)
-            }
-            TableColumn("端口") { r in
-                Text(Self.portText(r.portRange)).opacity(r.isEnabled ? 1 : 0.45)
-            }.width(90)
+            TableColumn("进程") { r in editableCell(r) { Text(r.appPattern).monospaced() } }
+            TableColumn("主机") { r in editableCell(r) { Text(r.hostPattern).monospaced() } }
+            TableColumn("端口") { r in editableCell(r) { Text(Self.portText(r.portRange)) } }.width(90)
             TableColumn("动作") { r in
-                Text(RuleActionStyle.label(r.action))
-                    .foregroundStyle(RuleActionStyle.color(r.action))
-                    .opacity(r.isEnabled ? 1 : 0.45)
+                editableCell(r) {
+                    Text(RuleActionStyle.label(r.action)).foregroundStyle(RuleActionStyle.color(r.action))
+                }
             }.width(70)
         }
         .contextMenu(forSelectionType: ProxyMatchRule.ID.self) { ids in
-            if let id = ids.first {
+            if let id = ids.first, let rule = rules.first(where: { $0.id == id }) {
+                Button("编辑…") { editingRule = rule }
                 enableDisableMenuItem(for: id)
                 Divider()
                 Button("上移") { move(id, by: -1) }
@@ -69,6 +69,18 @@ struct RulesEditorPaneView: View {
                 Button("删除", role: .destructive) { store.dispatch(.removeMatchRule(id)) }
             }
         }
+    }
+
+    /// 单元格内容 + 双击进入编辑 + 停用时半透明。双击手势不吞掉单击选中(simultaneousGesture)。
+    private func editableCell<Content: View>(
+        _ rule: ProxyMatchRule, @ViewBuilder _ content: () -> Content
+    ) -> some View {
+        content()
+            .lineLimit(1)
+            .opacity(rule.isEnabled ? 1 : 0.45)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .simultaneousGesture(TapGesture(count: 2).onEnded { editingRule = rule })
     }
 
     /// 每行前置的启用勾选框:点掉即停用(规则保留、不删除),下发前会被过滤,不再参与匹配。
@@ -99,6 +111,11 @@ struct RulesEditorPaneView: View {
             Button { removeSelected() } label: { Image(systemName: "minus") }
                 .disabled(selection == nil)
                 .help("删除选中")
+            Button {
+                if let id = selection, let rule = rules.first(where: { $0.id == id }) { editingRule = rule }
+            } label: { Image(systemName: "pencil") }
+                .disabled(selection == nil)
+                .help("编辑选中（也可双击某行）")
             Divider().frame(height: 14)
             Button { if let id = selection { move(id, by: -1) } } label: { Image(systemName: "chevron.up") }
                 .disabled(selection == nil)
@@ -159,15 +176,28 @@ enum RuleActionStyle {
     }
 }
 
-/// 「添加规则」sheet:进程 glob × 主机 glob × 端口(空/单/区间)→ 动作。添加后自动关闭。
-private struct AddMatchRuleSheet: View {
+/// 规则 sheet:进程 glob × 主机 glob × 端口(空/单/区间)→ 动作。`editing == nil` = 新增
+/// (`addMatchRule`,按三元组去重后置顶);非 nil = 就地编辑那条(`updateMatchRule`,保留位置)。
+private struct MatchRuleSheet: View {
     var store: Store
+    let editing: ProxyMatchRule?
     @Environment(\.dismiss) private var dismiss
 
-    @State private var appPattern = "*"
-    @State private var hostPattern = "*"
-    @State private var portText = ""
-    @State private var action: ProxyRule = .proxied
+    @State private var appPattern: String
+    @State private var hostPattern: String
+    @State private var portText: String
+    @State private var action: ProxyRule
+
+    init(store: Store, editing: ProxyMatchRule?) {
+        self.store = store
+        self.editing = editing
+        _appPattern = State(initialValue: editing?.appPattern ?? "*")
+        _hostPattern = State(initialValue: editing?.hostPattern ?? "*")
+        _portText = State(initialValue: editing.map { Self.portField($0.portRange) } ?? "")
+        _action = State(initialValue: editing?.action ?? .proxied)
+    }
+
+    private var isEditing: Bool { editing != nil }
 
     /// 双层可选:外层 nil = 输入非法;内层 nil = 「任意端口」。
     private var parsedPort: ClosedRange<UInt16>?? {
@@ -179,7 +209,7 @@ private struct AddMatchRuleSheet: View {
         return nil
     }
 
-    private var canAdd: Bool {
+    private var canSave: Bool {
         !appPattern.trimmingCharacters(in: .whitespaces).isEmpty
             && !hostPattern.trimmingCharacters(in: .whitespaces).isEmpty
             && parsedPort != nil
@@ -188,7 +218,7 @@ private struct AddMatchRuleSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("添加规则").font(.headline)
+                Text(isEditing ? "编辑规则" : "添加规则").font(.headline)
                 Spacer()
                 Button("取消") { dismiss() }
             }
@@ -210,24 +240,37 @@ private struct AddMatchRuleSheet: View {
             Divider()
             HStack {
                 Spacer()
-                Button("添加", action: add)
+                Button(isEditing ? "保存" : "添加", action: save)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(!canAdd)
+                    .disabled(!canSave)
             }
             .padding()
         }
         .frame(width: 420)
     }
 
-    private func add() {
+    private func save() {
         guard case .some(let range) = parsedPort else { return }
-        store.dispatch(.addMatchRule(ProxyMatchRule(
-            id: RuleID(UUID().uuidString),
-            appPattern: appPattern.trimmingCharacters(in: .whitespaces),
-            hostPattern: hostPattern.trimmingCharacters(in: .whitespaces),
-            portRange: range,
-            action: action
-        )))
+        let app = appPattern.trimmingCharacters(in: .whitespaces)
+        let host = hostPattern.trimmingCharacters(in: .whitespaces)
+        if let editing {
+            store.dispatch(.updateMatchRule(
+                id: editing.id, appPattern: app, hostPattern: host, portRange: range, action: action
+            ))
+        } else {
+            store.dispatch(.addMatchRule(ProxyMatchRule(
+                id: RuleID(UUID().uuidString),
+                appPattern: app, hostPattern: host, portRange: range, action: action
+            )))
+        }
         dismiss()
+    }
+
+    /// 端口区间 → 编辑框回填文本(与 `RulesEditorPaneView.portText` 的展示口径一致但用于输入)。
+    private static func portField(_ range: ClosedRange<UInt16>?) -> String {
+        guard let range else { return "" }
+        return range.lowerBound == range.upperBound
+            ? "\(range.lowerBound)"
+            : "\(range.lowerBound)-\(range.upperBound)"
     }
 }

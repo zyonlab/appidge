@@ -33,6 +33,12 @@ public enum Reducer {
         switch action {
         case .addMatchRule(let rule):
             return addMatchRule(rule, state)
+        case .updateMatchRule(let id, let appPattern, let hostPattern, let portRange, let action):
+            return updateMatchRule(
+                ProxyMatchRule(id: id, appPattern: appPattern, hostPattern: hostPattern,
+                               portRange: portRange, action: action),
+                state
+            )
         case .removeMatchRule(let id):
             return removeMatchRule(id, state)
         case .reorderMatchRules(let order):

@@ -38,7 +38,8 @@ struct ProcessOriginExclusionReducerTests {
         let effects: [Effect]
         (state, effects) = Reducer.reduce(state, .proxyProcessIdentitiesResolved(OriginExclusionDiscovery()))
         #expect(state.dynamicOriginExclusion == OriginExclusionDiscovery())
-        #expect(effects == [.applyProcessOriginExclusions(direct: OriginExclusionDiscovery(), hardBypass: OriginExclusionDiscovery())])
+        #expect(effects == [.applyProcessOriginExclusions(
+            direct: OriginExclusionDiscovery(), hardBypass: OriginExclusionDiscovery())])
     }
 
     @Test("a discovery that only changes executablePaths still counts as changed and pushes")

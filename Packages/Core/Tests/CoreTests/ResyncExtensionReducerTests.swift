@@ -61,7 +61,8 @@ struct ResyncExtensionReducerTests {
         let (_, effects) = Reducer.reduce(AppState(), .resyncExtension)
         #expect(effects.count == 6)
         // 第一条一定是排除名单(空发现)——防环信号先行。
-        #expect(effects.first == .applyProcessOriginExclusions(direct: OriginExclusionDiscovery(), hardBypass: OriginExclusionDiscovery()))
+        #expect(effects.first == .applyProcessOriginExclusions(
+            direct: OriginExclusionDiscovery(), hardBypass: OriginExclusionDiscovery()))
         // 最后一条一定是规则集推送(空规则、空 assignment)——判定最后放行。
         #expect(effects.last == .applyRuleSet(assignments: [:], matchRules: []))
     }

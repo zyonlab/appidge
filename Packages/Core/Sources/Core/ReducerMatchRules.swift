@@ -30,6 +30,19 @@ extension Reducer {
         return state
     }
 
+    /// 就地编辑一条规则(按 `updated.id`):替换进程/主机/端口/动作,**保留原位置与 `isEnabled`**
+    /// ——双击改规则用。id 不存在时 no-op、不推送(同 `removeMatchRule` 守卫)。不做三元组去重/置顶
+    /// (那是新增语义);用户明确要改某一条,就改那一条,位置不动。
+    static func updateMatchRule(_ updated: ProxyMatchRule, _ state: AppState) -> (AppState, [Effect]) {
+        var state = state
+        guard let index = state.rules.firstIndex(where: { $0.id == updated.id }) else { return (state, []) }
+        state.rules[index].appPattern = updated.appPattern
+        state.rules[index].hostPattern = updated.hostPattern
+        state.rules[index].portRange = updated.portRange
+        state.rules[index].action = updated.action
+        return (state, [ruleSetPush(state)])
+    }
+
     static func removeMatchRule(_ id: RuleID, _ state: AppState) -> (AppState, [Effect]) {
         var state = state
         guard state.rules.contains(where: { $0.id == id }) else { return (state, []) }

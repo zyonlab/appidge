@@ -85,8 +85,10 @@ public enum Reducer {
         }
     }
 
-    /// 路由相关状态变了就产出"把完整规则集推给扩展"的 effect：非默认的每进程规则
-    /// + 细粒度规则表。app 侧 effectHandler 翻成 RuleSetMessage 发出。
+    /// 路由相关状态变了就产出"把完整规则集推给扩展"的 effect。**规则表是唯一的路由真相**:
+    /// `assignments` 恒为空——每进程规则经 `assignRule` 已派生为表里的「进程 × * × *」规则,
+    /// 若继续并行下发 `MonitoredProcess.rule` 快照,用户在「规则」页删掉派生规则后,扩展的
+    /// 每进程兜底还按旧快照路由,规则页与实际路由就地失联(真机实锤的"删了规则不生效")。
     ///
     /// **fail-open 感知**:引擎不健康(`isEngineHealthy == false`)时推**空规则集**——扩展对
     /// 未知进程/无规则命中一律回落默认直连,这才是把"异常时恢复直连"落到真正在路由的组件上;
@@ -97,11 +99,7 @@ public enum Reducer {
         guard state.isEngineHealthy else {
             return .applyRuleSet(assignments: [:], matchRules: [])
         }
-        let assignments = state.processes.compactMapValues { $0.rule == .direct ? nil : $0.rule }
-        return .applyRuleSet(
-            assignments: assignments,
-            matchRules: state.rules
-        )
+        return .applyRuleSet(assignments: [:], matchRules: state.rules)
     }
 
     private static func processDiscovered(

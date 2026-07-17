@@ -75,7 +75,7 @@ struct MatchRuleReducerTests {
         state.processes[a] = MonitoredProcess(id: a, displayName: "A", executablePath: "/a", rule: .proxied)
         let (_, effects) = Reducer.reduce(state, .addMatchRule(rule("r1", host: "*.x")))
         #expect(effects == [.applyRuleSet(
-            assignments: [a: .proxied],
+            assignments: [:],
             matchRules: [rule("r1", host: "*.x")]
         )])
     }
@@ -154,7 +154,7 @@ struct MatchRuleReducerTests {
         #expect(next.rules[0].hostPattern == "*")
         #expect(next.rules[0].portRange == nil)
         #expect(next.rules[0].action == .proxied)
-        #expect(effects == [.applyRuleSet(assignments: [a: .proxied], matchRules: next.rules)])
+        #expect(effects == [.applyRuleSet(assignments: [:], matchRules: next.rules)])
     }
 
     @Test("a NEWER per-process assignment outranks an OLDER connection-level rule — recency wins across entries")

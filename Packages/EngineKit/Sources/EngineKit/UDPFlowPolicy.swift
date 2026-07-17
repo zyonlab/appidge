@@ -53,12 +53,7 @@ public enum UDPFlowPolicy {
         if ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourceIdentifier, ownIdentifiers: ownIdentifiers) {
             return .allowDirect
         }
-        if port == 53 { return .allowDirect }
-        if let host {
-            if LoopbackDetector.isLoopback(host: host) { return .allowDirect }
-            if PrivateNetworkExclusion.isPrivateNetwork(host: host) { return .allowDirect }
-            if NonUnicastExclusion.isNonUnicast(host: host) { return .allowDirect }
-        }
+        if destinationIsHardAllowed(host: host, port: port) { return .allowDirect }
         let effectiveRule = RuleMatcher.firstAppLevelMatch(matchRules, app: sourceIdentifier) ?? perProcessRule
         switch effectiveRule {
         case .some(.block):
@@ -73,5 +68,15 @@ public enum UDPFlowPolicy {
             // observe 只对 TCP 有"记录后放行"的语义;对 UDP 没有专门的观测通道,按直连放行处理。
             return .allowDirect
         }
+    }
+
+    /// 目的地类硬闸(见 `disposition` 文档的「目的地硬闸先于一切规则」):DNS(53)/回环/
+    /// 私网&链路本地/组播&广播 → 永远放行直连。host 为 nil 时只有端口 53 可判。
+    private static func destinationIsHardAllowed(host: String?, port: UInt16?) -> Bool {
+        if port == 53 { return true }
+        guard let host else { return false }
+        return LoopbackDetector.isLoopback(host: host)
+            || PrivateNetworkExclusion.isPrivateNetwork(host: host)
+            || NonUnicastExclusion.isNonUnicast(host: host)
     }
 }

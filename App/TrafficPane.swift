@@ -56,11 +56,17 @@ private struct TrafficTab: View {
 }
 
 /// 「应用」表:目录扫描到的应用,**右键设每进程规则**(走代理 / 直连 / 拦截)——这是「让某个 app
-/// 走代理」的入口。设了之后扩展加载即按此路由(在细粒度 host/port 规则之后、默认直连之前生效)。
-/// 有流量的排前面,其余按名字。
+/// 走代理」的入口。右键实际派生一条「进程 × * × *」规则置顶进规则表(见 Reducer.assignRule)。
+/// 「规则」列**从规则表推导**(EffectiveAppRule,与扩展路由同一真相):在「规则」页删掉/停用
+/// 对应规则,这里立刻回落显示下一条命中(或默认直连)——两页永不失联。有流量的排前面,其余按名字。
 private struct AppRoutingTable: View {
     var store: Store
     @State private var selection: Set<MonitoredProcess.ID> = []
+
+    /// 进程在当前规则表下的 app 维度有效动作;nil = 没有任何 host-agnostic 规则命中 → 默认直连。
+    private func effectiveAction(_ p: MonitoredProcess) -> ProxyRule {
+        EffectiveAppRule.action(forProcess: p.id, rules: store.state.rules) ?? .direct
+    }
 
     private var processes: [MonitoredProcess] {
         store.state.processes.values.sorted {
@@ -81,7 +87,8 @@ private struct AppRoutingTable: View {
             Table(processes, selection: $selection) {
                 TableColumn("应用") { p in AppLabel(name: p.displayName, path: p.executablePath) }
                 TableColumn("规则") { p in
-                    Text(RouteText.label(rule: p.rule, kind: nil)).foregroundStyle(RouteText.color(p.rule))
+                    let action = effectiveAction(p)
+                    Text(RouteText.label(rule: action, kind: nil)).foregroundStyle(RouteText.color(action))
                 }.width(64)
                 // 实时速率(本批瞬时,上+下合计):当前在吃带宽的应用一眼可见——活跃(>0)高亮,空闲变灰。
                 // 悬停看上/下分向。答「现在谁在吃带宽」,是 Activity Monitor 只给累计所答不了的。

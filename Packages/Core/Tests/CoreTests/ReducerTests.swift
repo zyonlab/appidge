@@ -37,9 +37,9 @@ struct ReducerTests {
         let (next, effects) = Reducer.reduce(state, .assignRule(processID: a, rule: .proxied))
         #expect(next.processes[a]?.rule == .proxied)
         #expect(next.processes[b]?.rule == .direct)
-        // only the non-direct assignment is pushed; the extension defaults unknowns to direct.
-        // assignRule 还派生一条「该进程 × * × *」规则收编进规则表(跨入口时间倒排的关键)。
-        #expect(effects == [.applyRuleSet(assignments: [a: .proxied], matchRules: next.rules)])
+        // assignRule 派生「该进程 × * × *」规则收编进规则表;规则表是唯一路由真相,
+        // assignments 恒为空(见 ruleSetPush)。
+        #expect(effects == [.applyRuleSet(assignments: [:], matchRules: next.rules)])
         #expect(next.rules.map(\.appPattern) == ["a"])
     }
 
@@ -174,7 +174,7 @@ struct ReducerTests {
         let (next, effects) = Reducer.reduce(state, .extensionActivationChanged(.active))
 
         #expect(next.isEngineHealthy == true)
-        #expect(effects == [.applyRuleSet(assignments: [a: .proxied], matchRules: [])])
+        #expect(effects == [.applyRuleSet(assignments: [:], matchRules: [])])
     }
 
     @Test("activation changes that are not .active do not touch engine health and push nothing")

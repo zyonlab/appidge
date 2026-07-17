@@ -43,7 +43,7 @@ struct ResyncExtensionReducerTests {
 
         #expect(effects == [
             .applyRuleSet(
-                assignments: [processID: .proxied],
+                assignments: [:],
                 matchRules: state.rules
             ),
             .applyProxyConfig(servers: [server], activeID: server.id),

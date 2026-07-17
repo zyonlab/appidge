@@ -13,6 +13,7 @@ struct ExtensionActivationReducerTests {
         "extensionActivationChanged 把状态写进 state,不产生副作用",
         arguments: [
             ExtensionActivation.activating,
+            .disabled,
             .needsApproval,
             .active,
             .failed(reason: "code signature invalid"),
@@ -28,7 +29,7 @@ struct ExtensionActivationReducerTests {
     @Test("只有 .active 时 isRunning 为真")
     func isRunningOnlyWhenActive() {
         #expect(ExtensionActivation.active.isRunning)
-        for other: ExtensionActivation in [.inactive, .activating, .needsApproval, .failed(reason: "x")] {
+        for other: ExtensionActivation in [.inactive, .activating, .needsApproval, .disabled, .failed(reason: "x")] {
             #expect(!other.isRunning)
         }
     }

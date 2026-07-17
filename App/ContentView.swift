@@ -50,6 +50,10 @@ struct MenuBarView: View {
                                       text: "待批准 · 系统设置里点允许",
                                       help: "打开「系统设置 → 隐私与安全性」,点「允许」加载 appidge 的系统扩展。",
                                       motion: .pulse)
+        case .disabled:
+            return StatusPresentation(symbol: "bolt.slash.circle", tint: .orange,
+                                      text: "扩展已停用 · 系统设置里开启",
+                                      help: "「系统设置 → 通用 → 登录项与扩展」里重新打开 appidge 的网络扩展,最多 30 秒自动恢复接管。")
         case .failed(let reason):
             return StatusPresentation(symbol: "xmark.octagon.fill", tint: .red,
                                       text: "扩展未安装", help: reason)

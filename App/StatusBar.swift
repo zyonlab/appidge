@@ -43,6 +43,9 @@ struct StatusBar: View {
         case .needsApproval:
             return StatusInfo(color: .orange, text: "扩展待批准 · 系统设置里点允许", emphasized: true,
                               tooltip: "打开「系统设置 → 隐私与安全性」,点「允许」加载 appidge 的系统扩展。", attention: true)
+        case .disabled:
+            return StatusInfo(color: .orange, text: "扩展已停用 · 系统设置里开启", emphasized: true,
+                              tooltip: "appidge 的网络扩展在「系统设置 → 通用 → 登录项与扩展」里被停用了,重新打开后即恢复接管(最多 30 秒自动重连,无需重启 app)。")
         case .failed(let reason):
             return StatusInfo(color: .red, text: "扩展未安装", emphasized: true, tooltip: reason)
         }

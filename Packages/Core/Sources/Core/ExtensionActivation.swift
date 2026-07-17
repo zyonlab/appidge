@@ -17,6 +17,11 @@ public enum ExtensionActivation: Sendable, Equatable, Codable {
     case needsApproval
     /// 扩展已安装并在运行。
     case active
+    /// 扩展**已安装但被用户在「系统设置 → 通用 → 登录项与扩展」里停用**——不会收到任何 flow,
+    /// XPC 也无人监听。区别于 `needsApproval`(从未批准):这是"批准过又被关掉",由启动时的
+    /// `propertiesRequest` 状态查询发现(isEnabled == false 且不在等批准)。UI 据此把人指向
+    /// 系统设置里重新打开,app 侧同时停止空耗(XPC 退避、不无脑重新激活)。
+    case disabled
     /// 激活失败(如缺 entitlement、签名不符);`reason` 是系统给的原因,供 tooltip/日志。
     case failed(reason: String)
 

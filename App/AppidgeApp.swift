@@ -92,15 +92,19 @@ struct AppidgeApp: App {
                 // 恢复之前(状态还空);这次确保扩展拿到的是恢复后的最新全量(规则+代理+路由+UDP+
                 // 排除名单)。effect 已串行化,这次 resync 的推送排在恢复推送之后、最终胜出。
                 store.dispatch(.resyncExtension)
-                // 已完成引导 = 之前提交过激活。激活状态不持久化，重新提交一次（幂等）把状态
-                // 栏校准到真实情况：已批准立刻回 .active，否则如实回 needsApproval/failed。
-                if store.state.hasCompletedOnboarding {
-                    SystemExtensionActivator.shared.activate()
+                // **先查真实状态,再决定要不要激活/起会话**(propertiesRequest 只查询、零 UI):
+                // 扩展被用户在系统设置里**停用**时,activate() 只会打扰、startVPNTunnel 必然失败,
+                // XPC 也无人监听——这种状态下什么都不做,状态栏如实显示「已停用」,把人指向系统
+                // 设置(真机实锤:0.2.20 前 app 曾在此状态下因 XPC 重连风暴空转 100%+ CPU)。
+                // 其余状态维持老路:已完成引导就重新提交激活(幂等,兼顾升级 replace),并直接
+                // 尝试起会话一次(不依赖 activate() 的 .completed 回调,旧版本它可能不回)。
+                SystemExtensionActivator.shared.checkStatus { state in
+                    if case .disabled = state { return }
+                    if store.state.hasCompletedOnboarding {
+                        SystemExtensionActivator.shared.activate()
+                        Task { await TransparentProxyController.start() }
+                    }
                 }
-                // 扩展获批后,必须由 app 启动透明代理会话,流量才会进 provider。不依赖 activate() 的
-                // .completed 回调(旧版本「待重启卸载」时它可能一直不回),启动时直接尝试一次:
-                // 幂等——已在跑就跳过,扩展没批准则 startVPNTunnel 失败并记 stderr,不影响别的。
-                await TransparentProxyController.start()
             }
         }
         .onChange(of: scenePhase) { _, newPhase in

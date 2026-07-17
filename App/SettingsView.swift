@@ -93,6 +93,7 @@ struct SettingsView: View {
         case .inactive: ("未接入", .secondary)
         case .activating: ("安装中…", .orange)
         case .needsApproval: ("待批准（去系统设置允许）", .orange)
+        case .disabled: ("已停用（系统设置 → 登录项与扩展 里开启）", .orange)
         case .failed: ("未安装", .red)
         }
     }

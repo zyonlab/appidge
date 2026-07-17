@@ -87,8 +87,10 @@ private struct AppRoutingTable: View {
             Table(processes, selection: $selection) {
                 TableColumn("应用") { p in AppLabel(name: p.displayName, path: p.executablePath) }
                 TableColumn("规则") { p in
+                    // 应用级规则用规则表同款文案(「代理/直连/拦截/观测」)——RouteText.label 是
+                    // 连接行专用的,proxyKind 为 nil 时会显示成「代理(回落直连)」,放这里是误导。
                     let action = effectiveAction(p)
-                    Text(RouteText.label(rule: action, kind: nil)).foregroundStyle(RouteText.color(action))
+                    Text(RuleActionStyle.label(action)).foregroundStyle(RuleActionStyle.color(action))
                 }.width(64)
                 // 实时速率(本批瞬时,上+下合计):当前在吃带宽的应用一眼可见——活跃(>0)高亮,空闲变灰。
                 // 悬停看上/下分向。答「现在谁在吃带宽」,是 Activity Monitor 只给累计所答不了的。

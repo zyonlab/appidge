@@ -68,11 +68,16 @@ struct ConnectionsTable: View {
                 RouteChip(rule: e.rule, kind: e.proxyKind)
             }.width(min: 110, ideal: 160)
 
+            // 观测行不接管数据通路,字节数本来就测不到——显示「—」,不显示误导性的 Zero KB。
             TableColumn("发送", value: \.bytesUp) { e in
-                Text(TrafficFormat.bytes(e.bytesUp)).monospacedDigit()
+                Text(e.rule == .observe ? "—" : TrafficFormat.bytes(e.bytesUp))
+                    .monospacedDigit()
+                    .foregroundStyle(e.rule == .observe ? .secondary : .primary)
             }.width(min: 64, ideal: 76)
             TableColumn("接收", value: \.bytesDown) { e in
-                Text(TrafficFormat.bytes(e.bytesDown)).monospacedDigit()
+                Text(e.rule == .observe ? "—" : TrafficFormat.bytes(e.bytesDown))
+                    .monospacedDigit()
+                    .foregroundStyle(e.rule == .observe ? .secondary : .primary)
             }.width(min: 64, ideal: 76)
         }
         .contextMenu(forSelectionType: ConnectionLogEntry.ID.self) { ids in
@@ -93,6 +98,19 @@ struct ConnectionsTable: View {
     /// 可见行数量级,不构成全表刷新);已关闭 → 灰对勾;失败 → 红八角叉。
     @ViewBuilder
     private func statusCell(_ entry: ConnectionLogEntry) -> some View {
+        if entry.rule == .observe {
+            // 观测 = 只登记「它连了哪里」,数据通路不经过我们(本地代理防环 / 回环×上游端口),
+            // 生命周期与字节数**跟踪不到**——显示「已放行」而不是误导性的「已关闭」。
+            Label("已放行", systemImage: "eye")
+                .foregroundStyle(.orange)
+                .help("观测:记录后放行,不接管数据通路,无时长/字节跟踪 · \(entry.openedAt.formatted(date: .omitted, time: .standard)) 记录")
+        } else {
+            trackedStatusCell(entry)
+        }
+    }
+
+    @ViewBuilder
+    private func trackedStatusCell(_ entry: ConnectionLogEntry) -> some View {
         switch entry.phase {
         case .opened:
             TimelineView(.periodic(from: .now, by: 1)) { context in

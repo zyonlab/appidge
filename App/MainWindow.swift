@@ -171,7 +171,14 @@ private struct ConnectionDetail: View {
                 }
                 Section("路由") {
                     LabeledContent("决策") { RouteChip(rule: e.rule, kind: e.proxyKind) }
-                    LabeledContent("状态") { statusLabel(e.phase) }
+                    LabeledContent("状态") {
+                        if e.rule == .observe {
+                            // 同连接表:观测行不跟踪生命周期,显示「已放行」而非「已关闭」。
+                            Label("已放行", systemImage: "eye").foregroundStyle(.orange)
+                        } else {
+                            statusLabel(e.phase)
+                        }
+                    }
                 }
                 Section("流量") {
                     LabeledContent("↑", value: TrafficFormat.bytes(e.bytesUp))

@@ -240,7 +240,7 @@ public enum Reducer {
             .applyRoutingMode(state.proxyRoutingMode),
             .applyPacketCapture(state.isPacketCaptureEnabled),
             .applyUDPPolicy(state.udpPolicy),
-            .applyProcessOriginExclusions(state.dynamicOriginExclusion)
+            .applyProcessOriginExclusions(state.combinedOriginExclusions)
         ])
     }
 
@@ -304,8 +304,8 @@ public enum Reducer {
 private extension Reducer {
     static func reduceSettings(_ state: AppState, _ action: Action) -> (AppState, [Effect])? {
         switch action {
-        case .loopWarningRaised(let signature):
-            return loopWarningRaised(signature, state)
+        case .loopWarningRaised(let signature, let processID, let executablePath):
+            return loopWarningRaised(signature, processID: processID, executablePath: executablePath, state)
         case .dismissLoopWarning:
             return dismissLoopWarning(state)
         case .resetState:
@@ -330,22 +330,40 @@ private extension Reducer {
             }
             return (state, [])
         case .proxyProcessIdentitiesResolved(let discovery):
-            // 未变化就不推(和 applyProxyConfig 等其它下发一致的幂等守卫)。
+            // 未变化就不推(和 applyProxyConfig 等其它下发一致的幂等守卫)。发现结果整体替换
+            // `dynamicOriginExclusion`;环自愈加的 `loopAutoExclusions` 独立保留,下发取并集。
             guard state.dynamicOriginExclusion != discovery else { return (state, []) }
             var state = state
             state.dynamicOriginExclusion = discovery
-            return (state, [.applyProcessOriginExclusions(discovery)])
+            return (state, [.applyProcessOriginExclusions(state.combinedOriginExclusions)])
         default:
             return nil
         }
     }
 
-    /// 用户已「忽略」过的 signature 不再重复弹(扩展侧检测器每次命中都会投递,不去重)。
-    static func loopWarningRaised(_ signature: String, _ state: AppState) -> (AppState, [Effect]) {
-        guard !state.dismissedLoopSignatures.contains(signature) else { return (state, []) }
+    /// 环检测自愈 + 告警:
+    /// 1. 把触发 flow 的来源进程双信号并进 `loopAutoExclusions` 并回推扩展——来源进程从此
+    ///    硬旁路,环当场断掉(对齐 Proxifier「检测到环 → 自动建该进程 Direct 置顶规则」)。
+    ///    已收录过则不重推(幂等)。自愈不受「忽略」影响:忽略只是不想再看见横幅。
+    /// 2. 弹告警条;用户已「忽略」过的 signature 不再重复弹(扩展侧检测器每次命中都会投递)。
+    static func loopWarningRaised(
+        _ signature: String, processID: ProcessID?, executablePath: String?, _ state: AppState
+    ) -> (AppState, [Effect]) {
         var state = state
-        state.loopWarning = signature
-        return (state, [])
+        var effects: [Effect] = []
+
+        var exclusions = state.loopAutoExclusions
+        if let processID { exclusions.identifiers.insert(processID.value) }
+        if let executablePath { exclusions.executablePaths.insert(executablePath) }
+        if exclusions != state.loopAutoExclusions {
+            state.loopAutoExclusions = exclusions
+            effects.append(.applyProcessOriginExclusions(state.combinedOriginExclusions))
+        }
+
+        if !state.dismissedLoopSignatures.contains(signature) {
+            state.loopWarning = signature
+        }
+        return (state, effects)
     }
 
     /// 关闭当前告警并记住它的 signature——同一问题不再打扰;重启后清零(运行时状态)。

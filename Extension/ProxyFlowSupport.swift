@@ -38,6 +38,9 @@ struct FlowOrigin {
     /// 人类可读的进程名(见 `ProcessPathResolver.displayName(fromExecutablePath:)`)。
     /// 解不出可执行文件路径、或路径解不出文件名时为 nil。
     let displayName: String?
+    /// 可执行文件路径(audit token 解出,可能为 nil)——环检测命中时随 loopDetected 上报,
+    /// app 据此把来源进程双信号自动加入旁路排除(环自愈)。
+    let executablePath: String?
     let rule: ProxyRuleDTO
 }
 

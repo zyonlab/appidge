@@ -49,8 +49,12 @@ public enum ExtensionMessageHandling {
                 processDisplayName: event.processDisplayName
             ))]
 
-        case .loopDetected(let signature):
-            return [.loopWarningRaised(signature)]
+        case .loopDetected(let signature, let processID, let executablePath):
+            return [.loopWarningRaised(
+                signature: signature,
+                processID: processID.map { Core.ProcessID($0.value) },
+                executablePath: executablePath
+            )]
         }
     }
 

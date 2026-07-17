@@ -112,7 +112,9 @@ struct CodableRoundTripTests {
         let failure = ExtensionToAppMessage.engineFailure(reason: "transport crashed")
         #expect(try roundTrip(failure) == failure)
 
-        let loop = ExtensionToAppMessage.loopDetected(signature: "10.0.0.1:1080")
+        let loop = ExtensionToAppMessage.loopDetected(
+            signature: "10.0.0.1:1080", processID: ProcessIdentifierDTO("a.out"), executablePath: "/usr/local/bin/xray"
+        )
         #expect(try roundTrip(loop) == loop)
 
         let event = ExtensionToAppMessage.connectionEvent(

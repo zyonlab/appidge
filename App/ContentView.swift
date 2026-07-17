@@ -164,7 +164,7 @@ struct LoopWarningBanner: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-            Text("检测到疑似转发环：\(signature) 被反复捕获。请检查上游 / 规则是否形成回路。")
+            Text("检测到疑似转发环：\(signature) 被反复捕获，已自动将来源进程旁路直连（见 设置 → 内置规则）。若仍反复出现，请检查上游 / 规则是否形成回路。")
                 .font(.callout)
             Spacer()
             Button("忽略", action: onDismiss)

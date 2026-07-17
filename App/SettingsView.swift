@@ -80,6 +80,26 @@ struct SettingsView: View {
                 Label("本地 / 回环地址（127.0.0.1、::1、localhost）始终直连，不经代理（不可关闭）",
                       systemImage: "lock.fill")
                     .font(.callout).foregroundStyle(.secondary)
+                // 对齐 Proxifier 检测到环后 auto-created 规则的「可见性」:自动旁路不是黑盒,
+                // 在这里如实列出(端口发现 + 环检测自愈两个来源的并集)。
+                let excluded = store.state.combinedOriginExclusions
+                if !excluded.identifiers.isEmpty || !excluded.executablePaths.isEmpty {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("已自动旁路的本地代理进程（完全不接管，防转发环；运行时自动识别）：")
+                            Text(
+                                (excluded.identifiers.sorted() + excluded.executablePaths.sorted())
+                                    .joined(separator: "  ·  ")
+                            )
+                            .monospaced()
+                            .textSelection(.enabled)
+                        }
+                        .font(.callout)
+                    } icon: {
+                        Image(systemName: "arrow.uturn.right.circle")
+                    }
+                    .foregroundStyle(.secondary)
+                }
             }
         }
         .formStyle(.grouped)

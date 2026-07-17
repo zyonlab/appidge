@@ -28,6 +28,19 @@ public struct AppState: Sendable, Equatable {
     /// libproc+SecCode 查到、经 `.proxyProcessIdentitiesResolved` 回灌。与静态的 app/扩展自身
     /// 标识/路径合并后下发给扩展,任一信号命中即强制直连。运行时发现的结果,不持久化(重启后重新查)。
     public var dynamicOriginExclusion: OriginExclusionDiscovery
+    /// **环检测自愈**加入的排除:扩展报告疑似转发环时,把触发 flow 的来源进程双信号自动收进来
+    /// (对齐 Proxifier「检测到环 → 自动建该进程 Direct 置顶规则」的行为)。与 `dynamicOriginExclusion`
+    /// 分开存——后者每次 applyProxyConfig 都会被发现结果**整体替换**,自愈加的不能被冲掉。
+    /// 下发时两者取并集(见 `combinedOriginExclusions`)。运行时状态,不持久化。
+    public var loopAutoExclusions: OriginExclusionDiscovery
+
+    /// 下发给扩展的完整来源排除 = 端口发现的 ∪ 环检测自愈的。
+    public var combinedOriginExclusions: OriginExclusionDiscovery {
+        OriginExclusionDiscovery(
+            identifiers: dynamicOriginExclusion.identifiers.union(loopAutoExclusions.identifiers),
+            executablePaths: dynamicOriginExclusion.executablePaths.union(loopAutoExclusions.executablePaths)
+        )
+    }
 
     /// 连接日志保留的最大条数;超出丢最旧。
     public static let connectionLogCap = 500
@@ -48,7 +61,8 @@ public struct AppState: Sendable, Equatable {
         isPacketCaptureEnabled: Bool = false,
         udpPolicy: UDPPolicy = .block,
         extensionActivation: ExtensionActivation = .inactive,
-        dynamicOriginExclusion: OriginExclusionDiscovery = OriginExclusionDiscovery()
+        dynamicOriginExclusion: OriginExclusionDiscovery = OriginExclusionDiscovery(),
+        loopAutoExclusions: OriginExclusionDiscovery = OriginExclusionDiscovery()
     ) {
         self.isEngineHealthy = isEngineHealthy
         self.processes = processes
@@ -66,5 +80,6 @@ public struct AppState: Sendable, Equatable {
         self.udpPolicy = udpPolicy
         self.extensionActivation = extensionActivation
         self.dynamicOriginExclusion = dynamicOriginExclusion
+        self.loopAutoExclusions = loopAutoExclusions
     }
 }

@@ -126,8 +126,12 @@ struct ExtensionMessageHandlingTests {
 
     @Test("loopDetected maps to a loopWarningRaised action carrying the signature")
     func loopDetectedMapsToWarning() {
-        let actions = ExtensionMessageHandling.actions(for: .loopDetected(signature: "10.0.0.1:1080"))
-        #expect(actions == [.loopWarningRaised("10.0.0.1:1080")])
+        let actions = ExtensionMessageHandling.actions(for: .loopDetected(
+            signature: "10.0.0.1:1080", processID: ProcessIdentifierDTO("a.out"), executablePath: "/opt/xray"
+        ))
+        #expect(actions == [.loopWarningRaised(
+            signature: "10.0.0.1:1080", processID: Core.ProcessID("a.out"), executablePath: "/opt/xray"
+        )])
     }
 
     @Test("a blocked connection event maps rule .block through to Core (proxyKind nil)")

@@ -275,7 +275,10 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             return false
         case .observe:
             // 不接管数据通路:记一条"观测"连接事件(0 字节)让活动栏看得到"这进程连了哪里",随即放行。
-            emitObservedFlow(processID: processID, displayName: name, host: hostPort?.0, port: hostPort?.1)
+            // 展示优先域名(app 用域名连时 NE 保留),对齐 Proxifier 的 Target 列。
+            emitObservedFlow(
+                processID: processID, displayName: name, host: remoteHostname ?? hostPort?.0, port: hostPort?.1
+            )
             return false
         case .handle(let rule):
             flowLogger.log("""
@@ -284,7 +287,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             """)
             beginHandledFlow(
                 tcpFlow: tcpFlow,
-                origin: FlowOrigin(processID: processID, displayName: name, rule: rule),
+                origin: FlowOrigin(processID: processID, displayName: name, executablePath: sourcePath, rule: rule),
                 to: remoteEndpoint, remoteHostname: remoteHostname, router: router
             )
             return true
@@ -306,16 +309,26 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         // async 重解,既省一次 actor 往返,也避免"同步判接管、异步又判成 .direct"的竞态。
         await routingHistoryTracker.record(processID: processID, wasProxied: rule == .proxied)
 
-        let (host, port) = ProxyDialer.hostPort(from: remoteEndpoint) ?? (remoteHostname ?? "?", 0)
+        // 展示/日志/环签名优先域名(app 用域名连时 NE 保留),对齐 Proxifier 的 Target 列——
+        // 同一域名换 IP 不再看起来是"不同目标",环签名也更稳。端口仍取自 endpoint。
+        let endpointHostPort = ProxyDialer.hostPort(from: remoteEndpoint)
+        let host = remoteHostname ?? endpointHostPort?.0 ?? "?"
+        let port = endpointHostPort?.1 ?? 0
 
-        // 主动环检测:把这次捕获喂给检测器,命中(同目标短窗口内反复捕获)就提示 app——
-        // 兜底 passive 的回环/上游/来源排除漏网的情况。
+        // 主动环检测:把这次捕获喂给检测器,命中(同目标短窗口内反复捕获)就提示 app,并随事件
+        // 带上来源进程双信号——app 会把它自动加入旁路排除并回推(环自愈,对齐 Proxifier 的
+        // auto-created Direct 规则),兜底 passive 的回环/上游/来源排除漏网的情况。
         let loopSignature = "\(host):\(port)"
         let looped = configLock.withLock {
             storedLoopDetector.record(signature: loopSignature, now: Date().timeIntervalSince1970)
         }
         if looped, let transport {
-            Task { await transport.deliver(.loopDetected(signature: loopSignature)) }
+            let origin = origin
+            Task {
+                await transport.deliver(.loopDetected(
+                    signature: loopSignature, processID: origin.processID, executablePath: origin.executablePath
+                ))
+            }
         }
 
         // 实际所用代理协议:按解析后的路由取第一跳的 kind——proxied 但降级成直连时记 nil,

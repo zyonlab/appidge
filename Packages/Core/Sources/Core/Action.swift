@@ -23,8 +23,10 @@ public enum Action: Sendable, Equatable {
     case connectionEventReceived(ConnectionLogEntry)
     /// 用户在「活动」页手动清空连接日志(不影响 `processes` 的累计流量/规则——只清这张表)。
     case clearConnectionLog
-    /// 扩展主动检测到疑似转发环(signature = 命中目标)。
-    case loopWarningRaised(String)
+    /// 扩展主动检测到疑似转发环(signature = 命中目标;processID/executablePath = 触发那条 flow
+    /// 的来源双信号,解析不出为 nil)。reducer 据此把来源进程**自动加入旁路排除**并回推扩展
+    /// (对齐 Proxifier 的 loop 自愈:检测到环即自动建「该进程 → Direct」),并弹告警条。
+    case loopWarningRaised(signature: String, processID: ProcessID?, executablePath: String?)
     /// 用户关闭环告警。
     case dismissLoopWarning
     /// 把 state 清回初始值(切换配置档案时用:先 reset 再 dispatch 新档案的 restorationActions,

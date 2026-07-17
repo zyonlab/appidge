@@ -4,8 +4,12 @@ import AppFeature
 
 /// 主窗口底部状态栏(对齐 Proxifier 底部那条):引擎健康 · 活动连接数 · 全局累计上下行。
 /// 用 `.bar` 材质,贴在 `.safeAreaInset(edge:.bottom)`。
-/// 动效(§08「动事件不动数值」):状态灯在「已接管」时呼吸、在「安装中/待批准」时脉冲(引擎活着的心跳);
-/// 累计上下行用 `.numericText()` 数字滚动。全部 `reduce-motion` 下自动静止。
+/// 动效(§08「动事件不动数值」):累计上下行用 `.numericText()` 数字滚动(事件驱动,只在值变时动)。
+/// ⚠️ 状态灯**不做**常驻动画:曾经的 `.symbolEffect(.breathe/.pulse, .repeat(.continuous))`
+/// 在真机上让 app 本体常驻 100%+ CPU——ProMotion 下 SF Symbol 的连续动画每帧插值重绘
+/// (RenderBox RBInterpolatedDisplayListContents),状态栏又常驻可见,等于永不停歇的全帧率
+/// 渲染循环(sample 实锤:主线程大头全在 UpdateCycle/CA::Transaction::commit/CGDrawingLayer.draw)。
+/// 状态语义靠颜色 + 文案表达,不靠动画。
 struct StatusBar: View {
     var store: Store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -17,15 +21,12 @@ struct StatusBar: View {
         TrafficStatsAggregator.totals(Array(store.state.processes.values))
     }
 
-    /// 状态栏那一格的呈现要素。`emphasized` = 是否给文字上色(否则用 primary);`live` = 引擎在跑(灯呼吸);
-    /// `attention` = 安装中/待批准(灯脉冲,提示需留意)。
+    /// 状态栏那一格的呈现要素。`emphasized` = 是否给文字上色(否则用 primary)。
     private struct StatusInfo {
         let color: Color
         let text: String
         let emphasized: Bool
         let tooltip: String?
-        var live = false
-        var attention = false
     }
 
     /// 状态先看扩展装没装(没装/待批准/失败都得先说清,否则"引擎正常"会误导);装上了再看引擎健康度。
@@ -33,16 +34,16 @@ struct StatusBar: View {
         switch store.state.extensionActivation {
         case .active:
             return store.state.isEngineHealthy
-                ? StatusInfo(color: .green, text: "引擎正常", emphasized: false, tooltip: nil, live: true)
+                ? StatusInfo(color: .green, text: "引擎正常", emphasized: false, tooltip: nil)
                 : StatusInfo(color: .red, text: "引擎异常 · 已回退直连", emphasized: true, tooltip: nil)
         case .inactive:
             return StatusInfo(color: .secondary, text: "扩展未接入", emphasized: true,
                               tooltip: "系统扩展还没装上/批准——去设置里点「启用」并在系统设置里允许后,才会接管流量。")
         case .activating:
-            return StatusInfo(color: .orange, text: "扩展安装中…", emphasized: false, tooltip: nil, attention: true)
+            return StatusInfo(color: .orange, text: "扩展安装中…", emphasized: false, tooltip: nil)
         case .needsApproval:
             return StatusInfo(color: .orange, text: "扩展待批准 · 系统设置里点允许", emphasized: true,
-                              tooltip: "打开「系统设置 → 隐私与安全性」,点「允许」加载 appidge 的系统扩展。", attention: true)
+                              tooltip: "打开「系统设置 → 隐私与安全性」,点「允许」加载 appidge 的系统扩展。")
         case .disabled:
             return StatusInfo(color: .orange, text: "扩展已停用 · 系统设置里开启", emphasized: true,
                               tooltip: "appidge 的网络扩展在「系统设置 → 通用 → 登录项与扩展」里被停用了,重新打开后即恢复接管(最多 30 秒自动重连,无需重启 app)。")
@@ -57,8 +58,6 @@ struct StatusBar: View {
                 Image(systemName: "circle.fill")
                     .font(.system(size: 8))
                     .foregroundStyle(status.color)
-                    .symbolEffect(.breathe, options: .repeat(.continuous), isActive: status.live && !reduceMotion)
-                    .symbolEffect(.pulse, options: .repeat(.continuous), isActive: status.attention && !reduceMotion)
                 Text(status.text)
                     .foregroundStyle(status.emphasized ? status.color : Color.primary)
             }

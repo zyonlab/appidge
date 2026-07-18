@@ -13,19 +13,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+/// 主窗口选中的顶层分段(活动/应用/规则/代理)提升为**跨窗口共享状态**:主窗口的分段 Picker 与
+/// 菜单栏的「打开入口」都绑到同一份,菜单栏点某个入口就能把主窗口切到对应 tab。轻量 `@Observable`
+/// `@MainActor`——只在主线程读写,满足 Swift 6 严格并发,不引入跨 actor 共享可变引用。
+@MainActor
+@Observable
+final class MainTabSelection {
+    var section: MainWindow.MainTab = .activity
+}
+
 @main
 struct AppidgeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var store: Store
     @State private var ipcReceiver: IPCReceiver
     @State private var profilesModel: ProfilesModel
+    /// 主窗口分段选中态,菜单栏「打开入口」与主窗口 Picker 共享同一份(见 MainTabSelection)。
+    @State private var tabSelection = MainTabSelection()
     // 类而非局部变量：`store.onAction` 闭包按引用捕获它,多次 dispatch 之间能共享同一个
     // "有没有待落盘的 Task" 状态(struct 会在每次闭包创建时拿到不同的副本，防抖就失效了)。
     @State private var persistenceDebouncer = PersistenceDebouncer()
     /// 版本握手自愈的去重:已针对哪个运行版本重启过会话(避免重启后版本仍旧时反复重启)。
     /// nil = 还没自愈过;`extensionNeedsRebind` 为真时 runningExtensionVersion 必非 nil。
     @State private var healedForRunningVersion: String?
+    /// 界面语言（跟随系统 / 简体中文 / English）。`.system` 时不覆盖 locale 环境。
+    /// 在根 scene 对内容套 `.environment(\.locale, ...)`，`Text(LocalizedStringKey)` 即时切换。
+    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     @Environment(\.scenePhase) private var scenePhase
+
+    /// 当前应覆盖到 `\.locale` 环境的 Locale：非 system 用所选语言，system 回退系统当前。
+    private var localeOverride: Locale { appLanguage.resolvedLocale ?? .autoupdatingCurrent }
 
     // 代理密码存 Keychain，不落 JSON（见 PersistedProxyServer 结构上无 password 字段）。
     private let credentialStore: any CredentialStore = KeychainCredentialStore()
@@ -61,10 +78,10 @@ struct AppidgeApp: App {
     }
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: "main") {
             Group {
                 if store.state.hasCompletedOnboarding {
-                    MainWindow(store: store, profiles: profilesModel)
+                    MainWindow(store: store, profiles: profilesModel, tabSelection: tabSelection)
                 } else {
                     OnboardingView(store: store)
                 }
@@ -130,13 +147,16 @@ struct AppidgeApp: App {
                 persistCurrentConfiguration()
             }
         }
+        .environment(\.locale, localeOverride)
 
         Settings {
             SettingsView(store: store)
+                .environment(\.locale, localeOverride)
         }
 
         MenuBarExtra("appidge", systemImage: "network") {
-            MenuBarView(store: store)
+            MenuBarView(store: store, tabSelection: tabSelection)
+                .environment(\.locale, localeOverride)
         }
         // .window 而非默认 .menu：内容是「仪表盘」(状态行 + Top-5 列表 + 开关),
         // 需要完整 SwiftUI 排版(语义色 / caption / 对齐),菜单渲染器会把这些收着。

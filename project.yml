@@ -3,6 +3,8 @@ options:
   deploymentTarget:
     macOS: "15.0"
   createIntermediateGroups: true
+  # UI 源语言是中文;String Catalog(App/Localizable.xcstrings)以 zh-Hans 为源、含 en 翻译。
+  developmentLanguage: zh-Hans
 
 configFiles:
   Debug: Config/Signing.xcconfig

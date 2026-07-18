@@ -91,4 +91,27 @@ struct RuleMatcherTests {
         #expect(RuleMatcher.firstMatch([rule("1", app: "com.only")], app: "com.other", host: "h", port: 1) == nil)
         #expect(RuleMatcher.firstMatch([], app: "x", host: "h", port: 1) == nil)
     }
+
+    @Test("firstMatchRule returns the whole matched rule (identity + patterns), not just the action")
+    func firstMatchRuleReturnsRule() {
+        let rules = [rule("internal", host: "*.internal", .direct), rule("all", host: "*", .proxied)]
+        // 首个命中的是 "internal" 那条——拿回整条,便于 UI 显示「命中了哪条规则」。
+        let hit = RuleMatcher.firstMatchRule(rules, app: "x", host: "wiki.internal", port: 443)
+        #expect(hit?.id == "internal")
+        #expect(hit?.hostPattern == "*.internal")
+        #expect(hit?.rule == .direct)
+        // 落到兜底那条。
+        #expect(RuleMatcher.firstMatchRule(rules, app: "x", host: "example.com", port: 443)?.id == "all")
+    }
+
+    @Test("firstMatchRule honors top-to-bottom order and port/app conjunction; nil when nothing matches")
+    func firstMatchRuleOrderAndMiss() {
+        let broadFirst = [rule("broad", host: "*", .proxied), rule("spec", host: "*.internal", .direct)]
+        // 宽规则在上,遮蔽下面更具体的——命中的是 broad。
+        #expect(RuleMatcher.firstMatchRule(broadFirst, app: "x", host: "wiki.internal", port: 443)?.id == "broad")
+        // 三维都要命中:端口不在区间 → 该条不算,继续找 → 全表无命中 → nil。
+        let ssh = [rule("ssh", app: "com.x", host: "*.corp.net", ports: 22...22, .direct)]
+        #expect(RuleMatcher.firstMatchRule(ssh, app: "com.x", host: "git.corp.net", port: 80) == nil)
+        #expect(RuleMatcher.firstMatchRule([], app: "x", host: "h", port: 1) == nil)
+    }
 }

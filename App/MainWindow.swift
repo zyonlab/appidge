@@ -2,37 +2,48 @@ import SwiftUI
 import Core
 import AppFeature
 
-/// 主窗口 —— 苹果原生三栏结构(侧栏 · 内容 · Inspector),对齐 HIG 对 Mac 工具类应用的建议,
-/// 也贴近 Little Snitch 的组织方式。侧栏切换顶层区域(活动 / 规则 / 代理 / 档案);「活动」里是
-/// 连接监视表 + 底部流量,选中某条连接时右侧 Inspector 显示它的详情、并可就地据此建规则。
+/// 主窗口 —— 菜单栏优先的小工具主界面。顶层区域用**工具栏分段 tab**切换(活动 · 应用 · 规则 · 代理),
+/// 取代旧的侧栏(对齐 HIG「小工具用 segmented control 切视图,不用侧栏」)。「活动」里是连接监视表 +
+/// 底部流量,选中某条连接时右侧 Inspector 显示详情、并可就地建规则。「档案」降级为工具栏按钮弹 sheet。
 /// 窗底 `.safeAreaInset` 常驻状态栏,顶栏出现回环告警;全局设置进 `Settings` 场景(⌘,)。
-///
-/// 改自旧的 `VSplitView` + 三个配置 sheet:配置(代理 / 规则 / 档案)从「弹窗」升级为侧栏常驻目的地,
-/// 符合 HIG「侧栏放顶层目的地、Inspector 看选中项详情」的分工。
 struct MainWindow: View {
     var store: Store
     var profiles: ProfilesModel
+    /// 选中的顶层分段提升为跨窗口共享状态(见 MainTabSelection):菜单栏「打开入口」也改它,
+    /// 所以主窗口在(可能已开着的)时也会跟着切 tab。`@Bindable` 让 Picker 能双向绑定其属性。
+    @Bindable var tabSelection: MainTabSelection
 
-    @State private var section: SidebarSection? = .activity
     @State private var filter = ""
     @State private var selection: Set<ConnectionLogEntry.ID> = []
     @State private var showInspector = true
     @State private var showingClearConfirmation = false
+    @State private var showingProfiles = false
     /// 连接表只看活动连接(对齐 Proxifier:上表活跃、历史沉底)。默认关(全部可见)。
     @State private var showActiveOnly = false
 
     var body: some View {
         VStack(spacing: 0) {
-            NavigationSplitView {
-                List(selection: $section) {
-                    ForEach(SidebarSection.allCases) { item in
-                        Label(item.title, systemImage: item.symbol).tag(item)
-                    }
-                }
-                .navigationSplitViewColumnWidth(min: 168, ideal: 188, max: 240)
-                .navigationTitle("appidge")
-            } detail: {
+            NavigationStack {
                 detail
+                    .toolbar {
+                        // 顶层区域切换从侧栏改为工具栏分段(对齐 HIG「小工具用 segmented control 切视图」)。
+                        ToolbarItem(placement: .principal) {
+                            Picker("区域", selection: $tabSelection.section) {
+                                ForEach(MainTab.allCases) { tab in
+                                    Text(tab.title).tag(tab)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                        }
+                        // 「档案」从侧栏顶层降级为工具栏按钮弹出的 sheet:4 个分段不含它,但功能保留。
+                        ToolbarItem(placement: .automatic) {
+                            Button { showingProfiles = true } label: {
+                                Label("配置档案", systemImage: "square.stack.3d.up")
+                            }
+                            .help("把当前代理 / 规则 / 目录配置存成命名档案,随时载入切换")
+                        }
+                    }
             }
             .safeAreaInset(edge: .top, spacing: 0) {
                 if let warning = store.state.loopWarning {
@@ -41,23 +52,38 @@ struct MainWindow: View {
                     ExtensionApprovalBanner(text: prompt)
                 }
             }
-            // 状态栏作为 VStack 同级子视图(而非 NavigationSplitView 的 .safeAreaInset)。用 bottom
-            // safeAreaInset 时,detail 列内容会伸进被 inset 的区域,把面板底部工具栏(如「规则」的 ＋)
-            // 盖在状态栏底下——高的 inset(如「代理」含路由模式)能露头、矮的(「规则」只一行工具栏)
-            // 全被盖住。作为同级子视图它真正占位,detail 内容排在其上方,工具栏恒可见。
+            // 状态栏作为 VStack 同级子视图(而非 detail 的 .safeAreaInset)。用 bottom safeAreaInset 时,
+            // detail 内容会伸进被 inset 的区域,把面板底部工具栏(如「规则」的 ＋)盖在状态栏底下。
+            // 作为同级子视图它真正占位,detail 内容排在其上方,工具栏恒可见。
             StatusBar(store: store)
         }
         .frame(minWidth: 900, minHeight: 520)
+        .sheet(isPresented: $showingProfiles) { profilesSheet }
     }
 
-    /// 侧栏选中区域 → 对应内容。配置面板从旧的 sheet 平移到这里托管,各自挂一个窗口标题。
+    /// 分段选中区域 → 对应内容。各自挂一个窗口标题。
     @ViewBuilder private var detail: some View {
-        switch section ?? .activity {
+        switch tabSelection.section {
         case .activity: activity
+        case .apps: AppsPaneView(store: store).navigationTitle("应用")
         case .rules: RulesEditorPaneView(store: store).navigationTitle("规则")
         case .proxies: ProxyServersPaneView(store: store).navigationTitle("代理服务器")
-        case .profiles: ProfilesPaneView(model: profiles).navigationTitle("配置档案")
         }
+    }
+
+    /// 「档案」sheet:标题栏 + 完成按钮 + ProfilesPaneView。
+    private var profilesSheet: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("配置档案").font(.headline)
+                Spacer()
+                Button("完成") { showingProfiles = false }
+            }
+            .padding()
+            Divider()
+            ProfilesPaneView(model: profiles)
+        }
+        .frame(width: 460, height: 420)
     }
 
     /// 「活动」:连接表(主) + 底部流量(次),右侧 Inspector 看选中连接详情。搜索、Inspector 开关挂在这一层的工具栏,
@@ -108,7 +134,7 @@ struct MainWindow: View {
 
     /// 扩展没在跑且需要用户去系统设置操作时,顶部给一条带直达按钮的横幅(对齐 Proxifier 的
     /// 引导顺滑度:批准是 Apple 强制的一次性步骤,能做的是把人直接带到那个面板)。
-    private var approvalPrompt: String? {
+    private var approvalPrompt: LocalizedStringKey? {
         switch store.state.extensionActivation {
         case .needsApproval:
             "系统扩展等待批准——在「登录项与扩展 → 网络扩展」里允许 appidge 后即开始接管。"
@@ -125,24 +151,16 @@ struct MainWindow: View {
         return store.state.connectionLog.first { $0.id == id }
     }
 
-    /// 侧栏顶层目的地。旧版是工具栏三个按钮弹 sheet,现在是常驻的侧栏区域。
-    enum SidebarSection: String, Identifiable, CaseIterable {
-        case activity, rules, proxies, profiles
+    /// 主窗口顶层分段 tab(旧版是侧栏)。顺序:活动 · 应用 · 规则 · 代理。
+    enum MainTab: String, Identifiable, CaseIterable {
+        case activity, apps, rules, proxies
         var id: String { rawValue }
-        var title: String {
+        var title: LocalizedStringKey {
             switch self {
             case .activity: "活动"
+            case .apps: "应用"
             case .rules: "规则"
             case .proxies: "代理"
-            case .profiles: "档案"
-            }
-        }
-        var symbol: String {
-            switch self {
-            case .activity: "point.3.filled.connected.trianglepath.dotted"
-            case .rules: "list.bullet.rectangle"
-            case .proxies: "server.rack"
-            case .profiles: "square.stack.3d.up"
             }
         }
     }
@@ -213,7 +231,7 @@ private struct ConnectionDetail: View {
 
     @ViewBuilder private func statusLabel(_ phase: ConnectionPhase) -> some View {
         switch phase {
-        case .opened: Label("活动", systemImage: "circle.fill").foregroundStyle(.green)
+        case .opened: Label("活跃", systemImage: "circle.fill").foregroundStyle(.green)
         case .closed: Label("已关闭", systemImage: "checkmark.circle").foregroundStyle(.secondary)
         case .failed: Label("失败", systemImage: "xmark.octagon").foregroundStyle(.red)
         }

@@ -1,0 +1,2276 @@
+{
+  "sourceLanguage" : "zh-Hans",
+  "version" : "1.0",
+  "strings" : {
+    "通用" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "General"
+          }
+        }
+      }
+    },
+    "语言" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Language"
+          }
+        }
+      }
+    },
+    "跟随系统" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Follow System"
+          }
+        }
+      }
+    },
+    "简体中文" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chinese, Simplified"
+          }
+        }
+      }
+    },
+    "English" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "English"
+          }
+        }
+      }
+    },
+    "默认跟随系统语言，可在此覆盖。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Follows the system language by default. Override it here."
+          }
+        }
+      }
+    },
+    "代理" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proxy"
+          }
+        }
+      }
+    },
+    "系统扩展" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System Extension"
+          }
+        }
+      }
+    },
+    "启用" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable"
+          }
+        }
+      }
+    },
+    "打开系统设置" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open System Settings"
+          }
+        }
+      }
+    },
+    "引擎状态" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Engine Status"
+          }
+        }
+      }
+    },
+    "正常" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Normal"
+          }
+        }
+      }
+    },
+    "异常，已回退直连" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed, reverted to direct"
+          }
+        }
+      }
+    },
+    "扩展加载失败：%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extension failed to load: %@"
+          }
+        }
+      }
+    },
+    "流量只有在系统扩展被批准并运行后才会真正被接管——点「启用」，再去「系统设置 → 隐私与安全性」允许。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traffic is only handled once the system extension is approved and running. Click Enable, then allow it in System Settings › Privacy & Security."
+          }
+        }
+      }
+    },
+    "网络接管" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network Handling"
+          }
+        }
+      }
+    },
+    "接管会话绑在旧扩展实例上（运行 %@、已安装 %@）——流量可能被交给僵尸扩展。已自动尝试重绑；若仍异常，点「重启接管」，或重启电脑清理旧扩展。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The handling session is bound to an old extension instance (running %@, installed %@). Traffic may be going to a stale extension. A rebind was attempted automatically; if problems persist, click Restart Handling, or restart your Mac to clear the old extension."
+          }
+        }
+      }
+    },
+    "恢复出口" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recovery"
+          }
+        }
+      }
+    },
+    "重启接管" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restart Handling"
+          }
+        }
+      }
+    },
+    "停止接管" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop Handling"
+          }
+        }
+      }
+    },
+    "重置（移除代理配置）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset (remove proxy config)"
+          }
+        }
+      }
+    },
+    "网络出问题时的恢复出口，无需重启电脑：「重启接管」把会话重新绑定到最新扩展（等于在系统设置里关开一次网络扩展，修复「拦到流量却不转发」的僵尸态）；「停止接管」结束当前会话，所有应用立即恢复原生直连；「重置」进一步把系统网络设置里的 appidge 代理配置整个移除（系统扩展保持安装）。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recovery options for when the network breaks, no restart needed: Restart Handling rebinds the session to the latest extension (like toggling the network extension off and on in System Settings, fixing the stale state where traffic is captured but not forwarded); Stop Handling ends the current session and every app returns to direct connection immediately; Reset also removes appidge's proxy config from the system network settings (the system extension stays installed)."
+          }
+        }
+      }
+    },
+    "代理进程的 UDP" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "UDP for Proxied Apps"
+          }
+        }
+      }
+    },
+    "拦截止漏" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Block (no leak)"
+          }
+        }
+      }
+    },
+    "直连放行" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow direct"
+          }
+        }
+      }
+    },
+    "SOCKS5 代理" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SOCKS5 proxy"
+          }
+        }
+      }
+    },
+    "默认：代理进程的 UDP/QUIC 一律拦截，逼 QUIC 回落 TCP 走代理，不泄漏。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default: all UDP/QUIC from proxied apps is blocked, forcing QUIC to fall back to TCP through the proxy, with no leaks."
+          }
+        }
+      }
+    },
+    "放行直连：UDP 可用，但绕过代理、可能暴露访问目标（游戏 / VoIP 需要 UDP 时用）。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow direct: UDP works but bypasses the proxy and may expose your destinations (use when games or VoIP need UDP)."
+          }
+        }
+      }
+    },
+    "上游是 SOCKS5 时经 UDP ASSOCIATE 真正代理；上游非 SOCKS5 则退回拦截。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When the upstream is SOCKS5, UDP is truly proxied via UDP ASSOCIATE; otherwise it falls back to blocking."
+          }
+        }
+      }
+    },
+    "诊断与抓包" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnostics & Capture"
+          }
+        }
+      }
+    },
+    "逐连接抓包（.dmp）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Per-connection capture (.dmp)"
+          }
+        }
+      }
+    },
+    "开启后逐连接把原始字节写进 App Group 容器的 captures/*.dmp（占磁盘、涉隐私）。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When on, raw bytes for each connection are written to captures/*.dmp in the App Group container (uses disk, affects privacy)."
+          }
+        }
+      }
+    },
+    "内置规则" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Built-in Rules"
+          }
+        }
+      }
+    },
+    "本地 / 回环地址（127.0.0.1、::1、localhost）始终直连，不经代理（不可关闭）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local / loopback addresses (127.0.0.1, ::1, localhost) always connect directly, never through the proxy (cannot be disabled)"
+          }
+        }
+      }
+    },
+    "识别到的本地代理进程（接管并强制直连，绝不代理回它自己）：" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detected local proxy processes (handled and forced to direct, never proxied back to themselves):"
+          }
+        }
+      }
+    },
+    "环检测自愈加入的完全旁路（数据通路彻底不接管，本次运行内有效）：" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full bypasses added by loop-detection self-healing (data path left entirely untouched, effective this run):"
+          }
+        }
+      }
+    },
+    "已接管" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handling"
+          }
+        }
+      }
+    },
+    "未接入" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not connected"
+          }
+        }
+      }
+    },
+    "安装中…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installing…"
+          }
+        }
+      }
+    },
+    "待批准（去系统设置允许）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Awaiting approval (allow in System Settings)"
+          }
+        }
+      }
+    },
+    "已停用（系统设置 → 登录项与扩展 里开启）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disabled (enable in System Settings › Login Items & Extensions)"
+          }
+        }
+      }
+    },
+    "未安装" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not installed"
+          }
+        }
+      }
+    },
+    "引擎正常" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Engine OK"
+          }
+        }
+      }
+    },
+    "引擎异常 · 已回退直连" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Engine failure · reverted to direct"
+          }
+        }
+      }
+    },
+    "扩展未接入" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extension not connected"
+          }
+        }
+      }
+    },
+    "系统扩展还没装上/批准——去设置里点「启用」并在系统设置里允许后,才会接管流量。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The system extension isn't installed or approved yet. Click Enable in Settings and allow it in System Settings before traffic is handled."
+          }
+        }
+      }
+    },
+    "扩展安装中…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installing extension…"
+          }
+        }
+      }
+    },
+    "扩展待批准 · 系统设置里点允许" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extension awaiting approval · allow it in System Settings"
+          }
+        }
+      }
+    },
+    "打开「系统设置 → 隐私与安全性」,点「允许」加载 appidge 的系统扩展。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open System Settings › Privacy & Security and click Allow to load appidge's system extension."
+          }
+        }
+      }
+    },
+    "扩展已停用 · 系统设置里开启" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extension disabled · enable it in System Settings"
+          }
+        }
+      }
+    },
+    "appidge 的网络扩展在「系统设置 → 通用 → 登录项与扩展」里被停用了,重新打开后即恢复接管(最多 30 秒自动重连,无需重启 app)。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "appidge's network extension was disabled in System Settings › General › Login Items & Extensions. Turn it back on to resume handling (auto-reconnects within 30 seconds, no app restart needed)."
+          }
+        }
+      }
+    },
+    "扩展未安装" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extension not installed"
+          }
+        }
+      }
+    },
+    "活动连接 %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active connections %lld"
+          }
+        }
+      }
+    },
+    "待批准 · 系统设置里点允许" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Awaiting approval · allow it in System Settings"
+          }
+        }
+      }
+    },
+    "「系统设置 → 通用 → 登录项与扩展」里重新打开 appidge 的网络扩展,最多 30 秒自动恢复接管。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reopen appidge's network extension in System Settings › General › Login Items & Extensions; handling resumes automatically within 30 seconds."
+          }
+        }
+      }
+    },
+    "总流量" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total Traffic"
+          }
+        }
+      }
+    },
+    "活动连接" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active Connections"
+          }
+        }
+      }
+    },
+    "流量占用 Top 5" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Top 5 by Traffic"
+          }
+        }
+      }
+    },
+    "暂无流量" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No traffic yet"
+          }
+        }
+      }
+    },
+    "打开" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open"
+          }
+        }
+      }
+    },
+    "紧急恢复直连（重置接管）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Emergency direct connection (reset handling)"
+          }
+        }
+      }
+    },
+    "停止接管并移除系统里的代理配置——浏览器等应用断网时的恢复出口，无需重启电脑。重启 app 可重新开启接管。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stops handling and removes the proxy config from the system — a recovery exit when apps like your browser lose connectivity, no Mac restart needed. Restart the app to re-enable handling."
+          }
+        }
+      }
+    },
+    "设置…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings…"
+          }
+        }
+      }
+    },
+    "退出" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quit"
+          }
+        }
+      }
+    },
+    "检测到疑似转发环：%@ 被反复捕获，已自动将来源进程旁路直连（见 设置 → 内置规则）。若仍反复出现，请检查上游 / 规则是否形成回路。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suspected forwarding loop detected: %@ is being captured repeatedly, so its source process was bypassed to direct automatically (see Settings › Built-in Rules). If it keeps happening, check whether the upstream or rules form a loop."
+          }
+        }
+      }
+    },
+    "忽略" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ignore"
+          }
+        }
+      }
+    },
+    "区域" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View"
+          }
+        }
+      }
+    },
+    "配置档案" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profiles"
+          }
+        }
+      }
+    },
+    "把当前代理 / 规则 / 目录配置存成命名档案,随时载入切换" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save the current proxy, rules, and apps as a named profile to load anytime."
+          }
+        }
+      }
+    },
+    "应用" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apps"
+          }
+        }
+      }
+    },
+    "规则" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rules"
+          }
+        }
+      }
+    },
+    "代理服务器" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proxy Servers"
+          }
+        }
+      }
+    },
+    "完成" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        }
+      }
+    },
+    "活动" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activity"
+          }
+        }
+      }
+    },
+    "过滤连接（进程 / 主机）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filter connections (process / host)"
+          }
+        }
+      }
+    },
+    "仅活动" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active only"
+          }
+        }
+      }
+    },
+    "只显示仍在活动的连接(隐藏已关闭 / 失败的历史记录)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show only active connections. Hides closed and failed history."
+          }
+        }
+      }
+    },
+    "清除记录" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear"
+          }
+        }
+      }
+    },
+    "清空当前显示的连接记录（不影响已生效的规则/流量统计）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear the displayed connection records. Active rules and traffic stats are unaffected."
+          }
+        }
+      }
+    },
+    "详情" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Details"
+          }
+        }
+      }
+    },
+    "显示 / 隐藏连接详情" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show or hide connection details."
+          }
+        }
+      }
+    },
+    "清除全部连接记录？" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear all connection records?"
+          }
+        }
+      }
+    },
+    "清除" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear"
+          }
+        }
+      }
+    },
+    "取消" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        }
+      }
+    },
+    "只清空「活动」页显示的连接记录，不影响已生效的规则或累计流量统计。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clears only the connection records shown in Activity. Active rules and cumulative traffic stats are unaffected."
+          }
+        }
+      }
+    },
+    "系统扩展等待批准——在「登录项与扩展 → 网络扩展」里允许 appidge 后即开始接管。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System extension awaiting approval. Allow appidge under Login Items & Extensions → Network Extensions to start handling traffic."
+          }
+        }
+      }
+    },
+    "网络扩展已被停用——在「登录项与扩展 → 网络扩展」里重新打开后自动恢复接管。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network extension is turned off. Turn it back on under Login Items & Extensions → Network Extensions to resume handling automatically."
+          }
+        }
+      }
+    },
+    "进程" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Process"
+          }
+        }
+      }
+    },
+    "标识" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identifier"
+          }
+        }
+      }
+    },
+    "目标" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Destination"
+          }
+        }
+      }
+    },
+    "主机" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Host"
+          }
+        }
+      }
+    },
+    "端口" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Port"
+          }
+        }
+      }
+    },
+    "路由" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Route"
+          }
+        }
+      }
+    },
+    "决策" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decision"
+          }
+        }
+      }
+    },
+    "状态" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Status"
+          }
+        }
+      }
+    },
+    "已放行" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allowed"
+          }
+        }
+      }
+    },
+    "建立" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opened"
+          }
+        }
+      }
+    },
+    "流量" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traffic"
+          }
+        }
+      }
+    },
+    "走代理" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proxy"
+          }
+        }
+      }
+    },
+    "直连" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Direct"
+          }
+        }
+      }
+    },
+    "观测" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Observe"
+          }
+        }
+      }
+    },
+    "拦截" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Block"
+          }
+        }
+      }
+    },
+    "为这条连接建规则" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create rule for this connection"
+          }
+        }
+      }
+    },
+    "未选择连接" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Connection Selected"
+          }
+        }
+      }
+    },
+    "在连接表里选一行，这里显示它的进程、目标、路由与流量，并可就地建规则。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select a row in the connections table to see its process, destination, route, and traffic, and create a rule here."
+          }
+        }
+      }
+    },
+    "已关闭" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Closed"
+          }
+        }
+      }
+    },
+    "失败" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed"
+          }
+        }
+      }
+    },
+    "还没有连接" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Connections Yet"
+          }
+        }
+      }
+    },
+    "扩展被批准并有流量后，每条连接会实时出现在这里。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Once the extension is approved and traffic flows, each connection appears here in real time."
+          }
+        }
+      }
+    },
+    "时长 / 状态" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duration / Status"
+          }
+        }
+      }
+    },
+    "规则 · 代理" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rule · Proxy"
+          }
+        }
+      }
+    },
+    "发送" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sent"
+          }
+        }
+      }
+    },
+    "接收" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Received"
+          }
+        }
+      }
+    },
+    "速率" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rate"
+          }
+        }
+      }
+    },
+    "为 %@:%lld 建规则" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rules for %@:%lld"
+          }
+        }
+      }
+    },
+    "观测:记录后放行,不接管数据通路,无时长/字节跟踪 · %@ 记录" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Observe: recorded and passed through. Data path not handled, no duration or byte tracking · logged at %@"
+          }
+        }
+      }
+    },
+    "活动 · 自 %@ 建立" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active · opened %@"
+          }
+        }
+      }
+    },
+    "已关闭 · %@ 建立" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Closed · opened %@"
+          }
+        }
+      }
+    },
+    "失败 / 被拦截" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed / blocked"
+          }
+        }
+      }
+    },
+    "代理 · SOCKS5" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proxy · SOCKS5"
+          }
+        }
+      }
+    },
+    "代理 · HTTP" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proxy · HTTP"
+          }
+        }
+      }
+    },
+    "代理（回落直连）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proxy (falls back to direct)"
+          }
+        }
+      }
+    },
+    "还没有规则" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No rules yet"
+          }
+        }
+      }
+    },
+    "点「＋」加一条，比如「主机 *.google.com → 代理」。规则从上到下、首个命中生效。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Click \"+\" to add one, e.g. \"Host *.google.com → Proxy\". Rules apply top-down, first match wins."
+          }
+        }
+      }
+    },
+    "动作" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Action"
+          }
+        }
+      }
+    },
+    "编辑…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit…"
+          }
+        }
+      }
+    },
+    "上移" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move Up"
+          }
+        }
+      }
+    },
+    "下移" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move Down"
+          }
+        }
+      }
+    },
+    "删除" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete"
+          }
+        }
+      }
+    },
+    "已启用（点掉可停用，规则保留）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On (uncheck to disable; rule is kept)"
+          }
+        }
+      }
+    },
+    "已停用（保留规则，不参与匹配）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off (rule kept, not matched)"
+          }
+        }
+      }
+    },
+    "停用" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disable"
+          }
+        }
+      }
+    },
+    "添加规则" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Rule"
+          }
+        }
+      }
+    },
+    "删除选中" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete Selected"
+          }
+        }
+      }
+    },
+    "编辑选中（也可双击某行）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit Selected (or double-click a row)"
+          }
+        }
+      }
+    },
+    "上移（优先级更高）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move Up (higher priority)"
+          }
+        }
+      }
+    },
+    "从上到下，首个命中生效" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Top-down, first match wins"
+          }
+        }
+      }
+    },
+    "任意" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Any"
+          }
+        }
+      }
+    },
+    "编辑规则" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit Rule"
+          }
+        }
+      }
+    },
+    "进程 glob" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Process glob"
+          }
+        }
+      }
+    },
+    "com.google.* 或 *" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "com.google.* or *"
+          }
+        }
+      }
+    },
+    "主机 glob" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Host glob"
+          }
+        }
+      }
+    },
+    "*.google.com 或 *" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "*.google.com or *"
+          }
+        }
+      }
+    },
+    "空 = 任意，或 443，或 80-443" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empty = any, or 443, or 80-443"
+          }
+        }
+      }
+    },
+    "保存" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save"
+          }
+        }
+      }
+    },
+    "添加" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add"
+          }
+        }
+      }
+    },
+    "自动旁路" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto Bypass"
+          }
+        }
+      }
+    },
+    "%lld 项" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld items"
+          }
+        }
+      }
+    },
+    "系统维护 · 只读" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System-maintained · Read-only"
+          }
+        }
+      }
+    },
+    "自动 · 回环" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto · loop"
+          }
+        }
+      }
+    },
+    "自动 · 本地代理" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto · local proxy"
+          }
+        }
+      }
+    },
+    "还没有代理服务器" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No proxy servers yet"
+          }
+        }
+      }
+    },
+    "点下面的「＋」添加一台上游代理。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Click \"+\" below to add an upstream proxy."
+          }
+        }
+      }
+    },
+    "地址:端口" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Address:Port"
+          }
+        }
+      }
+    },
+    "协议" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protocol"
+          }
+        }
+      }
+    },
+    "用户名" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Username"
+          }
+        }
+      }
+    },
+    "探活" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test"
+          }
+        }
+      }
+    },
+    "设为使用中" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set Active"
+          }
+        }
+      }
+    },
+    "测试" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test"
+          }
+        }
+      }
+    },
+    "添加代理服务器" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Proxy Server"
+          }
+        }
+      }
+    },
+    "可达" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reachable"
+          }
+        }
+      }
+    },
+    "连不上（超时或被拒）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unreachable (timeout or refused)"
+          }
+        }
+      }
+    },
+    "路由模式" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Routing Mode"
+          }
+        }
+      }
+    },
+    "单台" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Single"
+          }
+        }
+      }
+    },
+    "代理链" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chain"
+          }
+        }
+      }
+    },
+    "故障转移" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failover"
+          }
+        }
+      }
+    },
+    "负载均衡" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Balance"
+          }
+        }
+      }
+    },
+    "所有走代理的连接都用「使用中」的那台上游。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All proxied connections use the active upstream."
+          }
+        }
+      }
+    },
+    "连接依次穿过选中的多台上游（client → 上游1 → 上游2 → … → 目标），顺序即下面的编号。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connections pass through the selected upstreams in order (client → upstream 1 → upstream 2 → … → target); the order is the numbering below."
+          }
+        }
+      }
+    },
+    "按编号顺序尝试，第一台连不上就换下一台，直到某台成功。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tries upstreams in numbered order; if one fails, moves to the next until one succeeds."
+          }
+        }
+      }
+    },
+    "每条新连接在选中的上游之间轮流，分摊流量。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each new connection rotates among the selected upstreams to spread the load."
+          }
+        }
+      }
+    },
+    "先添加代理服务器，再选择参与的上游。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add a proxy server first, then choose the upstreams to include."
+          }
+        }
+      }
+    },
+    "地址" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Address"
+          }
+        }
+      }
+    },
+    "用户名（可选）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Username (optional)"
+          }
+        }
+      }
+    },
+    "密码（可选）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Password (optional)"
+          }
+        }
+      }
+    },
+    "还没有扫描到应用" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No apps scanned yet"
+          }
+        }
+      }
+    },
+    "启动时会扫描已安装的应用；右键某个应用可设它走代理 / 直连 / 拦截。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installed apps are scanned at launch. Right-click an app to route it via Proxy / Direct / Block."
+          }
+        }
+      }
+    },
+    "走法" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Route"
+          }
+        }
+      }
+    },
+    "累计 ↑" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total ↑"
+          }
+        }
+      }
+    },
+    "累计 ↓" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total ↓"
+          }
+        }
+      }
+    },
+    "此应用（%lld 个）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This app (%lld)"
+          }
+        }
+      }
+    },
+    "把当前的代理服务器 / 规则 / 目录配置存成命名档案，随时载入切换。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save the current proxy server / rules / directory setup as a named profile, then load and switch anytime."
+          }
+        }
+      }
+    },
+    "还没有档案。用下面的「存为新档案」把当前配置存一份。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No profiles yet. Use “Save as new” below to save the current setup."
+          }
+        }
+      }
+    },
+    "载入" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Load"
+          }
+        }
+      }
+    },
+    "新档案名（同名则更新那个档案）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New profile name (same name updates that profile)"
+          }
+        }
+      }
+    },
+    "存为新档案" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save as new"
+          }
+        }
+      }
+    },
+    "事件日志" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Log"
+          }
+        }
+      }
+    },
+    "在访达中显示" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reveal in Finder"
+          }
+        }
+      }
+    },
+    "在访达中打开磁盘上的连接日志文件(JSONL)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reveal the on-disk connection log file (JSONL) in Finder"
+          }
+        }
+      }
+    },
+    "清空连接日志(不影响已生效的规则 / 累计流量)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear the connection log (rules and total traffic are unaffected)"
+          }
+        }
+      }
+    },
+    "还没有事件——扩展被批准并有流量后,每条连接会实时出现在这里。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No events yet — once the extension is approved and traffic flows, each connection appears here live."
+          }
+        }
+      }
+    },
+    "自动 · 回环旁路" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto · loop bypass"
+          }
+        }
+      }
+    },
+    "自动 · 本地代理直连" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto · local-proxy direct"
+          }
+        }
+      }
+    },
+    "命中规则 %@ · %@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Matched %@ · %@ · %@"
+          }
+        }
+      }
+    },
+    "命中规则 %@ · %@ · 任意端口" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Matched %@ · %@ · Any port"
+          }
+        }
+      }
+    },
+    "默认直连" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default direct"
+          }
+        }
+      }
+    },
+    "appidge · 按进程代理" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "appidge · Per-App Proxy"
+          }
+        }
+      }
+    },
+    "为每个应用单独指定走代理或直连。代理异常时自动回退直连。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set each app to use the proxy or connect directly. Falls back to direct when the proxy fails."
+          }
+        }
+      }
+    },
+    "能接管：直连出网的应用" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Handles: apps that connect out directly"
+          }
+        }
+      }
+    },
+    "多数 App、命令行、开发工具，包括无视全局代理的那些。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Most apps, command-line tools, and dev tools, including the ones that ignore the global proxy."
+          }
+        }
+      }
+    },
+    "管不到：连本地代理端口的应用" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skips: apps that connect to a local proxy port"
+          }
+        }
+      }
+    },
+    "少数应用自己连 127.0.0.1，那部分已由别的代理处理。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A few apps connect to 127.0.0.1 themselves. That traffic is already handled by another proxy."
+          }
+        }
+      }
+    },
+    "环境检查：部分应用不经 appidge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Environment check: some apps skip appidge"
+          }
+        }
+      }
+    },
+    "环境检查通过" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Environment check passed"
+          }
+        }
+      }
+    },
+    "有应用没走 appidge？" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An app not going through appidge?"
+          }
+        }
+      }
+    },
+    "系统代理" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System proxy"
+          }
+        }
+      }
+    },
+    "环境变量" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Env vars"
+          }
+        }
+      }
+    },
+    "额外网络接口" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extra network interfaces"
+          }
+        }
+      }
+    },
+    "未在 appidge 进程中发现（终端里可能仍有，见诊断）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not found in the appidge process. Your terminal may still have them. See Diagnostics."
+          }
+        }
+      }
+    },
+    "未在 appidge 进程中发现（终端里可能仍有，见下方诊断）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not found in the appidge process. Your terminal may still have them. See Diagnostics below."
+          }
+        }
+      }
+    },
+    "%@（可能是其它 VPN/TUN 型代理在 IP 层抢流量）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (another VPN/TUN proxy may be grabbing traffic at the IP layer)"
+          }
+        }
+      }
+    },
+    "开始使用" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get started"
+          }
+        }
+      }
+    },
+    "它可能认了系统代理或读了环境变量，直接连本地端口（回环）——appidge 看不到这类流量。终端里测：`env | grep -i proxy` 查有没有 HTTP_PROXY；有就 `unset HTTP_PROXY HTTPS_PROXY ALL_PROXY` 后再跑，appidge 就能接管并显示它。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It may follow the system proxy or read env vars and connect straight to a local port (loopback). appidge can't see that traffic. Test in the terminal: `env | grep -i proxy` checks for HTTP_PROXY. If it's set, run `unset HTTP_PROXY HTTPS_PROXY ALL_PROXY` and try again. appidge can then handle it and show it."
+          }
+        }
+      }
+    },
+    "它的流量可能已被 yunti 等聚合——活动栏里显示成 xray（本地代理出站），而不是原始应用名。关掉上游的系统规则模式即可让应用以自己的身份出现。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Its traffic may already be aggregated by yunti or similar. The activity list shows xray (the local proxy's outbound) instead of the original app name. Turn off the upstream's system-rule mode so the app appears under its own identity."
+          }
+        }
+      }
+    },
+    "它可能走 QUIC/UDP（HTTP/3）——appidge 默认拦截代理进程的 UDP 逼其回落 TCP；个别工具异常时可在「UDP / QUIC」里改「直连放行」。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It may use QUIC/UDP (HTTP/3). appidge blocks UDP from proxied apps by default to force a TCP fallback. If a tool misbehaves, switch it to Allow direct under UDP / QUIC."
+          }
+        }
+      }
+    },
+    "确认扩展在跑：状态栏是「引擎正常」、系统扩展「已接管」。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm the extension is running. The status bar shows Engine OK and the system extension shows Handling."
+          }
+        }
+      }
+    },
+    "部分应用走系统代理/环境变量，不经 appidge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some apps use the system proxy or env vars and skip appidge"
+          }
+        }
+      }
+    },
+    "所有直连出站都由 appidge 按进程接管" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All direct outbound is handled per app by appidge"
+          }
+        }
+      }
+    },
+    "未设置（认系统代理的应用会直连 → appidge 接管）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not set. Apps that follow the system proxy connect directly, so appidge handles them."
+          }
+        }
+      }
+    },
+    "PAC 脚本 · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PAC script · %@"
+          }
+        }
+      }
+    },
+    "appidge 接管的是「直连出站」流量" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "appidge handles direct outbound traffic"
+          }
+        }
+      }
+    },
+    "应用直接连远程服务器时，appidge 按进程接管、按你的规则转发到配置的上游（如 yunti 的本地端口）。这正是「设了全局代理却不生效」的开发 / AI / 科研工具能被接管的原因——它们本就无视代理配置、直连出网。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When an app connects straight to a remote server, appidge handles it per process and forwards it to your configured upstream (such as yunti's local port) by your rules. That's why dev, AI, and research tools that ignore the global proxy still get handled. They connect out directly and bypass proxy settings by design."
+          }
+        }
+      }
+    },
+    "appidge 看不到的：应用主动连本地代理端口（127.0.0.1）的流量——认系统代理或读环境变量的应用走这条路，属于回环，系统不会交给 appidge（平台限制）。这类应用其实已被本地代理处理，appidge 无需介入。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What appidge can't see: traffic from apps that connect to a local proxy port (127.0.0.1) themselves. Apps that follow the system proxy or read env vars take this path. It's loopback, and the system never hands it to appidge (a platform limit). These apps are already handled by the local proxy, so appidge doesn't need to step in."
+          }
+        }
+      }
+    },
+    "本机探测" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Machine probe"
+          }
+        }
+      }
+    },
+    "检测到会绕过 appidge 的代理层。若希望**所有**应用都由 appidge 按进程接管、在活动栏可见：把 yunti / Clash 等的「系统规则模式」关掉，只保留它的本地代理端口作为 appidge 的上游。这样每个应用都直连出站 → appidge 接管转发，没有回环盲区。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detected a proxy layer that bypasses appidge. To have **every** app handled per process by appidge and visible in the activity list, turn off system-rule mode in yunti, Clash, or similar and keep only its local proxy port as appidge's upstream. Then every app connects out directly, appidge handles the forwarding, and there's no loopback blind spot."
+          }
+        }
+      }
+    },
+    "某个应用没走 appidge / 看不到？" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An app not going through appidge, or not showing up?"
+          }
+        }
+      }
+    },
+    "活跃" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active"
+          }
+        }
+      }
+    }
+  }
+}

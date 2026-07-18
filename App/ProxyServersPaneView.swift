@@ -198,7 +198,7 @@ private struct RoutingModeSection: View {
         )
     }
 
-    private static func explanation(_ kind: RoutingModeKind) -> String {
+    private static func explanation(_ kind: RoutingModeKind) -> LocalizedStringKey {
         switch kind {
         case .single: "所有走代理的连接都用「使用中」的那台上游。"
         case .chain: "连接依次穿过选中的多台上游（client → 上游1 → 上游2 → … → 目标），顺序即下面的编号。"

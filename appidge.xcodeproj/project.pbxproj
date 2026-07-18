@@ -23,7 +23,6 @@
 		586E6945675466F5FAEDBCE6 /* ProcessPathResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D71AD68E0D673791D64826 /* ProcessPathResolver.swift */; };
 		5DD53B8CA098AAE20D297B7F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7106009A56C24078709224DC /* ContentView.swift */; };
 		62F04AAF57F01ECD1256C923 /* ProxyExtension.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = 88C15509479EC265EC4FD6F2 /* ProxyExtension.systemextension */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		66F60D2C57CEDD221728DC92 /* BandwidthChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 257B7D2A3926A604D9A56ED4 /* BandwidthChart.swift */; };
 		6E46EA6DED240707302344D8 /* ProxyDialer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A5B68425966099A3134F76F /* ProxyDialer.swift */; };
 		6E548D025B438A87B3650958 /* ProxyFlowSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5760DDA63F6D5AB07BEF302C /* ProxyFlowSupport.swift */; };
 		70A50B81E49589C783D3FD3A /* ConnectionsTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F7A7B0EB0032EB32E342AC4 /* ConnectionsTable.swift */; };
@@ -39,11 +38,14 @@
 		BF3C3EA1865EA2811E2CC3B8 /* ProxyServersPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F32B133633BBB992A13D17D /* ProxyServersPaneView.swift */; };
 		C4AE8EAE06FB99890379876B /* ExtDiag.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FE1FDE2601F854C4AB0FCB4 /* ExtDiag.swift */; };
 		CD074F91F9D8E81EF3AF1E9B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 011FA75EB4918608F8A42804 /* Assets.xcassets */; };
+		CEB6289185EA4E3CA070E696 /* AppsPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8EEB3B3B4F5AE8205F1F7B3 /* AppsPaneView.swift */; };
 		D81B1C44E7FA0F18207CF8AD /* Core in Frameworks */ = {isa = PBXBuildFile; productRef = 070C87CD751D657AB4653E16 /* Core */; };
 		D8E7DC6893CB84274AEBAC74 /* AppIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEF8C43AA00DC8615A6EF807 /* AppIcon.swift */; };
+		DD8DC7DAAE36979D8FE408D9 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 5901951F9EA7DCC493280D91 /* Localizable.xcstrings */; };
 		E0A05D3AE2BA60A8E9479E24 /* IPCContract in Frameworks */ = {isa = PBXBuildFile; productRef = A02F4122DB86F776E2D950D8 /* IPCContract */; };
 		FCBF4A432ECB3B5E94F88C26 /* ProfilesPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C2DCBF93F75AB530471B830 /* ProfilesPaneView.swift */; };
 		FE13440EB704BFFA918319FB /* IPCContract in Frameworks */ = {isa = PBXBuildFile; productRef = 096EEA660E596D625A61C6A2 /* IPCContract */; };
+		FEDF5CEF2BE2AADFB674A072 /* AppLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C157C1CDDFF721EAB2D28795 /* AppLanguage.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -77,13 +79,13 @@
 		163B07BB0DEAE3E528ECBC13 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		199BAC5919441EDC3576E476 /* StatusBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBar.swift; sourceTree = "<group>"; };
 		1DA718340F1304A9F6ECF582 /* NWConnectionProxyProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NWConnectionProxyProbe.swift; sourceTree = "<group>"; };
-		257B7D2A3926A604D9A56ED4 /* BandwidthChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandwidthChart.swift; sourceTree = "<group>"; };
 		299CCCC8304EDC13E69F6A38 /* TransparentProxyController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransparentProxyController.swift; sourceTree = "<group>"; };
 		30697183A781221EDE913CB6 /* EngineKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = EngineKit; path = Packages/EngineKit; sourceTree = SOURCE_ROOT; };
 		321F6F00E5ACB2B23E7602E0 /* AppFeature */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AppFeature; path = Packages/AppFeature; sourceTree = SOURCE_ROOT; };
 		3DF70C29327CD2B5EA92DC75 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		4A5B68425966099A3134F76F /* ProxyDialer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyDialer.swift; sourceTree = "<group>"; };
 		5760DDA63F6D5AB07BEF302C /* ProxyFlowSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyFlowSupport.swift; sourceTree = "<group>"; };
+		5901951F9EA7DCC493280D91 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		5DA34ADCCFFBEA044937D573 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		5F32B133633BBB992A13D17D /* ProxyServersPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyServersPaneView.swift; sourceTree = "<group>"; };
 		6C1DBE5B022F70217A175D0D /* Core */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Core; path = Packages/Core; sourceTree = SOURCE_ROOT; };
@@ -109,7 +111,9 @@
 		B3C329A4A885B31BFA3C7A26 /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BD55E37B6D821CA63EB00B0A /* ProxyExtensionProviderUDP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyExtensionProviderUDP.swift; sourceTree = "<group>"; };
 		BEF8C43AA00DC8615A6EF807 /* AppIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIcon.swift; sourceTree = "<group>"; };
+		C157C1CDDFF721EAB2D28795 /* AppLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLanguage.swift; sourceTree = "<group>"; };
 		C5A9AAC7350E301EB78C0187 /* PacketCaptureWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketCaptureWriter.swift; sourceTree = "<group>"; };
+		C8EEB3B3B4F5AE8205F1F7B3 /* AppsPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppsPaneView.swift; sourceTree = "<group>"; };
 		C9D71AD68E0D673791D64826 /* ProcessPathResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessPathResolver.swift; sourceTree = "<group>"; };
 		EEBD232B5EDEBEEDC598FA44 /* ProfilesModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilesModel.swift; sourceTree = "<group>"; };
 		F3502285178386167CBDC5B8 /* RulesEditorPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesEditorPaneView.swift; sourceTree = "<group>"; };
@@ -186,11 +190,13 @@
 				3DF70C29327CD2B5EA92DC75 /* App.entitlements */,
 				BEF8C43AA00DC8615A6EF807 /* AppIcon.swift */,
 				7AADB654447DCB49FB372FAE /* AppidgeApp.swift */,
+				C157C1CDDFF721EAB2D28795 /* AppLanguage.swift */,
+				C8EEB3B3B4F5AE8205F1F7B3 /* AppsPaneView.swift */,
 				011FA75EB4918608F8A42804 /* Assets.xcassets */,
-				257B7D2A3926A604D9A56ED4 /* BandwidthChart.swift */,
 				9F7A7B0EB0032EB32E342AC4 /* ConnectionsTable.swift */,
 				7106009A56C24078709224DC /* ContentView.swift */,
 				A3B0E63976E8ACBBACCC8C7B /* Info.plist */,
+				5901951F9EA7DCC493280D91 /* Localizable.xcstrings */,
 				82D18B41BB8F2680C6E5F6B9 /* MainWindow.swift */,
 				1DA718340F1304A9F6ECF582 /* NWConnectionProxyProbe.swift */,
 				5DA34ADCCFFBEA044937D573 /* OnboardingView.swift */,
@@ -293,11 +299,12 @@
 				};
 			};
 			buildConfigurationList = 54CFF25B79D1811416CE906A /* Build configuration list for PBXProject "appidge" */;
-			developmentRegion = en;
+			developmentRegion = "zh-Hans";
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
 				en,
+				"zh-Hans",
 			);
 			mainGroup = 9003EEF583464980A16CA112;
 			minimizedProjectReferenceProxies = 1;
@@ -324,6 +331,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CD074F91F9D8E81EF3AF1E9B /* Assets.xcassets in Resources */,
+				DD8DC7DAAE36979D8FE408D9 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -353,8 +361,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				D8E7DC6893CB84274AEBAC74 /* AppIcon.swift in Sources */,
+				FEDF5CEF2BE2AADFB674A072 /* AppLanguage.swift in Sources */,
 				B419714D1E5E144ED39353BB /* AppidgeApp.swift in Sources */,
-				66F60D2C57CEDD221728DC92 /* BandwidthChart.swift in Sources */,
+				CEB6289185EA4E3CA070E696 /* AppsPaneView.swift in Sources */,
 				70A50B81E49589C783D3FD3A /* ConnectionsTable.swift in Sources */,
 				5DD53B8CA098AAE20D297B7F /* ContentView.swift in Sources */,
 				552D5797BCE134EF6D6EE560 /* MainWindow.swift in Sources */,

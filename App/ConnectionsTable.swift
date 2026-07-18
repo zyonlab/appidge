@@ -79,6 +79,12 @@ struct ConnectionsTable: View {
                     .monospacedDigit()
                     .foregroundStyle(e.rule == .observe ? .secondary : .primary)
             }.width(min: 64, ideal: 76)
+
+            // 速率:该连接所属**进程**的实时瞬时速率(↓+↑ 合计),而非单连接——扩展只按进程计量速率
+            // (见 MonitoredProcess.rateUp/DownPerSec)。活跃(>0)用主色高亮,空闲用次要色,一眼看出谁在动。
+            TableColumn("速率") { e in
+                rateCell(e)
+            }.width(min: 78, ideal: 92)
         }
         .contextMenu(forSelectionType: ConnectionLogEntry.ID.self) { ids in
             let targets = rows.filter { ids.contains($0.id) }
@@ -129,6 +135,21 @@ struct ConnectionsTable: View {
         case .failed:
             Label("失败", systemImage: "xmark.octagon")
                 .foregroundStyle(.red).help("失败 / 被拦截")
+        }
+    }
+
+    /// 速率格:该连接进程的实时瞬时速率(↓+↑)。进程不在 `processes` 表(还没回灌统计)时显示「—」;
+    /// >0 高亮为主色、否则次要色。观测行数据通路不经过我们,进程速率仍可反映其整体活动,照常显示。
+    @ViewBuilder
+    private func rateCell(_ entry: ConnectionLogEntry) -> some View {
+        if let proc = store.state.processes[entry.processID] {
+            let total = proc.rateDownPerSec + proc.rateUpPerSec
+            Text(total > 0 ? TrafficFormat.rate(total) : "—")
+                .monospacedDigit()
+                .lineLimit(1)
+                .foregroundStyle(total > 0 ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+        } else {
+            Text("—").monospacedDigit().foregroundStyle(.secondary)
         }
     }
 

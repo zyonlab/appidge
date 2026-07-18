@@ -13,8 +13,14 @@ public enum RuleMatcher {
 
     /// 规则表从上到下,返回首个命中规则的动作;都不命中返回 nil(调用方回落每进程/默认)。
     public static func firstMatch(_ rules: [MatchRuleDTO], app: String, host: String, port: UInt16) -> ProxyRuleDTO? {
+        firstMatchRule(rules, app: app, host: host, port: port)?.rule
+    }
+
+    /// 同 `firstMatch`,但返回**整条**命中规则(不只是动作),便于调用方回答「命中的是哪条规则」
+    /// ——UI 要据此显示规则的 app/host/port 文案。都不命中返回 nil。
+    public static func firstMatchRule(_ rules: [MatchRuleDTO], app: String, host: String, port: UInt16) -> MatchRuleDTO? {
         for rule in rules where matches(rule, app: app, host: host, port: port) {
-            return rule.rule
+            return rule
         }
         return nil
     }

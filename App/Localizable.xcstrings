@@ -2261,6 +2261,16 @@
           }
         }
       }
+    },
+    "活跃" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Active"
+          }
+        }
+      }
     }
   }
 }

@@ -231,7 +231,7 @@ private struct ConnectionDetail: View {
 
     @ViewBuilder private func statusLabel(_ phase: ConnectionPhase) -> some View {
         switch phase {
-        case .opened: Label("活动", systemImage: "circle.fill").foregroundStyle(.green)
+        case .opened: Label("活跃", systemImage: "circle.fill").foregroundStyle(.green)
         case .closed: Label("已关闭", systemImage: "checkmark.circle").foregroundStyle(.secondary)
         case .failed: Label("失败", systemImage: "xmark.octagon").foregroundStyle(.red)
         }

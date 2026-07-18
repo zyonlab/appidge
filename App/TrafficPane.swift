@@ -235,7 +235,7 @@ private struct EventLogRow: View {
             Label("已放行", systemImage: "eye").foregroundStyle(.orange)
         } else {
             switch entry.phase {
-            case .opened: Label("活动", systemImage: "circle.fill").foregroundStyle(.green)
+            case .opened: Label("活跃", systemImage: "circle.fill").foregroundStyle(.green)
             case .closed: Label("已关闭", systemImage: "checkmark.circle").foregroundStyle(.secondary)
             case .failed: Label("失败", systemImage: "xmark.octagon").foregroundStyle(.red)
             }

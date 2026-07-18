@@ -46,10 +46,6 @@ struct SettingsView: View {
                 }
             }
 
-            Section("代理环境 · 我们能管哪一层") {
-                ProxyEnvironmentSection(env: store.state.proxyEnvironment)
-            }
-
             Section("网络接管") {
                 if store.state.extensionNeedsRebind {
                     Label {

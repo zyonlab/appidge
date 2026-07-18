@@ -134,7 +134,7 @@ struct MainWindow: View {
 
     /// 扩展没在跑且需要用户去系统设置操作时,顶部给一条带直达按钮的横幅(对齐 Proxifier 的
     /// 引导顺滑度:批准是 Apple 强制的一次性步骤,能做的是把人直接带到那个面板)。
-    private var approvalPrompt: String? {
+    private var approvalPrompt: LocalizedStringKey? {
         switch store.state.extensionActivation {
         case .needsApproval:
             "系统扩展等待批准——在「登录项与扩展 → 网络扩展」里允许 appidge 后即开始接管。"
@@ -155,7 +155,7 @@ struct MainWindow: View {
     enum MainTab: String, Identifiable, CaseIterable {
         case activity, apps, rules, proxies
         var id: String { rawValue }
-        var title: String {
+        var title: LocalizedStringKey {
             switch self {
             case .activity: "活动"
             case .apps: "应用"

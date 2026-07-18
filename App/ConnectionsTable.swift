@@ -205,7 +205,7 @@ struct RouteChip: View {
 
 /// 「规则·代理」列的文案与颜色,单处共用(直连/拦截/代理·协议)。
 enum RouteText {
-    static func label(rule: ProxyRule, kind: ProxyKind?) -> String {
+    static func label(rule: ProxyRule, kind: ProxyKind?) -> LocalizedStringKey {
         switch (rule, kind) {
         case (.direct, _): "直连"
         case (.block, _): "拦截"

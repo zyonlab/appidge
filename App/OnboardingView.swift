@@ -57,7 +57,7 @@ struct OnboardingView: View {
         .frame(maxWidth: 420)
     }
 
-    private func capabilityCard(symbol: String, tint: Color, title: String, detail: String) -> some View {
+    private func capabilityCard(symbol: String, tint: Color, title: LocalizedStringKey, detail: LocalizedStringKey) -> some View {
         Label {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.callout.weight(.medium))
@@ -95,17 +95,18 @@ struct OnboardingView: View {
                       warn: env.systemProxy != .none)
             detailRow("环境变量", env.environmentVariables.isEmpty
                       ? "未在 appidge 进程中发现（终端里可能仍有，见诊断）"
-                      : env.environmentVariables.joined(separator: ", "),
+                      : "\(env.environmentVariables.joined(separator: ", "))",
                       warn: !env.environmentVariables.isEmpty)
             if !env.extraTunnelInterfaces.isEmpty {
-                detailRow("额外网络接口", env.extraTunnelInterfaces.joined(separator: ", ")
-                          + "（可能是其它 VPN/TUN 型代理在 IP 层抢流量）", warn: true)
+                detailRow("额外网络接口",
+                          "\(env.extraTunnelInterfaces.joined(separator: ", "))（可能是其它 VPN/TUN 型代理在 IP 层抢流量）",
+                          warn: true)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func detailRow(_ label: String, _ value: String, warn: Bool) -> some View {
+    private func detailRow(_ label: LocalizedStringKey, _ value: LocalizedStringKey, warn: Bool) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Image(systemName: warn ? "exclamationmark.triangle.fill" : "checkmark.circle")
                 .foregroundStyle(warn ? .orange : .green)
@@ -135,9 +136,7 @@ struct OnboardingView: View {
 private struct DiagnosticGuideView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            bullet("它可能认了系统代理或读了环境变量，直接连本地端口（回环）——appidge 看不到这类流量。"
-                   + "终端里测：`env | grep -i proxy` 查有没有 HTTP_PROXY；有就 `unset HTTP_PROXY HTTPS_PROXY ALL_PROXY` "
-                   + "后再跑，appidge 就能接管并显示它。")
+            bullet("它可能认了系统代理或读了环境变量，直接连本地端口（回环）——appidge 看不到这类流量。终端里测：`env | grep -i proxy` 查有没有 HTTP_PROXY；有就 `unset HTTP_PROXY HTTPS_PROXY ALL_PROXY` 后再跑，appidge 就能接管并显示它。")
             bullet("它的流量可能已被 yunti 等聚合——活动栏里显示成 xray（本地代理出站），而不是原始应用名。关掉上游的系统规则模式即可让应用以自己的身份出现。")
             bullet("它可能走 QUIC/UDP（HTTP/3）——appidge 默认拦截代理进程的 UDP 逼其回落 TCP；个别工具异常时可在「UDP / QUIC」里改「直连放行」。")
             bullet("确认扩展在跑：状态栏是「引擎正常」、系统扩展「已接管」。")
@@ -146,10 +145,10 @@ private struct DiagnosticGuideView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func bullet(_ text: String) -> some View {
+    private func bullet(_ text: LocalizedStringKey) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text("•")
-            Text(.init(text)).fixedSize(horizontal: false, vertical: true)
+            Text(text).fixedSize(horizontal: false, vertical: true)
         }
         .font(.callout)
     }

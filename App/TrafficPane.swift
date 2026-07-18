@@ -113,7 +113,7 @@ struct TrafficPane: View {
     /// 最后回落默认直连。用户规则的匹配逻辑镜像 `EngineKit.RuleMatcher.firstMatchRule`(App target
     /// 不链接 EngineKit、且 B2 不变量禁止跨包依赖其匹配层,故按 Core 模型**镜像不复用**——语义须与
     /// 之一致,与 `Core.EffectiveAppRule` 镜像 `RuleMatcher.firstAppLevelMatch` 同理)。
-    private func eventReason(_ entry: ConnectionLogEntry) -> String? {
+    private func eventReason(_ entry: ConnectionLogEntry) -> LocalizedStringKey? {
         let identifier = entry.processID.value
         let path = store.state.catalog[entry.processID]?.executablePath
 
@@ -126,9 +126,14 @@ struct TrafficPane: View {
             return "自动 · 本地代理直连"
         }
         // 3) 用户规则表:进程 × 主机 × 端口首个命中的**启用**规则(停用的从不进 wire,故跳过)。
+        // 静态部分(「命中规则」/「任意端口」)走 String Catalog;模式串是动态数据,以插值 %@ 传入。
         if let rule = firstEnabledRuleMatch(store.state.rules, app: identifier, host: entry.host, port: entry.port) {
-            let portText = rule.portRange.map(Self.portLabel) ?? "任意端口"
-            return "命中规则 \(rule.appPattern) · \(rule.hostPattern) · \(portText)"
+            if let range = rule.portRange {
+                let portText = Self.portLabel(range)
+                return "命中规则 \(rule.appPattern) · \(rule.hostPattern) · \(portText)"
+            } else {
+                return "命中规则 \(rule.appPattern) · \(rule.hostPattern) · 任意端口"
+            }
         }
         // 4) 规则表不命中、实际又走了直连 → 默认直连。
         if entry.rule == .direct {
@@ -181,8 +186,8 @@ private struct EventLogRow: View {
     let entry: ConnectionLogEntry
     let name: String
     /// 「为什么这么走」的原因(命中规则 / 自动旁路 / 默认直连),由 `TrafficPane.eventReason` 按
-    /// 当前规则近似推导;推不出时为 nil(不显示副行)。
-    let reason: String?
+    /// 当前规则近似推导;推不出时为 nil(不显示副行)。已本地化(`LocalizedStringKey`)。
+    let reason: LocalizedStringKey?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {

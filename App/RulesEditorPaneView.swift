@@ -165,17 +165,17 @@ struct RulesEditorPaneView: View {
         store.dispatch(.reorderMatchRules(order.map(\.id)))
     }
 
-    private static func portText(_ range: ClosedRange<UInt16>?) -> String {
+    private static func portText(_ range: ClosedRange<UInt16>?) -> LocalizedStringKey {
         guard let range else { return "任意" }
         return range.lowerBound == range.upperBound
-            ? "\(range.lowerBound)"
-            : "\(range.lowerBound)-\(range.upperBound)"
+            ? LocalizedStringKey("\(range.lowerBound)")
+            : LocalizedStringKey("\(range.lowerBound)-\(range.upperBound)")
     }
 }
 
 /// 规则动作在表里的展示样式(标签 + 颜色),三态共用一处,避免二元判断漏掉 block。
 enum RuleActionStyle {
-    static func label(_ action: ProxyRule) -> String {
+    static func label(_ action: ProxyRule) -> LocalizedStringKey {
         switch action {
         case .proxied: "代理"
         case .direct: "直连"
@@ -327,7 +327,7 @@ private struct AutoBypassSection: View {
         .background(.bar)
     }
 
-    private func row(_ entry: String, source: String, tint: Color) -> some View {
+    private func row(_ entry: String, source: LocalizedStringKey, tint: Color) -> some View {
         HStack(spacing: 8) {
             Text(entry)
                 .font(.caption).monospaced()

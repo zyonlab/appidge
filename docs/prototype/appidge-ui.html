@@ -1,0 +1,742 @@
+<title>appidge · 桌面工具版 v2</title>
+<style>
+  :root{
+    color-scheme:light dark;
+    --canvas:#EBEBEF;--grid:rgba(0,0,0,0.05);--ink0:#1d1d1f;--flabel:#78787F;
+    --note-bg:#FFF6D6;--note-ink:#5C4B00;--note-edge:#E8D48A;
+    --win:#FFFFFF;--win-2:#F6F6F8;--titlebar:#EAEAED;--bar:#F1F1F4;
+    --stroke:rgba(0,0,0,0.10);--stroke-2:rgba(0,0,0,0.15);--rowalt:rgba(0,0,0,0.022);
+    --ink:#1C1C1E;--ink-2:#66666C;--ink-3:#9A9AA1;--sel:#DBE7FF;
+    --accent:#0A6DF5;--accent-2:#5B5AE8;--accent-fill:rgba(10,109,245,0.12);--accent-edge:rgba(10,109,245,0.28);
+    --green:#1C9E4A;--green-fill:rgba(28,158,74,0.13);--green-edge:rgba(28,158,74,0.30);
+    --red:#DE2F26;--red-fill:rgba(222,47,38,0.12);--red-edge:rgba(222,47,38,0.32);
+    --orange:#C67608;--orange-fill:rgba(198,118,8,0.13);--orange-edge:rgba(198,118,8,0.32);
+    --off:#C9C9CE;
+    --shadow:0 30px 60px -20px rgba(20,20,40,0.28),0 8px 24px -12px rgba(20,20,40,0.2);
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;--ui:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --canvas:#161618;--grid:rgba(255,255,255,0.045);--ink0:#F2F2F5;--flabel:#8A8A92;
+    --note-bg:#2E2A16;--note-ink:#EBD98A;--note-edge:#5A4E22;
+    --win:#1E1E20;--win-2:#252528;--titlebar:#2B2B2F;--bar:#28282C;
+    --stroke:rgba(255,255,255,0.10);--stroke-2:rgba(255,255,255,0.16);--rowalt:rgba(255,255,255,0.03);
+    --ink:#F2F2F5;--ink-2:#9C9CA4;--ink-3:#6C6C74;--sel:#2E4A78;
+    --accent:#4C93FF;--accent-2:#7C7AFF;--accent-fill:rgba(76,147,255,0.18);--accent-edge:rgba(76,147,255,0.40);
+    --green:#37C862;--green-fill:rgba(55,200,98,0.16);--green-edge:rgba(55,200,98,0.38);
+    --red:#FF5A50;--red-fill:rgba(255,90,80,0.16);--red-edge:rgba(255,90,80,0.40);
+    --orange:#F0A63A;--orange-fill:rgba(240,166,58,0.16);--orange-edge:rgba(240,166,58,0.40);
+    --off:#48484E;--shadow:0 30px 70px -20px rgba(0,0,0,0.65),0 8px 24px -12px rgba(0,0,0,0.5);
+  }}
+  :root[data-theme="light"]{color-scheme:light;--canvas:#EBEBEF;--grid:rgba(0,0,0,0.05);--ink0:#1d1d1f;--flabel:#78787F;--note-bg:#FFF6D6;--note-ink:#5C4B00;--note-edge:#E8D48A;--win:#FFF;--win-2:#F6F6F8;--titlebar:#EAEAED;--bar:#F1F1F4;--stroke:rgba(0,0,0,0.10);--stroke-2:rgba(0,0,0,0.15);--rowalt:rgba(0,0,0,0.022);--ink:#1C1C1E;--ink-2:#66666C;--ink-3:#9A9AA1;--sel:#DBE7FF;--accent:#0A6DF5;--accent-2:#5B5AE8;--accent-fill:rgba(10,109,245,0.12);--accent-edge:rgba(10,109,245,0.28);--green:#1C9E4A;--green-fill:rgba(28,158,74,0.13);--green-edge:rgba(28,158,74,0.30);--red:#DE2F26;--red-fill:rgba(222,47,38,0.12);--red-edge:rgba(222,47,38,0.32);--orange:#C67608;--orange-fill:rgba(198,118,8,0.13);--orange-edge:rgba(198,118,8,0.32);--off:#C9C9CE;--shadow:0 30px 60px -20px rgba(20,20,40,0.28),0 8px 24px -12px rgba(20,20,40,0.2);}
+  :root[data-theme="dark"]{color-scheme:dark;--canvas:#161618;--grid:rgba(255,255,255,0.045);--ink0:#F2F2F5;--flabel:#8A8A92;--note-bg:#2E2A16;--note-ink:#EBD98A;--note-edge:#5A4E22;--win:#1E1E20;--win-2:#252528;--titlebar:#2B2B2F;--bar:#28282C;--stroke:rgba(255,255,255,0.10);--stroke-2:rgba(255,255,255,0.16);--rowalt:rgba(255,255,255,0.03);--ink:#F2F2F5;--ink-2:#9C9CA4;--ink-3:#6C6C74;--sel:#2E4A78;--accent:#4C93FF;--accent-2:#7C7AFF;--accent-fill:rgba(76,147,255,0.18);--accent-edge:rgba(76,147,255,0.40);--green:#37C862;--green-fill:rgba(55,200,98,0.16);--green-edge:rgba(55,200,98,0.38);--red:#FF5A50;--red-fill:rgba(255,90,80,0.16);--red-edge:rgba(255,90,80,0.40);--orange:#F0A63A;--orange-fill:rgba(240,166,58,0.16);--orange-edge:rgba(240,166,58,0.40);--off:#48484E;--shadow:0 30px 70px -20px rgba(0,0,0,0.65),0 8px 24px -12px rgba(0,0,0,0.5);}
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{font-family:var(--ui);color:var(--ink0);background:var(--canvas);overflow:hidden;-webkit-font-smoothing:antialiased;}
+
+  .topbar{position:fixed;top:0;left:0;right:0;height:46px;z-index:100;display:flex;align-items:center;gap:12px;padding:0 16px;background:color-mix(in srgb,var(--win) 80%,transparent);backdrop-filter:blur(24px) saturate(160%);border-bottom:1px solid var(--stroke);}
+  .topbar .logo{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--accent-2),var(--accent));display:grid;place-items:center;color:#fff;}
+  .topbar .logo svg{width:16px;height:16px;}
+  .topbar .file{font-size:13px;font-weight:600;color:var(--ink);}.topbar .file span{color:var(--ink-3);font-weight:500;}
+  .topbar .spring{flex:1;}
+  .pillset{display:flex;background:var(--bar);border:1px solid var(--stroke);border-radius:8px;padding:2px;}
+  .pillset button{border:none;background:transparent;font-family:var(--ui);font-size:12px;color:var(--ink-2);padding:4px 10px;border-radius:6px;cursor:pointer;}
+  .pillset button.on{background:var(--win);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,0.14);}
+
+  .viewport{position:absolute;inset:46px 0 0 0;overflow:auto;}
+  .canvas{position:relative;width:1800px;height:2420px;background-image:radial-gradient(var(--grid) 1.4px,transparent 1.4px);background-size:26px 26px;background-position:12px 12px;}
+  .sectlabel{position:absolute;font-size:15px;font-weight:700;color:var(--ink0);display:flex;align-items:center;gap:9px;}
+  .sectlabel .b{width:24px;height:24px;border-radius:7px;background:var(--ink0);color:var(--canvas);display:grid;place-items:center;font-size:13px;}
+  .sectlabel small{font-weight:500;color:var(--flabel);font-size:12.5px;}
+  .frame{position:absolute;z-index:2;}
+  .frame>.flabel{font-size:12px;color:var(--flabel);font-weight:600;display:flex;align-items:center;gap:7px;margin-bottom:10px;}
+  .frame>.flabel .dot{width:7px;height:7px;border-radius:2px;background:var(--accent);}
+
+  /* menu bar strip */
+  .menubar{position:absolute;height:26px;border-radius:8px;background:color-mix(in srgb,#101012 60%,transparent);backdrop-filter:blur(18px);display:flex;align-items:center;gap:16px;padding:0 12px;color:rgba(255,255,255,0.9);font-size:12px;box-shadow:var(--shadow);z-index:3;}
+  .menubar .mi{opacity:0.8;}.menubar .spring{flex:1;}
+  .menubar .appicon{display:flex;align-items:center;gap:5px;padding:2px 8px;border-radius:6px;background:rgba(255,255,255,0.24);font-weight:600;}
+  .menubar .appicon svg{width:14px;height:14px;}
+  .stem{position:absolute;width:2px;background:linear-gradient(var(--accent),transparent);opacity:0.5;z-index:1;}
+
+  /* menu dropdown */
+  .menudrop{width:340px;background:var(--win);border:1px solid var(--stroke-2);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;position:relative;}
+  .menudrop::before{content:"";position:absolute;top:-8px;left:var(--beak,44px);width:15px;height:15px;background:var(--win);border-left:1px solid var(--stroke-2);border-top:1px solid var(--stroke-2);transform:rotate(45deg);}
+  .md-hero{padding:14px 15px;display:flex;align-items:center;gap:12px;}
+  .md-hero .mi{width:38px;height:38px;border-radius:11px;background:var(--green-fill);color:var(--green);display:grid;place-items:center;}.md-hero .mi svg{width:21px;height:21px;}
+  .md-hero .tt b{font-size:15px;font-weight:700;display:block;}.md-hero .tt span{font-size:12px;color:var(--ink-2);}
+  .md-hero .sw{margin-left:auto;}
+  .mdiv{height:1px;background:var(--stroke);}
+  .md-stats{display:grid;grid-template-columns:1fr 1fr 1fr;background:var(--stroke);gap:1px;}
+  .md-stats .s{background:var(--win);padding:12px 6px;text-align:center;}
+  .md-stats .s .n{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-0.02em;}
+  .md-stats .s .l{font-size:10.5px;color:var(--ink-2);margin-top:3px;}
+  .md-item{display:flex;align-items:center;gap:11px;padding:10px 15px;font-size:13.5px;cursor:pointer;}
+  .md-item:hover{background:var(--accent-fill);}
+  .md-item .mii{width:17px;height:17px;color:var(--ink-2);display:inline-flex;}.md-item .mii svg{width:17px;height:17px;}
+  .md-item .k{font-size:11px;color:var(--ink-3);margin-left:auto;font-family:var(--mono);}
+  .md-emergency{margin:8px 12px;padding:11px;border-radius:11px;border:1px solid var(--orange-edge);background:var(--orange-fill);color:var(--orange);display:flex;align-items:center;gap:8px;justify-content:center;font-size:13px;font-weight:700;cursor:pointer;}
+  .md-emergency svg{width:16px;height:16px;}
+  .md-foot{display:flex;padding:10px 15px;font-size:12.5px;color:var(--ink-2);border-top:1px solid var(--stroke);}
+  .md-foot .spring{flex:1;}.md-foot span{cursor:pointer;}
+  /* faithful MenuBarView (matches ContentView.swift) */
+  .mb{padding:12px;width:100%;}
+  .mb-status{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;}
+  .mb-status svg{width:18px;height:18px;}
+  .mbd{height:1px;background:var(--stroke);margin:10px 0;}
+  .mb-cov{display:flex;align-items:center;gap:7px;font-size:11.5px;}
+  .mb-cov svg{width:13px;height:13px;}
+  .mb-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:12.5px;}
+  .mb-row .k{color:var(--ink-2);}.mb-row .v{font-family:var(--mono);font-variant-numeric:tabular-nums;}
+  .mb-cap{font-size:11px;color:var(--ink-2);margin-bottom:4px;}
+  .mb-top{display:flex;justify-content:space-between;align-items:center;padding:2px 0;font-size:12.5px;}
+  .mb-top .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .mb-top .v{font-family:var(--mono);color:var(--ink-2);margin-left:12px;flex:none;font-variant-numeric:tabular-nums;}
+  .mb-emg{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink);cursor:pointer;}
+  .mb-emg svg{width:15px;height:15px;color:var(--orange);flex:none;}
+  .mb-foot{display:flex;align-items:center;font-size:12.5px;}
+  .mb-foot .item{display:flex;align-items:center;gap:6px;color:var(--ink);cursor:pointer;}
+  .mb-foot .item svg{width:14px;height:14px;color:var(--ink-2);}
+  .mb-foot .spring{flex:1;}
+  /* menu nav entries */
+  .mb-nav .nit{display:flex;align-items:center;gap:10px;padding:6px 8px;margin:0 -8px;border-radius:7px;font-size:13px;cursor:pointer;}
+  .mb-nav .nit:hover{background:var(--accent-fill);}
+  .mb-nav .nit .nii{width:16px;height:16px;color:var(--ink-2);display:inline-flex;}.mb-nav .nit .nii svg{width:16px;height:16px;}
+  .mb-nav .nit .nik{margin-left:auto;font-size:11px;color:var(--ink-3);font-family:var(--mono);}
+  /* settings window (faithful to SettingsView.swift) */
+  .setbody{flex:1;min-height:0;overflow-y:auto;padding:14px 16px 18px;background:var(--win-2);}
+  .set-hdr{font-size:10.5px;color:var(--ink-2);text-transform:uppercase;letter-spacing:0.04em;padding:12px 4px 6px;font-weight:600;}
+  .set-hdr:first-child{padding-top:2px;}
+  .set-card{background:var(--win);border:1px solid var(--stroke);border-radius:10px;overflow:hidden;}
+  .set-row{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:0.5px solid var(--stroke);min-height:38px;font-size:12.5px;}
+  .set-row:last-child{border-bottom:none;}
+  .set-row .rl{flex:1;line-height:1.4;}
+  .set-row .rv{color:var(--ink-2);font-size:12.5px;text-align:right;}
+  .set-note{font-size:11px;color:var(--ink-3);line-height:1.45;padding:6px 4px 2px;}
+  .set-btn{font-size:11px;padding:4px 9px;border:1px solid var(--stroke-2);border-radius:7px;background:var(--win);color:var(--ink);cursor:pointer;}
+  .set-btn.danger{color:var(--red);border-color:var(--red-edge);}
+  .set-hdr .shi{display:inline-flex;vertical-align:-2px;margin-right:6px;color:var(--ink-3);}
+  .set-hdr .shi svg{width:13px;height:13px;}
+  .set-seg{display:inline-flex;background:var(--bar);border:1px solid var(--stroke);border-radius:7px;padding:2px;}
+  .set-seg span{font-size:11.5px;color:var(--ink-2);padding:4px 12px;border-radius:5px;cursor:pointer;white-space:nowrap;}
+  .set-seg span.on{background:var(--win);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,0.12);font-weight:600;}
+
+  /* onboarding (redesigned per Apple HIG: plain first, detail one level deeper) */
+  .onbw{flex:1;display:flex;flex-direction:column;align-items:center;text-align:center;gap:11px;padding:26px 26px 20px;overflow:auto;}
+  .onb-badge{width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,var(--accent-2),var(--accent));display:grid;place-items:center;color:#fff;box-shadow:0 13px 26px -10px rgba(10,109,245,0.6);}
+  .onb-badge svg{width:32px;height:32px;}
+  .onbw h1{font-size:19px;font-weight:700;margin:2px 0 0;letter-spacing:-0.02em;}
+  .onbw .desc{font-size:13px;color:var(--ink-2);line-height:1.55;max-width:330px;}
+  .cap2{width:100%;display:flex;flex-direction:column;gap:9px;text-align:left;margin-top:4px;}
+  .cap2 .c{display:flex;gap:11px;align-items:flex-start;background:var(--win-2);border:1px solid var(--stroke);border-radius:12px;padding:12px 13px;}
+  .cap2 .c .ci{width:26px;height:26px;border-radius:8px;flex:none;display:grid;place-items:center;}.cap2 .c .ci svg{width:15px;height:15px;}
+  .cap2 .c b{font-size:12.5px;font-weight:600;display:block;margin-bottom:2px;}
+  .cap2 .c span{font-size:11.5px;color:var(--ink-2);line-height:1.45;}
+  .disc{width:100%;text-align:left;}
+  .disc .dh{display:flex;align-items:center;gap:9px;padding:11px 13px;background:var(--win-2);border:1px solid var(--stroke);border-radius:12px;cursor:pointer;}
+  .disc .dh .chev{margin-left:auto;color:var(--ink-3);display:flex;transition:transform .2s;}.disc .dh .chev svg{width:14px;height:14px;}
+  .disc.open .dh .chev{transform:rotate(90deg);}
+  .disc .dbody{display:none;padding:11px 4px 2px;}
+  .disc.open .dbody{display:block;}
+  .disc.link .dh{background:transparent;border:none;padding:6px 2px;color:var(--accent);font-size:12px;border-radius:0;}
+  .disc.link .dh .chev{color:var(--accent);}
+  .disc .drow{display:flex;gap:8px;align-items:flex-start;margin-bottom:9px;}
+  .disc .drow .di{flex:none;margin-top:1px;}.disc .drow .di svg{width:13px;height:13px;}
+  .disc .drow .dl{font-size:10px;color:var(--ink-3);}.disc .drow .dv{font-size:11.5px;color:var(--ink-2);line-height:1.4;}
+  .disc .bl{display:flex;gap:6px;color:var(--ink-2);line-height:1.45;margin-bottom:8px;font-size:11px;}
+  .disc .bl b{color:var(--ink);font-family:var(--mono);font-weight:600;}
+  .disc .bl::before{content:"•";color:var(--ink-3);}
+  .onb-btn{margin-top:6px;padding:10px 30px;border-radius:10px;background:var(--accent);color:#fff;font-size:14.5px;font-weight:600;border:none;cursor:pointer;box-shadow:0 6px 16px -5px rgba(10,109,245,0.6);}
+  .onb-hint{font-size:10.5px;color:var(--ink-3);line-height:1.4;max-width:320px;}
+  @media (prefers-reduced-motion:reduce){.disc .dh .chev{transition:none;}}
+
+  /* window */
+  .win{background:var(--win);border:1px solid var(--stroke-2);border-radius:12px;overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column;height:100%;}
+  .titlebar{height:48px;flex:none;background:var(--titlebar);border-bottom:1px solid var(--stroke);display:flex;align-items:center;gap:12px;padding:0 14px;}
+  .lights{display:flex;gap:8px;}.lights i{width:12px;height:12px;border-radius:50%;}.lights .r{background:#FF5F57;}.lights .y{background:#FEBC2E;}.lights .g{background:#28C840;}
+  .tabs{display:flex;background:var(--bar);border:1px solid var(--stroke);border-radius:8px;padding:2px;margin:0 auto;}
+  .tabs button{border:none;background:transparent;font-family:var(--ui);font-size:12.5px;color:var(--ink-2);padding:5px 18px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;}
+  .tabs button svg{width:14px;height:14px;}
+  .tabs button.on{background:var(--win);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,0.14);font-weight:600;}
+  .wtools{display:flex;align-items:center;gap:9px;}
+  .tsearch{display:flex;align-items:center;gap:6px;background:var(--win);border:1px solid var(--stroke);border-radius:7px;padding:4px 9px;width:140px;color:var(--ink-3);font-size:12px;}.tsearch svg{width:13px;height:13px;}
+  .masterlbl{font-size:11.5px;color:var(--ink-2);}
+  .sw{width:38px;height:23px;border-radius:12px;background:var(--off);position:relative;cursor:pointer;flex:none;transition:background .2s;}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:19px;height:19px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);transition:transform .2s;}
+  .sw.on{background:var(--green);}.sw.on::after{transform:translateX(15px);}
+
+  .wcontent{flex:1;overflow:auto;position:relative;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  thead th{position:sticky;top:0;background:var(--win);text-align:left;font-weight:600;color:var(--ink-2);padding:9px 14px;border-bottom:1px solid var(--stroke);font-size:11px;white-space:nowrap;}
+  thead th.num{text-align:right;}
+  tbody td{padding:9px 14px;border-bottom:1px solid var(--stroke);white-space:nowrap;}
+  tbody tr:nth-child(even){background:var(--rowalt);}
+  tbody tr.sel{background:var(--sel);}
+  td.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;}
+  .app{display:flex;align-items:center;gap:9px;}.app .ic{width:22px;height:22px;border-radius:6px;color:#fff;display:grid;place-items:center;font-size:10px;font-weight:700;flex:none;}
+  .app .nm b{font-size:12.5px;font-weight:600;display:block;}.app .nm small{font-size:10px;color:var(--ink-3);font-family:var(--mono);}
+  .mono{font-family:var(--mono);}.muted{color:var(--ink-2);}.dim{color:var(--ink-3);}
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:2px 9px;border-radius:999px;border:0.5px solid;}
+  .chip svg{width:11px;height:11px;}
+  .chip.proxy{color:var(--accent);background:var(--accent-fill);border-color:var(--accent-edge);}
+  .chip.direct{color:var(--green);background:var(--green-fill);border-color:var(--green-edge);}
+  .chip.block{color:var(--red);background:var(--red-fill);border-color:var(--red-edge);}
+  .stat{display:inline-flex;align-items:center;gap:5px;}.stat .d{width:8px;height:8px;border-radius:50%;}.g{background:var(--green);}
+  .rate{font-family:var(--mono);font-variant-numeric:tabular-nums;}
+  .rate.hot{color:var(--ink);font-weight:600;}.rate.idle{color:var(--ink-3);}
+  .chip.mini{font-size:10px;padding:1px 7px;flex:none;}
+  /* activity split: connections over log (Proxifier-style) */
+  .wcontent.actwrap{overflow:hidden;display:flex;flex-direction:column;}
+  .conn-scroll{flex:1;min-height:0;overflow:auto;position:relative;}
+  .logpane{flex:none;height:184px;border-top:1px solid var(--stroke);background:var(--win-2);display:flex;flex-direction:column;overflow:hidden;}
+  .logpane.collapsed{height:33px;}
+  .logpane.collapsed .log-body{display:none;}
+  .log-collapse{display:flex;color:var(--ink-3);cursor:pointer;transform:rotate(90deg);transition:transform .18s;}
+  .log-collapse svg{width:13px;height:13px;}
+  .logpane.collapsed .log-collapse{transform:rotate(0deg);}
+  .log-h{height:32px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--stroke);}
+  .log-h .log-title{font-size:11.5px;font-weight:700;display:flex;align-items:center;gap:6px;}
+  .log-h .log-title svg{width:13px;height:13px;color:var(--ink-2);}
+  .log-h .log-title .cnt{color:var(--ink-3);font-weight:500;}
+  .log-h .spring{flex:1;}
+  .log-h .log-act{font-size:11px;color:var(--accent);cursor:pointer;display:flex;align-items:center;gap:4px;}
+  .log-h .log-act svg{width:12px;height:12px;}
+  .log-body{flex:1;overflow:auto;}
+  .logline{display:flex;align-items:baseline;gap:8px;padding:4px 12px;font-size:11.5px;border-bottom:0.5px solid var(--stroke);white-space:nowrap;}
+  .logline .lt{font-family:var(--mono);color:var(--ink-3);font-variant-numeric:tabular-nums;flex:none;}
+  .logline .lapp{font-weight:600;flex:none;}
+  .logline .lhost{color:var(--ink-2);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;}
+  .logline .lreason{color:var(--ink-3);margin-left:auto;flex:none;padding-left:12px;}
+  .logline.closed{opacity:0.55;}
+  .logline.warn .lwarn{color:var(--orange);display:flex;align-items:center;gap:6px;white-space:normal;}
+  .logline.warn .lwarn svg{width:12px;height:12px;flex:none;}
+  /* per-row route segmented (Apps tab) */
+  .rseg{display:inline-flex;background:var(--bar);border:1px solid var(--stroke);border-radius:7px;padding:2px;}
+  .rseg span{font-size:10.5px;padding:3px 9px;border-radius:5px;color:var(--ink-2);cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;}
+  .rseg span svg{width:10px;height:10px;}
+  .rseg span.on{font-weight:600;}
+  .rseg span.on.proxy{background:var(--accent);color:#fff;}
+  .rseg span.on.direct{background:var(--green);color:#fff;}
+  .rseg span.on.block{background:var(--red);color:#fff;}
+  .appsrc{font-size:10px;color:var(--ink-3);display:inline-flex;align-items:center;gap:3px;}
+  .appsrc svg{width:11px;height:11px;}
+
+  /* status bar (text stats — replaces the bandwidth chart) */
+  .statusbar{height:28px;flex:none;background:var(--bar);border-top:1px solid var(--stroke);display:flex;align-items:center;gap:10px;padding:0 14px;font-size:11.5px;color:var(--ink);}
+  .statusbar .led{width:8px;height:8px;border-radius:50%;background:var(--green);}
+  .statusbar .sep{width:1px;height:12px;background:var(--stroke-2);}
+  .statusbar .spring{flex:1;}
+  .statusbar .tot{font-family:var(--mono);color:var(--ink-2);}
+
+  /* rules */
+  .badge-auto{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;color:var(--accent);background:var(--accent-fill);border:0.5px solid var(--accent-edge);border-radius:5px;padding:1px 6px;}
+  .badge-you{font-size:10px;color:var(--ink-3);}
+  .ck{width:15px;height:15px;border:1px solid var(--stroke-2);border-radius:4px;display:inline-grid;place-items:center;background:var(--win);cursor:pointer;}
+  .ck.on{background:var(--accent);border-color:var(--accent);}.ck svg{width:10px;height:10px;color:#fff;display:none;}.ck.on svg{display:block;}
+  .act-tag{font-weight:600;}.act-tag.proxy{color:var(--accent);}.act-tag.direct{color:var(--green);}.act-tag.block{color:var(--red);}
+  .pane-toolbar{height:38px;flex:none;border-top:1px solid var(--stroke);background:var(--bar);display:flex;align-items:center;gap:5px;padding:0 10px;}
+  .pt-btn{width:26px;height:24px;display:inline-grid;place-items:center;border:1px solid var(--stroke);background:var(--win);border-radius:6px;color:var(--ink-2);cursor:pointer;}.pt-btn svg{width:13px;height:13px;}
+  .pt-sep{width:1px;height:15px;background:var(--stroke-2);margin:0 4px;}
+  .pt-hint{margin-left:auto;font-size:11px;color:var(--ink-3);}
+
+  /* proxies */
+  .radio{color:var(--accent);}.radio.off{color:var(--ink-3);}.radio svg{width:15px;height:15px;}
+  .routing{border-top:1px solid var(--stroke);background:var(--win-2);padding:13px 16px;}
+  .routing h4{margin:0 0 8px;font-size:12.5px;font-weight:700;}
+  .rt-seg{display:flex;background:var(--bar);border:1px solid var(--stroke);border-radius:7px;padding:2px;width:fit-content;margin-bottom:8px;}
+  .rt-seg span{font-size:11.5px;color:var(--ink-2);padding:4px 13px;border-radius:5px;cursor:pointer;}.rt-seg span.on{background:var(--win);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,0.12);font-weight:600;}
+  .rt-exp{font-size:11.5px;color:var(--ink-2);line-height:1.5;}
+
+  /* context menu */
+  .ctxmenu{position:absolute;z-index:6;background:var(--win);border:1px solid var(--stroke-2);border-radius:10px;box-shadow:var(--shadow);padding:5px;width:210px;font-size:12.5px;}
+  .ctxmenu .ch{font-size:10.5px;color:var(--ink-3);padding:5px 9px 3px;font-weight:600;}
+  .ctxmenu .ci{display:flex;align-items:center;gap:9px;padding:6px 9px;border-radius:6px;cursor:pointer;}
+  .ctxmenu .ci:hover{background:var(--accent-fill);}.ctxmenu .ci.on{color:var(--accent);}.ctxmenu .ci .dm{width:14px;color:var(--accent);}.ctxmenu .ci .dm svg{width:13px;height:13px;}
+  .ctxmenu .ci.danger:hover{color:var(--red);}.ctxmenu .sep{height:1px;background:var(--stroke);margin:4px 0;}
+
+  /* emergency banner (state) */
+  .ebanner{position:absolute;left:0;right:0;top:0;background:var(--red);color:#fff;display:flex;align-items:center;gap:9px;padding:8px 14px;font-size:12.5px;z-index:4;}
+  .ebanner svg{width:15px;height:15px;flex:none;}.ebanner .spring{flex:1;}
+  .ebanner button{background:rgba(255,255,255,0.24);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;font-family:var(--ui);font-weight:600;}
+
+  /* answers panel */
+  .panel{position:absolute;background:var(--win);border:1px solid var(--stroke-2);border-radius:14px;box-shadow:var(--shadow);padding:18px 20px;z-index:2;}
+  .panel h3{margin:0 0 12px;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;}
+  .panel h3 .q{width:22px;height:22px;border-radius:7px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:12px;}
+  .qa{padding:11px 0;border-bottom:1px solid var(--stroke);}
+  .qa:last-child{border-bottom:none;}
+  .qa .qt{font-size:12.5px;font-weight:600;margin-bottom:5px;}
+  .qa .ans{font-size:12px;color:var(--ink-2);line-height:1.5;}
+  .qa .ans b{color:var(--green);}.qa .ans .no{color:var(--red);font-weight:600;}
+
+  .note{position:absolute;width:222px;background:var(--note-bg);border:1px solid var(--note-edge);border-radius:12px 12px 12px 3px;padding:13px 14px;box-shadow:0 12px 28px -12px rgba(20,20,40,0.4);color:var(--note-ink);z-index:4;}
+  .note .pin{position:absolute;top:-11px;left:-11px;width:26px;height:26px;border-radius:50% 50% 50% 2px;background:var(--accent);display:grid;place-items:center;color:#fff;font-size:12px;font-weight:700;}
+  .note h6{margin:0 0 5px;font-size:12px;font-weight:700;}.note p{margin:0;font-size:11.5px;line-height:1.5;}
+
+  .wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;}
+  .wire{fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:2 7;stroke-linecap:round;opacity:0.72;}
+  .wlabel{position:absolute;font-size:11px;font-weight:600;color:var(--accent);background:var(--canvas);padding:2px 8px;border-radius:20px;border:1px solid var(--accent);z-index:3;white-space:nowrap;transform:translate(-50%,-50%);}
+  @media (prefers-reduced-transparency:reduce){.topbar,.menubar{backdrop-filter:none;}}
+</style>
+
+<div class="topbar">
+  <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3l7 3v5c0 4.4-3 8-7 9-4-1-7-4.6-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+  <div class="file" id="fileTitle"></div>
+  <div class="spring"></div>
+  <div class="pillset" id="langPill"><button data-l="zh" class="on">中</button><button data-l="en">EN</button></div>
+  <div class="pillset" id="themePill"><button data-th="light"></button><button data-th="auto" class="on"></button><button data-th="dark"></button></div>
+</div>
+
+<div class="viewport" id="viewport"><div class="canvas" id="canvas"></div></div>
+
+<script>
+/* ===== i18n ===== */
+const DICT={
+  fileTitle:{zh:'appidge · 桌面工具版 v2 ／ 分段 tab · 文字统计',en:'appidge · Desktop v2 ／ Segmented tabs · text stats'},
+  themeL:{zh:'浅',en:'L'},themeA:{zh:'自动',en:'Auto'},themeD:{zh:'深',en:'D'},
+  sec0:{zh:'首次进入 · 引导（对应 OnboardingView.swift）',en:'First run · onboarding (OnboardingView.swift)'},
+  sec0s:{zh:'一屏说清接管范围、探测环境、激活扩展',en:'One screen: coverage, environment check, activation'},
+  sec1:{zh:'日常 · 菜单栏下拉 + 主窗口',en:'Daily · menu dropdown + main window'},
+  sec1s:{zh:'菜单栏看状态；主窗口分段切 活动 / 应用 / 规则 / 代理',en:'Menu shows status; window tabs: Activity / Apps / Rules / Proxy'},
+
+  onbTitle:{zh:'appidge · 按进程代理',en:'appidge · Per-app proxy'},
+  onbLead:{zh:'为每个应用单独指定走代理或直连。代理异常时自动回退直连。',en:'Set proxy or direct for each app. Falls back to direct if the proxy fails.'},
+  capCanT:{zh:'能接管：直连出网的应用',en:'Handles apps that connect out directly'},
+  capCanD:{zh:'多数 App、命令行、开发工具，包括无视全局代理的那些。',en:'Most apps, CLIs and dev tools, including ones that ignore the global proxy.'},
+  capCantT:{zh:'管不到：连本地代理端口的应用',en:'Skips apps that dial a local proxy port'},
+  capCantD:{zh:'少数应用自己连 127.0.0.1，那部分已由别的代理处理。',en:'A few connect to 127.0.0.1 themselves; that is already handled elsewhere.'},
+  envOK:{zh:'环境检查通过',en:'Environment check passed'},
+  envOKsub:{zh:'未发现会绕过 appidge 的系统代理或环境变量。',en:'No system proxy or env var that would bypass appidge.'},
+  diagLink:{zh:'有应用没走 appidge？',en:'An app not going through appidge?'},
+  onbHint:{zh:'开始后需在系统设置里允许扩展，仅一次。',en:'You’ll allow the extension in System Settings once.'},
+  envDetected:{zh:'本机探测',en:'Machine probe'},
+  envSysP:{zh:'系统代理',en:'System proxy'},
+  envSysPV:{zh:'未设置。认系统代理的应用会直连，由 appidge 接管。',en:'Not set. Apps honoring it connect direct and appidge takes over.'},
+  envVar:{zh:'环境变量',en:'Env vars'},
+  envVarV:{zh:'未在 appidge 进程中发现。终端里可能仍有。',en:'Not found in appidge’s process. A terminal may still have them.'},
+  envDiagT:{zh:'某个应用没走 appidge / 看不到？',en:'An app isn’t going through appidge / not shown?'},
+  envD1:{zh:'可能认了系统代理或环境变量，直连本地端口。终端里跑 <b>env | grep -i proxy</b>，有就 unset 后再试。',en:'It may honor the system proxy or env vars and hit a local port. Run <b>env | grep -i proxy</b>; if set, unset and retry.'},
+  envD2:{zh:'可能被上游聚合，显示成 xray。关掉上游的系统规则模式，它就以自己的身份出现。',en:'Traffic may be aggregated by the upstream and shown as xray. Turn off the upstream’s rule mode.'},
+  envD3:{zh:'可能走 QUIC/UDP。appidge 默认拦 UDP 逼其回落 TCP，异常时在「UDP / QUIC」改直连放行。',en:'It may use QUIC/UDP. appidge blocks UDP to force TCP; if it misbehaves, allow direct under UDP / QUIC.'},
+  envD4:{zh:'确认扩展在跑：状态栏「引擎正常」、系统扩展「已接管」。',en:'Confirm the extension runs: “Engine OK” and “Active”.'},
+  onbStart:{zh:'开始使用',en:'Get started'},
+  onbLabel:{zh:'首次引导（对应 OnboardingView）',en:'Onboarding (OnboardingView)'},
+  nOnbT:{zh:'诚实，但先说人话',en:'Honest, but plain first'},
+  nOnbP:{zh:'保留源码先讲清接管范围的做法，但拆掉术语墙：一句话说清，能管/管不到两张卡，技术细节收进「详情」。',en:'Keeps the source’s upfront honesty about coverage, minus the jargon wall: one line, two plain cards, technical detail under “details”.'},
+
+  mbTakeover:{zh:'已接管',en:'Active'},
+  mbCoverage:{zh:'系统级 · 全量',en:'System-wide · full'},
+  mbTotal:{zh:'总流量',en:'Total traffic'},
+  mbActive:{zh:'活动连接',en:'Active connections'},
+  mbTop5:{zh:'流量占用 Top 5',en:'Top 5 by traffic'},
+  mbEmergency:{zh:'紧急恢复直连（重置接管）',en:'Emergency restore direct (reset)'},
+  mbSettings:{zh:'设置…',en:'Settings…'},mbQuit:{zh:'退出',en:'Quit'},
+  mbOpen:{zh:'打开',en:'OPEN'},
+
+  setLabel:{zh:'设置（⌘,，对应 SettingsView）',en:'Settings (⌘, · SettingsView)'},
+  secSet:{zh:'设置 · ⌘, 打开',en:'Settings · opens with ⌘,'},
+  secSetS:{zh:'全局、少改的项：扩展状态 / 恢复出口 / UDP / 抓包 / 内置规则',en:'Global, rarely-changed: extension, recovery, UDP, capture, built-in rules'},
+  setTitle:{zh:'设置',en:'Settings'},
+  secGeneral:{zh:'通用',en:'General'},
+  setLang:{zh:'语言',en:'Language'},langZh:{zh:'简体中文',en:'简体中文'},langEn:{zh:'English',en:'English'},
+  setLangNote:{zh:'默认跟随系统语言，可在此覆盖。',en:'Follows the system language by default. Override here.'},
+  setAppear:{zh:'外观',en:'Appearance'},apAuto:{zh:'跟随系统',en:'Auto'},apLight:{zh:'浅色',en:'Light'},apDark:{zh:'深色',en:'Dark'},
+  secProxy:{zh:'代理',en:'Proxy'},
+  setExt:{zh:'系统扩展',en:'System extension'},setExtV:{zh:'已接管',en:'Active'},
+  setEngine:{zh:'引擎状态',en:'Engine'},setEngineV:{zh:'正常',en:'OK'},
+  secEnv:{zh:'能管哪一层',en:'Coverage'},
+  setCan:{zh:'能接管',en:'Handles'},setCanV:{zh:'直连出网的应用',en:'Direct-out apps'},
+  setCant:{zh:'管不到',en:'Skips'},setCantV:{zh:'连本地代理端口的应用',en:'Local-port apps'},
+  setEnvChk:{zh:'环境检查',en:'Env check'},setEnvChkV:{zh:'通过 · 无绕过设置',en:'Passed · no bypass'},
+  secRecover:{zh:'网络接管 · 恢复出口',en:'Takeover · recovery'},
+  setRecover:{zh:'恢复出口',en:'Recovery'},setRestart:{zh:'重启接管',en:'Restart'},setStop:{zh:'停止接管',en:'Stop'},setReset:{zh:'重置',en:'Reset'},
+  setRecoverNote:{zh:'重启接管：重绑最新扩展。停止接管：全部恢复直连。重置：移除系统里的代理配置。均无需重启电脑。',en:'Restart: re-bind to the latest extension. Stop: return all apps to direct. Reset: remove the proxy config. No reboot needed.'},
+  secUDP:{zh:'UDP / QUIC',en:'UDP / QUIC'},
+  setUDP:{zh:'代理进程的 UDP',en:'Proxied UDP'},
+  udpBlock:{zh:'拦截止漏',en:'Block'},udpDirect:{zh:'直连放行',en:'Direct'},udpSocks:{zh:'SOCKS5 代理',en:'SOCKS5'},
+  setUDPnote:{zh:'拦截代理进程的 UDP/QUIC，逼 QUIC 回落 TCP，避免泄漏。',en:'Blocks proxied UDP/QUIC so QUIC falls back to TCP, avoiding leaks.'},
+  secCap:{zh:'诊断与抓包',en:'Diagnostics'},
+  setCap:{zh:'逐连接抓包（.dmp）',en:'Per-connection capture (.dmp)'},
+  setCapNote:{zh:'把原始字节写入 captures/*.dmp。占磁盘、涉隐私，按需开启。',en:'Writes raw bytes to captures/*.dmp. Disk and privacy cost; enable only when needed.'},
+  secBuiltin:{zh:'内置规则',en:'Built-in rules'},
+  setLocalhost:{zh:'localhost / 127.0.0.1 / ::1 始终直连（不可关）',en:'localhost / 127.0.0.1 / ::1 always direct (locked)'},
+  setLocalProxy:{zh:'本地代理进程 · 强制直连',en:'Local proxy processes · forced direct'},
+  setLoopBypass:{zh:'回环自愈旁路 · 本次运行',en:'Loop-fix bypass · this run'},
+  mdLabel:{zh:'菜单栏下拉（对应 MenuBarView）',en:'Menu dropdown (MenuBarView)'},
+
+  winLabel:{zh:'主窗口 · 活动 / 应用 / 规则 / 代理',en:'Window · Activity / Apps / Rules / Proxy'},
+  tabAct:{zh:'活动',en:'Activity'},tabApps:{zh:'应用',en:'Apps'},tabRule:{zh:'规则',en:'Rules'},tabProxy:{zh:'代理',en:'Proxy'},
+  filter:{zh:'过滤',en:'Filter'},searchApp:{zh:'搜索 App',en:'Search apps'},master:{zh:'总开关',en:'Master'},
+
+  appsHdrT:{zh:'每个应用的默认走法',en:'Default route per app'},
+  appsHdrS:{zh:'可直接预设，无需等它联网。按网站的例外在「规则」里设。',en:'Preset directly, no need to wait for it to connect. Site exceptions live in Rules.'},
+  colAppRoute:{zh:'走法',en:'Route'},colTotal:{zh:'累计 ↓',en:'Total ↓'},
+  appAuto:{zh:'默认',en:'default'},appLoop:{zh:'回环',en:'loop'},appYou:{zh:'你设的',en:'yours'},
+
+  colApp:{zh:'应用',en:'App'},colTo:{zh:'连到哪里',en:'Destination'},colRoute:{zh:'走法',en:'Route'},
+  colRate:{zh:'速率',en:'Rate'},colStatus:{zh:'状态',en:'Status'},colUp:{zh:'↑ 发送',en:'↑ Sent'},colDown:{zh:'↓ 接收',en:'↓ Recv'},
+  logTitle:{zh:'日志',en:'Log'},
+  logReveal:{zh:'在访达中显示',en:'Reveal in Finder'},
+  logClear:{zh:'清除',en:'Clear'},
+  ctxHead:{zh:'把 Telegram 改为',en:'Set Telegram to'},
+  rProxy:{zh:'走代理',en:'Proxy'},rDirect:{zh:'直连',en:'Direct'},rBlock:{zh:'拦截',en:'Block'},
+  ctxRule:{zh:'为这条连接建精确规则…',en:'New precise rule for this…'},
+  blocked:{zh:'被拦截',en:'Blocked'},
+
+  colEnable:{zh:'启用',en:'On'},colProc:{zh:'进程',en:'Process'},colHost:{zh:'主机',en:'Host'},colPort:{zh:'端口',en:'Port'},colAction:{zh:'动作',en:'Action'},colSource:{zh:'来源',en:'Source'},
+  srcAutoDefault:{zh:'自动 · 默认',en:'Auto · default'},srcAutoLoop:{zh:'自动 · 回环',en:'Auto · loop'},srcYou:{zh:'你',en:'You'},
+  anyHost:{zh:'任意',en:'Any'},ruleHint:{zh:'从上到下，首个命中生效',en:'Top-down, first match wins'},
+
+  colServer:{zh:'地址:端口',en:'Address:Port'},colKind:{zh:'协议',en:'Type'},colUser:{zh:'用户名',en:'User'},colProbe:{zh:'探活',en:'Test'},
+  routingTitle:{zh:'路由模式',en:'Routing mode'},rmSingle:{zh:'单台',en:'Single'},rmChain:{zh:'代理链',en:'Chain'},rmFail:{zh:'故障转移',en:'Failover'},rmLoad:{zh:'负载均衡',en:'Balance'},
+  rmExp:{zh:'所有走代理的连接都用「使用中」的那台上游。',en:'All proxied connections use the active upstream.'},
+
+  sbEngine:{zh:'引擎正常',en:'Engine OK'},sbConn:{zh:'活动连接 7',en:'7 live'},
+
+  ebanner:{zh:'网络异常：部分 App 连不上？一键让所有 App 恢复直连，无需重启。',en:'Network trouble: apps can’t connect? Restore direct for all — no restart.'},
+  ebFix:{zh:'立即恢复',en:'Restore now'},
+
+  ansTitle:{zh:'几处取舍',en:'Design choices'},
+  q1t:{zh:'活动 / 应用 / 规则 / 代理 怎么分？',en:'How are the tabs split?'},
+  q1a:{zh:'用顶部分段，不用侧栏。四个页分两层：<b>应用</b>逐 App 一个走法开关，可浏览预设；<b>规则</b>是有序规则表，首个命中生效；活动实时，右键也能就地改。',en:'A toolbar segmented control, not a sidebar. Two layers: <b>Apps</b> is one route switch per app; <b>Rules</b> is the ordered table, first match wins; Activity is live and editable inline.'},
+  q2t:{zh:'带宽图？',en:'Bandwidth chart?'},
+  q2a:{zh:'去掉。底部状态栏给总量，活动表加一列<b>每进程速率</b>，比聚合曲线更能看清谁在吃带宽。',en:'Dropped. The status bar shows totals and Activity has a <b>per-app rate</b> column — clearer than an aggregate curve.'},
+  q3t:{zh:'规则从哪来？',en:'Where do rules come from?'},
+  q3a:{zh:'规则页用「来源」列标清：<b>自动·默认</b>（`* *`→走代理）、<b>自动·回环</b>（xray→直连）、<b>你</b>手动加的。首个命中生效，catch-all 在最底。',en:'The Rules tab marks a source: <b>Auto·default</b> (`* *`→proxy), <b>Auto·loop</b> (xray→direct), <b>You</b>. First match wins; the catch-all is last.'},
+
+  nAt:{zh:'活动＝改规则的地方',en:'Activity = where you set rules'},
+  nAp:{zh:'右键任意进程改走法，或建精确规则，无需切页。',en:'Right-click any app to change its route or add a precise rule, without switching tabs.'},
+  nBt:{zh:'速率列取代带宽图',en:'Rate column, not a chart'},
+  nBp:{zh:'每进程实时速率（活跃高亮、空闲变灰）比一条聚合曲线更有用。',en:'A per-app live rate (hot highlighted, idle dimmed) beats one aggregate line.'},
+};
+let lang='zh';let theme='auto';const t=k=>DICT[k]?DICT[k][lang]:k;
+
+/* ===== icons ===== */
+const S=(p,sw=2)=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const IC={
+  shield:S('<path d="M12 3l7 3v5c0 4.4-3 8-7 9-4-1-7-4.6-7-9V6z"/><path d="M9 12l2 2 4-4"/>'),
+  shieldCheck:S('<path d="M12 3l7 3v5c0 4.4-3 8-7 9-4-1-7-4.6-7-9V6z"/><path d="M9 12l2 2 4-4"/>'),
+  power:S('<path d="M18.4 7A8 8 0 1 1 5.6 7"/><path d="M12 2v8"/>'),
+  branch:S('<path d="M6 3v6M6 21a3 3 0 1 0 0-6M6 15c0-3 3-4 6-4h2M18 5a3 3 0 1 0 0 6"/>'),
+  arrow:S('<path d="M5 12h14M13 6l6 6-6 6"/>'),
+  ban:S('<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>'),
+  loop:S('<path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>'),
+  recover:S('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>'),
+  check:S('<path d="M4 12l5 5L20 6"/>',2.4),
+  activity:S('<path d="M3 12h4l3 8 4-16 3 8h4"/>'),
+  apps:S('<rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/>'),
+  list:S('<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>'),
+  server:S('<rect x="3" y="4" width="18" height="7" rx="1.6"/><rect x="3" y="13" width="18" height="7" rx="1.6"/>'),
+  gear:S('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2 2M17 17l2 2M2 12h3M19 12h3M4.9 19l2-2M17 7l2-2"/>'),
+  search:S('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>'),
+  warn:S('<path d="M12 3l10 17H2z"/><path d="M12 9v5M12 18h.01"/>'),
+  plus:S('<path d="M12 5v14M5 12h14"/>'),minus:S('<path d="M5 12h14"/>'),pencil:S('<path d="M4 20l4-1 11-11-3-3L5 16z"/>'),up:S('<path d="M6 15l6-6 6 6"/>'),down:S('<path d="M6 9l6 6 6-6"/>'),
+  radioOn:S('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4" fill="currentColor"/>'),radioOff:S('<circle cx="12" cy="12" r="9"/>'),
+  net:S('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>'),
+  upfwd:S('<circle cx="12" cy="12" r="9"/><path d="M9 15l6-6M10 9h5v5"/>'),
+  bulb:S('<path d="M9 18h6M10 21h4M12 3a6 6 0 0 1 4 10c-.7.7-1 1.4-1 2H9c0-.6-.3-1.3-1-2A6 6 0 0 1 12 3z"/>'),
+  chevR:S('<path d="M9 6l6 6-6 6"/>'),
+  info:S('<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>'),
+  shieldsm:S('<path d="M12 3l7 3v5c0 4.4-3 8-7 9-4-1-7-4.6-7-9V6z"/><path d="M9 12l2 2 4-4"/>'),
+  reveal:S('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'),
+  logi:S('<path d="M4 6h16M4 12h16M4 18h10"/>'),
+  lock:S('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'),
+};
+const rIco={proxy:IC.branch,direct:IC.arrow,block:IC.ban};
+function chip(r){const w={proxy:t('rProxy'),direct:t('rDirect'),block:t('rBlock')};return `<span class="chip ${r}">${rIco[r]}${w[r]}</span>`;}
+function tile(bg,ab){return `<span class="ic" style="background:${bg}">${ab}</span>`;}
+
+/* ===== data ===== */
+const conns=[
+  {nm:'Google Chrome',ab:'Ch',bg:'#4285F4',id:'com.google.Chrome',host:'www.google.com:443',route:'proxy',rate:'2.1 MB/s',hot:true,up:'12 KB',dn:'340 KB'},
+  {nm:'Telegram',ab:'Tg',bg:'#2AABEE',id:'ru.keepcoder.Telegram',host:'149.154.167.51:443',route:'proxy',rate:'140 KB/s',hot:true,up:'640 KB',dn:'2.3 MB'},
+  {nm:'Spotify',ab:'Sp',bg:'#1DB954',id:'com.spotify.client',host:'audio-fa.scdn.co:443',route:'direct',rate:'0 B/s',hot:false,up:'210 KB',dn:'6.1 MB'},
+  {nm:'xray',ab:'Xr',bg:'#5A5A66',id:'a.out (xray)',host:'104.18.32.7:443',route:'direct',rate:'880 KB/s',hot:true,up:'1.1 MB',dn:'9.8 MB'},
+  {nm:'Update Agent',ab:'Up',bg:'#8A2BE2',id:'com.adobe.updater',host:'metrics.adobe.io:80',route:'block',rate:'—',hot:false,up:'—',dn:'—'},
+];
+const rules=[
+  {en:true,proc:'a.out (xray)',host:'*',port:'any',act:'direct',src:'loop'},
+  {en:true,proc:'*',host:'*.google.com',port:'any',act:'direct',src:'you'},
+  {en:false,proc:'com.adobe.updater',host:'metrics.*',port:'80',act:'block',src:'you'},
+  {en:true,proc:'*',host:'*',port:'any',act:'proxy',src:'default'},
+];
+const servers=[
+  {active:true,host:'127.0.0.1',port:1080,kind:'SOCKS5',user:'—',ok:true},
+  {active:false,host:'10.0.0.8',port:1080,kind:'SOCKS5',user:'joe',ok:true},
+  {active:false,host:'proxy.corp',port:8080,kind:'HTTP',user:'—',ok:false},
+];
+/* Apps tab: browsable installed/recent apps with a per-app default route (Proxifier-style).
+   src = why this route: default(* *→proxy) / loop(auto exclusion) / you / (blank = follows default) */
+const appsList=[
+  {nm:'Google Chrome',ab:'Ch',bg:'#4285F4',id:'com.google.Chrome',route:'proxy',src:'default',rate:'2.1 MB/s',hot:true,dn:'42 MB'},
+  {nm:'Telegram',ab:'Tg',bg:'#2AABEE',id:'ru.keepcoder.Telegram',route:'proxy',src:'default',rate:'140 KB/s',hot:true,dn:'2.3 MB'},
+  {nm:'Raycast',ab:'Ry',bg:'#FF6363',id:'com.raycast.macos',route:'proxy',src:'default',rate:'0 B/s',hot:false,dn:'1.2 MB'},
+  {nm:'Spotify',ab:'Sp',bg:'#1DB954',id:'com.spotify.client',route:'direct',src:'you',rate:'0 B/s',hot:false,dn:'6.1 MB'},
+  {nm:'xray',ab:'Xr',bg:'#5A5A66',id:'a.out (xray)',route:'direct',src:'loop',rate:'880 KB/s',hot:true,dn:'9.8 MB'},
+  {nm:'Slack',ab:'Sl',bg:'#4A154B',id:'com.tinyspeck.slackmacgap',route:'proxy',src:'default',rate:'0 B/s',hot:false,dn:'—'},
+  {nm:'Figma',ab:'Fi',bg:'#0ACF83',id:'com.figma.Desktop',route:'direct',src:'you',rate:'0 B/s',hot:false,dn:'—'},
+  {nm:'Update Agent',ab:'Up',bg:'#8A2BE2',id:'com.adobe.updater',route:'block',src:'you',rate:'—',hot:false,dn:'—'},
+];
+
+/* ===== connection event log (Proxifier-style, from ConnectionLogFileStore) ===== */
+const logs=[
+  {t:'14:22:40',kind:'conn',app:'Raycast',host:'backend.raycast.com:443',route:'proxy',reason:{zh:'命中规则 * *',en:'matched * *'}},
+  {t:'14:22:07',kind:'conn',app:'Google Chrome',host:'www.google.com:443',route:'proxy',reason:{zh:'命中 * *，走 SOCKS5 127.0.0.1:1080',en:'matched * *, via SOCKS5 127.0.0.1:1080'}},
+  {t:'14:20:55',kind:'block',app:'Terminal',host:'analytics.example.net:443',route:'block',reason:{zh:'命中规则 Terminal → 拦截',en:'matched Terminal → block'}},
+  {t:'14:20:12',kind:'warn',msg:{zh:'上游 127.0.0.1:1080 超时，Chrome 本次回退直连',en:'Upstream 127.0.0.1:1080 timed out; Chrome fell back to direct'}},
+  {t:'14:19:34',kind:'conn',app:'xray',host:'104.18.32.7:443',route:'direct',reason:{zh:'命中 xray → 直连（回环自愈）',en:'matched xray → direct (loop fix)'}},
+  {t:'14:18:02',kind:'warn',msg:{zh:'检测到回环：xray 反复捕获自身流量，已自动加规则 xray → 直连',en:'Loop detected: xray kept capturing its own traffic; added rule xray → direct'}},
+  {t:'14:14:47',kind:'conn',app:'Spotify',host:'audio-fa.scdn.co:443',route:'direct',reason:{zh:'命中规则 Spotify → 直连',en:'matched Spotify → direct'}},
+  {t:'14:05:11',kind:'closed',app:'Mail',host:'imap.gmail.com:993',route:'direct',reason:{zh:'连接关闭',en:'connection closed'}},
+];
+function chipMini(r){const w={proxy:t('rProxy'),direct:t('rDirect'),block:t('rBlock')};return `<span class="chip ${r} mini">${w[r]}</span>`;}
+function logLine(e){
+  if(e.kind==='warn') return `<div class="logline warn"><span class="lt">${e.t}</span><span class="lwarn">${IC.warn}${e.msg[lang]}</span></div>`;
+  return `<div class="logline ${e.kind==='closed'?'closed':''}"><span class="lt">${e.t}</span><b class="lapp">${e.app}</b><span class="lhost">→ ${e.host}</span>${chipMini(e.route)}<span class="lreason">${e.reason[lang]}</span></div>`;
+}
+
+/* ===== window tabs ===== */
+let tab='act';
+function actBody(){
+  const rows=conns.map((c,i)=>{
+    let st;
+    if(c.route==='block') st=`<span class="stat" style="color:var(--red)">${IC.ban}${t('blocked')}</span>`;
+    else st=`<span class="stat" style="color:var(--green)"><span class="d g"></span><span class="mono">${['0:42','12:31','8:02','3:15','—'][i]}</span></span>`;
+    return `<tr class="${i===1?'sel':''}"><td><div class="app">${tile(c.bg,c.ab)}<div class="nm"><b>${c.nm}</b><small>${c.id}</small></div></div></td>
+      <td class="mono muted">${c.host}</td><td>${chip(c.route)}</td>
+      <td class="num rate ${c.hot?'hot':'idle'}">${c.rate}</td>
+      <td>${st}</td><td class="num ${c.route==='block'?'dim':''}">${c.dn}</td></tr>`;
+  }).join('');
+  const loglines=logs.map(logLine).join('');
+  return `<div class="wcontent actwrap">
+    <div class="conn-scroll">
+      <table><thead><tr><th>${t('colApp')}</th><th>${t('colTo')}</th><th>${t('colRoute')}</th><th class="num">${t('colRate')}</th><th>${t('colStatus')}</th><th class="num">${t('colDown')}</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="ctxmenu" style="left:300px;top:100px">
+        <div class="ch">${t('ctxHead')}</div>
+        <div class="ci on"><span class="dm">${IC.check}</span>${t('rProxy')}</div>
+        <div class="ci"><span class="dm" style="visibility:hidden">${IC.check}</span>${t('rDirect')}</div>
+        <div class="ci danger"><span class="dm" style="visibility:hidden">${IC.check}</span>${t('rBlock')}</div>
+        <div class="sep"></div><div class="ci">${t('ctxRule')}</div>
+      </div>
+    </div>
+    <div class="logpane">
+      <div class="log-h"><span class="log-collapse">${IC.chevR}</span><span class="log-title">${IC.logi}${t('logTitle')}<span class="cnt">${logs.length}</span></span><span class="spring"></span>
+        <span class="log-act">${IC.reveal}${t('logReveal')}</span><span class="log-act">${t('logClear')}</span></div>
+      <div class="log-body">${loglines}</div>
+    </div>
+  </div>`;
+}
+function rseg(active){const o=(k)=>`<span class="${k} ${active===k?'on':''}">${rIco[k]}${{proxy:t('rProxy'),direct:t('rDirect'),block:t('rBlock')}[k]}</span>`;
+  return `<div class="rseg">${o('proxy')}${o('direct')}${o('block')}</div>`;}
+function appsBody(){
+  const srcTag=(s)=>s==='default'?`<span class="appsrc">${IC.shield}${t('appAuto')}</span>`
+    :s==='loop'?`<span class="appsrc" style="color:var(--orange)">${IC.loop}${t('appLoop')}</span>`
+    :s==='you'?`<span class="appsrc">${t('appYou')}</span>`:'';
+  const rows=appsList.map(a=>`<tr><td><div class="app">${tile(a.bg,a.ab)}<div class="nm"><b>${a.nm}</b><small>${a.id}</small></div></div></td>
+    <td>${rseg(a.route)}</td>
+    <td>${srcTag(a.src)}</td>
+    <td class="num rate ${a.hot?'hot':'idle'}">${a.rate}</td>
+    <td class="num ${a.dn==='—'?'dim':''}">${a.dn}</td></tr>`).join('');
+  return `<div class="wcontent">
+    <div style="padding:11px 16px;border-bottom:1px solid var(--stroke)"><div style="font-size:13px;font-weight:600">${t('appsHdrT')}</div>
+      <div style="font-size:11.5px;color:var(--ink-2);margin-top:3px;line-height:1.4">${t('appsHdrS')}</div></div>
+    <table><thead><tr><th>${t('colApp')}</th><th style="width:220px">${t('colAppRoute')}</th><th style="width:70px">${t('colSource')}</th><th class="num">${t('colRate')}</th><th class="num">${t('colTotal')}</th></tr></thead><tbody>${rows}</tbody></table>
+  </div>`;
+}
+function ruleBody(){
+  const srcCell=(s)=>s==='default'?`<span class="badge-auto">${IC.shield}${t('srcAutoDefault')}</span>`
+    :s==='loop'?`<span class="badge-auto" style="color:var(--orange);background:var(--orange-fill);border-color:var(--orange-edge)">${IC.loop}${t('srcAutoLoop')}</span>`
+    :`<span class="badge-you">${t('srcYou')}</span>`;
+  const rows=rules.map((r,i)=>`<tr class="rrow" data-r="${i}">
+    <td style="width:44px"><span class="ck ${r.en?'on':''}">${IC.check}</span></td>
+    <td class="mono" style="opacity:${r.en?1:0.45}">${r.proc}</td>
+    <td class="mono" style="opacity:${r.en?1:0.45}">${r.host}</td>
+    <td style="opacity:${r.en?1:0.45}">${r.port==='any'?t('anyHost'):r.port}</td>
+    <td style="opacity:${r.en?1:0.45}"><span class="act-tag ${r.act}">${{proxy:t('rProxy'),direct:t('rDirect'),block:t('rBlock')}[r.act]}</span></td>
+    <td>${srcCell(r.src)}</td></tr>`).join('');
+  return `<div class="wcontent"><table><thead><tr><th style="width:44px">${t('colEnable')}</th><th>${t('colProc')}</th><th>${t('colHost')}</th><th style="width:70px">${t('colPort')}</th><th style="width:80px">${t('colAction')}</th><th style="width:120px">${t('colSource')}</th></tr></thead><tbody>${rows}</tbody></table></div>
+  <div class="pane-toolbar"><span class="pt-btn">${IC.plus}</span><span class="pt-btn">${IC.minus}</span><span class="pt-btn">${IC.pencil}</span><span class="pt-sep"></span><span class="pt-btn">${IC.up}</span><span class="pt-btn">${IC.down}</span><span class="pt-hint">${t('ruleHint')}</span></div>`;
+}
+function proxyBody(){
+  const rows=servers.map(s=>`<tr><td style="width:26px"><span class="radio ${s.active?'':'off'}">${s.active?IC.radioOn:IC.radioOff}</span></td>
+    <td class="mono">${s.host}:${s.port}</td><td>${s.kind}</td><td class="muted">${s.user}</td>
+    <td style="width:56px">${s.ok?`<span style="color:var(--green)">${IC.check}</span>`:`<span style="color:var(--red)">${IC.ban}</span>`}</td></tr>`).join('');
+  return `<div class="wcontent"><table><thead><tr><th style="width:26px"></th><th>${t('colServer')}</th><th style="width:80px">${t('colKind')}</th><th>${t('colUser')}</th><th style="width:56px">${t('colProbe')}</th></tr></thead><tbody>${rows}</tbody></table></div>
+  <div class="routing"><h4>${t('routingTitle')}</h4>
+    <div class="rt-seg"><span class="on">${t('rmSingle')}</span><span>${t('rmChain')}</span><span>${t('rmFail')}</span><span>${t('rmLoad')}</span></div>
+    <div class="rt-exp">${t('rmExp')}</div></div>`;
+}
+function winBody(){return tab==='act'?actBody():tab==='apps'?appsBody():tab==='rule'?ruleBody():proxyBody();}
+function fWindow(){
+  const tb=(k,ic,lab)=>`<button class="${tab===k?'on':''}" data-tab="${k}">${ic}${lab}</button>`;
+  const tools=tab==='act'?`<div class="tsearch">${IC.search}<span>${t('filter')}</span></div>`
+    :tab==='apps'?`<div class="tsearch">${IC.search}<span>${t('searchApp')}</span></div>`:'';
+  return `<div class="win">
+    <div class="titlebar"><div class="lights"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+      <div class="tabs">${tb('act',IC.activity,t('tabAct'))}${tb('apps',IC.apps,t('tabApps'))}${tb('rule',IC.list,t('tabRule'))}${tb('proxy',IC.server,t('tabProxy'))}</div>
+      <div class="wtools">${tools}</div>
+    </div>
+    ${winBody()}
+    <div class="statusbar"><span class="led"></span>${t('sbEngine')}<span class="sep"></span>${t('sbConn')}<span class="spring"></span>
+      <span class="tot">↑ 4.2 MB   ↓ 61.8 MB</span></div>
+  </div>`;
+}
+/* Faithful reproduction of MenuBarView in ContentView.swift:
+   status → coverage → 总流量/活动连接 → 流量占用 Top 5 → 紧急恢复直连（重置接管）→ 设置…/退出.
+   No master switch, no nav entries, no stat grid — those aren't in the source. */
+const top5=[
+  {nm:'Google Chrome',v:'↑ 1.9M  ↓ 42M'},
+  {nm:'xray',v:'↑ 1.1M  ↓ 9.8M'},
+  {nm:'Spotify',v:'↑ 210K  ↓ 6.1M'},
+  {nm:'Telegram',v:'↑ 640K  ↓ 2.3M'},
+  {nm:'Raycast',v:'↑ 88K  ↓ 1.2M'},
+];
+function fSettings(){
+  const sec=(ic,hdr,inner,note)=>`<div class="set-hdr"><span class="shi">${ic}</span>${hdr}</div><div class="set-card">${inner}</div>${note?`<div class="set-note">${note}</div>`:''}`;
+  const row=(l,r)=>`<div class="set-row"><span class="rl">${l}</span>${r}</div>`;
+  const langSeg=`<div class="set-seg"><span class="${lang==='zh'?'on':''}" data-setlang="zh">${t('langZh')}</span><span class="${lang==='en'?'on':''}" data-setlang="en">${t('langEn')}</span></div>`;
+  const udp=`<div class="rt-seg"><span class="on">${t('udpBlock')}</span><span>${t('udpDirect')}</span><span>${t('udpSocks')}</span></div>`;
+  return `<div class="win"><div class="titlebar"><div class="lights"><i class="r"></i><i class="y"></i><i class="g"></i></div><div class="tbtitle" style="font-weight:600">${t('setTitle')}</div></div>
+  <div class="setbody">
+    ${sec(IC.gear,t('secGeneral'),
+      row(t('setLang'),langSeg),
+      t('setLangNote'))}
+    ${sec(IC.shieldsm,t('secProxy'),
+      row(t('setExt'),`<span class="rv" style="color:var(--green)">${t('setExtV')}</span>`)+
+      row(t('setEngine'),`<span class="rv">${t('setEngineV')}</span>`))}
+    ${sec(IC.recover,t('secRecover'),
+      row(t('setRecover'),`<span style="display:flex;gap:6px"><span class="set-btn">${t('setRestart')}</span><span class="set-btn">${t('setStop')}</span><span class="set-btn danger">${t('setReset')}</span></span>`),
+      t('setRecoverNote'))}
+    <div class="set-hdr"><span class="shi">${IC.info}</span>${t('secUDP')}</div><div class="set-card"><div class="set-row" style="flex-direction:column;align-items:stretch;gap:8px"><span class="rl">${t('setUDP')}</span>${udp}</div></div><div class="set-note">${t('setUDPnote')}</div>
+    ${sec(IC.logi,t('secCap'),row(t('setCap'),`<div class="sw"></div>`),t('setCapNote'))}
+    <div class="set-hdr"><span class="shi">${IC.lock}</span>${t('secBuiltin')}</div><div class="set-card">
+      <div class="set-row"><span style="color:var(--ink-3);display:inline-flex;vertical-align:-2px">${IC.lock}</span><span class="rl" style="font-size:11.5px;color:var(--ink-2)">${t('setLocalhost')}</span></div>
+      <div class="set-row" style="align-items:flex-start;flex-direction:column;gap:5px"><span class="dim" style="font-size:11px">${t('setLocalProxy')}</span><span><span class="chip direct mini">xray</span> <span class="chip direct mini">a.out</span></span></div>
+      <div class="set-row" style="align-items:flex-start;flex-direction:column;gap:5px"><span class="dim" style="font-size:11px">${t('setLoopBypass')}</span><span><span class="chip direct mini">xray</span></span></div>
+    </div>
+  </div></div>`;
+}
+function fOnboarding(){
+  return `<div class="win"><div class="titlebar"><div class="lights"><i class="r"></i><i class="y"></i><i class="g"></i></div><div class="tbtitle" style="font-weight:600">appidge</div></div>
+  <div class="onbw">
+    <div class="onb-badge">${IC.net}</div>
+    <h1>${t('onbTitle')}</h1>
+    <div class="desc">${t('onbLead')}</div>
+    <div class="cap2">
+      <div class="c"><div class="ci" style="background:var(--green-fill);color:var(--green)">${IC.check}</div><div><b>${t('capCanT')}</b><span>${t('capCanD')}</span></div></div>
+      <div class="c"><div class="ci" style="background:var(--orange-fill);color:var(--orange)">${IC.info}</div><div><b>${t('capCantT')}</b><span>${t('capCantD')}</span></div></div>
+    </div>
+    <div class="disc" data-disc>
+      <div class="dh"><span style="color:var(--green);display:flex">${IC.shieldsm}</span>
+        <div><b style="font-size:12.5px;font-weight:600">${t('envOK')}</b><div style="font-size:11px;color:var(--ink-2);margin-top:1px">${t('envOKsub')}</div></div>
+        <span class="chev">${IC.chevR}</span></div>
+      <div class="dbody">
+        <div class="drow"><span class="di" style="color:var(--green)">${IC.check}</span><div><div class="dl">${t('envSysP')}</div><div class="dv">${t('envSysPV')}</div></div></div>
+        <div class="drow"><span class="di" style="color:var(--green)">${IC.check}</span><div><div class="dl">${t('envVar')}</div><div class="dv">${t('envVarV')}</div></div></div>
+      </div>
+    </div>
+    <div class="disc link" data-disc>
+      <div class="dh">${t('diagLink')}<span class="chev">${IC.chevR}</span></div>
+      <div class="dbody">
+        <div class="bl">${t('envD1')}</div><div class="bl">${t('envD2')}</div><div class="bl">${t('envD3')}</div><div class="bl">${t('envD4')}</div>
+      </div>
+    </div>
+    <button class="onb-btn">${t('onbStart')}</button>
+    <div class="onb-hint">${t('onbHint')}</div>
+  </div></div>`;
+}
+function fMenu(){
+  const tops=top5.map(p=>`<div class="mb-top"><span class="nm">${p.nm}</span><span class="v">${p.v}</span></div>`).join('');
+  return `<div class="menudrop"><div class="mb">
+    <div class="mb-status" style="color:var(--green)">${IC.shieldCheck}${t('mbTakeover')}</div>
+    <div class="mbd"></div>
+    <div class="mb-cov" style="color:var(--green)">${IC.check}${t('mbCoverage')}</div>
+    <div class="mbd"></div>
+    <div class="mb-row"><span class="k">${t('mbTotal')}</span><span class="v">↑ 4.2 MB  ↓ 61.8 MB</span></div>
+    <div class="mb-row"><span class="k">${t('mbActive')}</span><span class="v">7</span></div>
+    <div class="mbd"></div>
+    <div class="mb-cap">${t('mbTop5')}</div>${tops}
+    <div class="mbd"></div>
+    <div class="mb-cap">${t('mbOpen')}</div>
+    <div class="mb-nav">
+      <div class="nit"><span class="nii">${IC.activity}</span>${t('tabAct')}<span class="nik">⌘1</span></div>
+      <div class="nit"><span class="nii">${IC.apps}</span>${t('tabApps')}<span class="nik">⌘2</span></div>
+      <div class="nit"><span class="nii">${IC.list}</span>${t('tabRule')}<span class="nik">⌘3</span></div>
+      <div class="nit"><span class="nii">${IC.server}</span>${t('tabProxy')}<span class="nik">⌘4</span></div>
+    </div>
+    <div class="mbd"></div>
+    <div class="mb-emg">${IC.recover}${t('mbEmergency')}</div>
+    <div class="mbd"></div>
+    <div class="mb-foot"><span class="item">${IC.gear}${t('mbSettings')}</span><span class="spring"></span><span class="item">${IC.power}${t('mbQuit')}</span></div>
+  </div></div>`;
+}
+
+/* ===== layout ===== */
+const canvas=document.getElementById('canvas');
+function render(){
+  canvas.innerHTML=`<svg class="wires" viewBox="0 0 1800 2420" preserveAspectRatio="none">
+    <defs><marker id="ah" markerWidth="9" markerHeight="9" refX="6" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="var(--accent)"/></marker></defs>
+    <path class="wire" marker-end="url(#ah)" d="M295 852 L295 906"/>
+    <path class="wire" marker-end="url(#ah)" d="M210 1652 L210 1740"/>
+  </svg>`;
+  // menu bar strip (context for the dropdown)
+  const mb=document.createElement('div');mb.className='menubar';mb.style.cssText='left:60px;top:952px;width:1412px;';
+  mb.innerHTML=`<span class="mi" style="font-weight:700;opacity:1">Finder</span><span class="mi">${lang==='zh'?'文件':'File'}</span><span class="spring"></span><span class="appicon">${IC.shield}4</span><span class="mi">9:41</span>`;
+  canvas.appendChild(mb);
+  const stem=document.createElement('div');stem.className='stem';stem.style.cssText='left:104px;top:978px;height:34px;';canvas.appendChild(stem);
+
+  const frames=[
+    {x:60,y:200,w:470,h:620,label:t('onbLabel'),html:fOnboarding()},
+    {x:60,y:1012,w:340,h:600,label:t('mdLabel'),html:fMenu()},
+    {x:512,y:1012,w:960,h:560,label:t('winLabel'),html:fWindow()},
+    {x:60,y:1740,w:480,h:560,label:t('setLabel'),html:fSettings()},
+  ];
+  frames.forEach(f=>{const el=document.createElement('div');el.className='frame';el.style.cssText=`left:${f.x}px;top:${f.y}px;width:${f.w}px;`;
+    el.innerHTML=`<div class="flabel"><span class="dot"></span>${f.label}</div><div style="height:${f.h}px">${f.html}</div>`;canvas.appendChild(el);});
+  [['⓪',t('sec0'),t('sec0s'),60,150],['①',t('sec1'),t('sec1s'),60,900],['②',t('secSet'),t('secSetS'),60,1690]].forEach(([b,tt,ss,x,y])=>{
+    const el=document.createElement('div');el.className='sectlabel';el.style.cssText=`left:${x}px;top:${y}px;`;
+    el.innerHTML=`<span class="b">${b}</span>${tt} <small>· ${ss}</small>`;canvas.appendChild(el);});
+  // wire label
+  const wl=document.createElement('div');wl.className='wlabel';wl.style.cssText='left:295px;top:879px';wl.textContent=lang==='zh'?'开始使用 → 进入日常':'Get started → daily';canvas.appendChild(wl);
+  // answers panel (right of onboarding)
+  const p=document.createElement('div');p.className='panel';p.style.cssText='left:600px;top:200px;width:540px;';
+  p.innerHTML=`<h3><span class="q">?</span>${t('ansTitle')}</h3>
+    <div class="qa"><div class="qt">${t('q1t')}</div><div class="ans">${t('q1a')}</div></div>
+    <div class="qa"><div class="qt">${t('q2t')}</div><div class="ans">${t('q2a')}</div></div>
+    <div class="qa"><div class="qt">${t('q3t')}</div><div class="ans">${t('q3a')}</div></div>`;
+  canvas.appendChild(p);
+  // notes
+  [['O',t('nOnbT'),t('nOnbP'),1180,240],['A',t('nAt'),t('nAp'),1500,1030],['B',t('nBt'),t('nBp'),1500,1250]].forEach(([n,h,pp,x,y])=>{
+    const el=document.createElement('div');el.className='note';el.style.cssText=`left:${x}px;top:${y}px`;
+    el.innerHTML=`<div class="pin">${n}</div><h6>${h}</h6><p>${pp}</p>`;canvas.appendChild(el);});
+  document.getElementById('fileTitle').innerHTML=t('fileTitle').replace('／','<span>／</span>');
+  const th=document.querySelectorAll('#themePill button');th[0].textContent=t('themeL');th[1].textContent=t('themeA');th[2].textContent=t('themeD');
+}
+render();
+
+/* ===== interactions ===== */
+function setLang(v){lang=v;document.querySelectorAll('#langPill button').forEach(b=>b.classList.toggle('on',b.dataset.l===lang));render();}
+function setTheme(v){theme=v;if(theme==='auto')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme',theme);
+  document.querySelectorAll('#themePill button').forEach(b=>b.classList.toggle('on',b.dataset.th===theme));render();}
+document.getElementById('langPill').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setLang(b.dataset.l);});
+document.getElementById('themePill').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setTheme(b.dataset.th);});
+canvas.addEventListener('click',e=>{
+  const sl=e.target.closest('[data-setlang]');if(sl){setLang(sl.dataset.setlang);return;}
+  const sa=e.target.closest('[data-setappear]');if(sa){setTheme(sa.dataset.setappear);return;}
+  const tb=e.target.closest('[data-tab]');if(tb){tab=tb.dataset.tab;render();return;}
+  const sw=e.target.closest('.sw');if(sw){sw.classList.toggle('on');return;}
+  const ck=e.target.closest('.ck');if(ck){ck.classList.toggle('on');return;}
+  const rs=e.target.closest('.rseg span');if(rs){rs.parentElement.querySelectorAll('span').forEach(x=>x.classList.remove('on'));rs.classList.add('on');return;}
+  const dh=e.target.closest('.disc .dh');if(dh){dh.parentElement.classList.toggle('open');return;}
+  const lc=e.target.closest('.log-collapse');if(lc){lc.closest('.logpane').classList.toggle('collapsed');return;}
+  const rt=e.target.closest('.rt-seg span');if(rt){rt.parentElement.querySelectorAll('span').forEach(x=>x.classList.remove('on'));rt.classList.add('on');return;}
+  const ci=e.target.closest('.ctxmenu .ci');if(ci&&ci.querySelector('.dm')){
+    const m=ci.closest('.ctxmenu');m.querySelectorAll('.ci').forEach(x=>{const d=x.querySelector('.dm');if(d)d.style.visibility='hidden';x.classList.remove('on');});
+    ci.classList.add('on');ci.querySelector('.dm').style.visibility='visible';}
+});
+const vp=document.getElementById('viewport');let pan=false,sx,sy,sl,st;
+vp.addEventListener('pointerdown',e=>{if(e.target.closest('.win,.menudrop,.note,.panel,.menubar'))return;
+  pan=true;sx=e.clientX;sy=e.clientY;sl=vp.scrollLeft;st=vp.scrollTop;vp.setPointerCapture(e.pointerId);vp.style.cursor='grabbing';});
+vp.addEventListener('pointermove',e=>{if(!pan)return;vp.scrollLeft=sl-(e.clientX-sx);vp.scrollTop=st-(e.clientY-sy);});
+vp.addEventListener('pointerup',()=>{pan=false;vp.style.cursor='';});
+</script>

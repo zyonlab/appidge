@@ -11,7 +11,10 @@ import AppFeature
 /// 只读 `store.state`、只 `dispatch(action)`,不持任何本地状态(对齐单向数据流)。
 struct MenuBarView: View {
     var store: Store
+    /// 与主窗口共享的分段选中态:点「打开入口」即改它,主窗口(新开或已在)据此切到对应 tab。
+    var tabSelection: MainTabSelection
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.openWindow) private var openWindow
 
     /// 状态行的呈现要素:SF Symbol + 语义色 + 文案(+ 可选 tooltip)。永不只靠颜色——
     /// 符号与文案同时表意,色盲/高对比场景也读得懂。
@@ -124,7 +127,25 @@ struct MenuBarView: View {
 
             Divider()
 
-            // 5. 紧急恢复:浏览器等断网时的一键出口(停止会话 + 移除代理配置,全部应用立即恢复
+            // 5. 打开入口:直达主窗口四个分段(活动 ⌘1 / 应用 ⌘2 / 规则 ⌘3 / 代理 ⌘4)。
+            //    点一下=设置共享分段 + 打开/前置主窗口(见 open(_:));菜单里就能把主窗口切到目标页。
+            Text("打开")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            ForEach(Array(MainWindow.MainTab.allCases.enumerated()), id: \.element) { index, tab in
+                Button {
+                    open(tab)
+                } label: {
+                    Label(tab.title, systemImage: Self.tabSymbol(tab))
+                }
+                .buttonStyle(.borderless)
+                .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
+                .font(.callout)
+            }
+
+            Divider()
+
+            // 6. 紧急恢复:浏览器等断网时的一键出口(停止会话 + 移除代理配置,全部应用立即恢复
             //    原生直连,无需重启电脑)。放菜单栏是因为主窗口此时可能根本打不开/没人想找设置。
             Button {
                 Task { await TransparentProxyController.reset() }
@@ -137,7 +158,7 @@ struct MenuBarView: View {
 
             Divider()
 
-            // 6. 页脚:设置 + 退出。
+            // 7. 页脚:设置 + 退出。
             HStack {
                 SettingsLink { Label("设置…", systemImage: "gearshape") }
                 Spacer()
@@ -150,6 +171,25 @@ struct MenuBarView: View {
         }
         .padding(12)
         .frame(width: 280)
+    }
+
+    /// 「打开入口」点击:先把共享分段切到目标 tab(主窗口若已开着会立刻跟着切),再打开/前置主窗口。
+    /// `openWindow(id:)` 对已存在的 "main" 窗口是前置、不存在则新建;`NSApp.activate` 保证 app 抢到前台
+    /// (菜单栏 app 常不在前台,只 openWindow 可能只在后台恢复窗口)。顺序:先设状态,后展示窗口。
+    private func open(_ tab: MainWindow.MainTab) {
+        tabSelection.section = tab
+        openWindow(id: "main")
+        NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+
+    /// 分段对应的 SF Symbol:菜单入口里符号 + 文案同时表意,不只靠文字。
+    private static func tabSymbol(_ tab: MainWindow.MainTab) -> String {
+        switch tab {
+        case .activity: "dot.radiowaves.left.and.right"
+        case .apps: "app.badge"
+        case .rules: "list.bullet.rectangle"
+        case .proxies: "server.rack"
+        }
     }
 
     /// 一行「标签左 · 值右」统计,值用等宽数字。

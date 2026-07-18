@@ -9,8 +9,10 @@ import AppFeature
 struct MainWindow: View {
     var store: Store
     var profiles: ProfilesModel
+    /// 选中的顶层分段提升为跨窗口共享状态(见 MainTabSelection):菜单栏「打开入口」也改它,
+    /// 所以主窗口在(可能已开着的)时也会跟着切 tab。`@Bindable` 让 Picker 能双向绑定其属性。
+    @Bindable var tabSelection: MainTabSelection
 
-    @State private var section: MainTab = .activity
     @State private var filter = ""
     @State private var selection: Set<ConnectionLogEntry.ID> = []
     @State private var showInspector = true
@@ -26,7 +28,7 @@ struct MainWindow: View {
                     .toolbar {
                         // 顶层区域切换从侧栏改为工具栏分段(对齐 HIG「小工具用 segmented control 切视图」)。
                         ToolbarItem(placement: .principal) {
-                            Picker("区域", selection: $section) {
+                            Picker("区域", selection: $tabSelection.section) {
                                 ForEach(MainTab.allCases) { tab in
                                     Text(tab.title).tag(tab)
                                 }
@@ -61,7 +63,7 @@ struct MainWindow: View {
 
     /// 分段选中区域 → 对应内容。各自挂一个窗口标题。
     @ViewBuilder private var detail: some View {
-        switch section {
+        switch tabSelection.section {
         case .activity: activity
         case .apps: AppsPaneView(store: store).navigationTitle("应用")
         case .rules: RulesEditorPaneView(store: store).navigationTitle("规则")

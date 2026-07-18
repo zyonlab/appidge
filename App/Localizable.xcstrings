@@ -1,0 +1,336 @@
+{
+  "sourceLanguage" : "zh-Hans",
+  "version" : "1.0",
+  "strings" : {
+    "通用" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "General" } }
+      }
+    },
+    "语言" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Language" } }
+      }
+    },
+    "跟随系统" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Follow System" } }
+      }
+    },
+    "简体中文" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Chinese, Simplified" } }
+      }
+    },
+    "English" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "English" } }
+      }
+    },
+    "默认跟随系统语言，可在此覆盖。" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Follows the system language by default. Override it here." } }
+      }
+    },
+    "代理" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Proxy" } }
+      }
+    },
+    "系统扩展" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "System Extension" } }
+      }
+    },
+    "启用" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Enable" } }
+      }
+    },
+    "打开系统设置" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open System Settings" } }
+      }
+    },
+    "引擎状态" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Engine Status" } }
+      }
+    },
+    "正常" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Normal" } }
+      }
+    },
+    "异常，已回退直连" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Failed, reverted to direct" } }
+      }
+    },
+    "扩展加载失败：%@" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Extension failed to load: %@" } }
+      }
+    },
+    "流量只有在系统扩展被批准并运行后才会真正被接管——点「启用」，再去「系统设置 → 隐私与安全性」允许。" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Traffic is only handled once the system extension is approved and running. Click Enable, then allow it in System Settings › Privacy & Security." } }
+      }
+    },
+    "网络接管" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Network Handling" } }
+      }
+    },
+    "接管会话绑在旧扩展实例上（运行 %@、已安装 %@）——流量可能被交给僵尸扩展。已自动尝试重绑；若仍异常，点「重启接管」，或重启电脑清理旧扩展。" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The handling session is bound to an old extension instance (running %@, installed %@). Traffic may be going to a stale extension. A rebind was attempted automatically; if problems persist, click Restart Handling, or restart your Mac to clear the old extension." } }
+      }
+    },
+    "恢复出口" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Recovery" } }
+      }
+    },
+    "重启接管" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Restart Handling" } }
+      }
+    },
+    "停止接管" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Stop Handling" } }
+      }
+    },
+    "重置（移除代理配置）" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reset (remove proxy config)" } }
+      }
+    },
+    "网络出问题时的恢复出口，无需重启电脑：「重启接管」把会话重新绑定到最新扩展（等于在系统设置里关开一次网络扩展，修复「拦到流量却不转发」的僵尸态）；「停止接管」结束当前会话，所有应用立即恢复原生直连；「重置」进一步把系统网络设置里的 appidge 代理配置整个移除（系统扩展保持安装）。" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Recovery options for when the network breaks, no restart needed: Restart Handling rebinds the session to the latest extension (like toggling the network extension off and on in System Settings, fixing the stale state where traffic is captured but not forwarded); Stop Handling ends the current session and every app returns to direct connection immediately; Reset also removes appidge's proxy config from the system network settings (the system extension stays installed)." } }
+      }
+    },
+    "代理进程的 UDP" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "UDP for Proxied Apps" } }
+      }
+    },
+    "拦截止漏" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Block (no leak)" } }
+      }
+    },
+    "直连放行" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Allow direct" } }
+      }
+    },
+    "SOCKS5 代理" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "SOCKS5 proxy" } }
+      }
+    },
+    "默认：代理进程的 UDP/QUIC 一律拦截，逼 QUIC 回落 TCP 走代理，不泄漏。" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Default: all UDP/QUIC from proxied apps is blocked, forcing QUIC to fall back to TCP through the proxy, with no leaks." } }
+      }
+    },
+    "放行直连：UDP 可用，但绕过代理、可能暴露访问目标（游戏 / VoIP 需要 UDP 时用）。" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Allow direct: UDP works but bypasses the proxy and may expose your destinations (use when games or VoIP need UDP)." } }
+      }
+    },
+    "上游是 SOCKS5 时经 UDP ASSOCIATE 真正代理；上游非 SOCKS5 则退回拦截。" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "When the upstream is SOCKS5, UDP is truly proxied via UDP ASSOCIATE; otherwise it falls back to blocking." } }
+      }
+    },
+    "诊断与抓包" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Diagnostics & Capture" } }
+      }
+    },
+    "逐连接抓包（.dmp）" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Per-connection capture (.dmp)" } }
+      }
+    },
+    "开启后逐连接把原始字节写进 App Group 容器的 captures/*.dmp（占磁盘、涉隐私）。" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "When on, raw bytes for each connection are written to captures/*.dmp in the App Group container (uses disk, affects privacy)." } }
+      }
+    },
+    "内置规则" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Built-in Rules" } }
+      }
+    },
+    "本地 / 回环地址（127.0.0.1、::1、localhost）始终直连，不经代理（不可关闭）" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Local / loopback addresses (127.0.0.1, ::1, localhost) always connect directly, never through the proxy (cannot be disabled)" } }
+      }
+    },
+    "识别到的本地代理进程（接管并强制直连，绝不代理回它自己）：" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Detected local proxy processes (handled and forced to direct, never proxied back to themselves):" } }
+      }
+    },
+    "环检测自愈加入的完全旁路（数据通路彻底不接管，本次运行内有效）：" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Full bypasses added by loop-detection self-healing (data path left entirely untouched, effective this run):" } }
+      }
+    },
+    "已接管" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Handling" } }
+      }
+    },
+    "未接入" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Not connected" } }
+      }
+    },
+    "安装中…" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Installing…" } }
+      }
+    },
+    "待批准（去系统设置允许）" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Awaiting approval (allow in System Settings)" } }
+      }
+    },
+    "已停用（系统设置 → 登录项与扩展 里开启）" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Disabled (enable in System Settings › Login Items & Extensions)" } }
+      }
+    },
+    "未安装" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Not installed" } }
+      }
+    },
+    "引擎正常" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Engine OK" } }
+      }
+    },
+    "引擎异常 · 已回退直连" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Engine failure · reverted to direct" } }
+      }
+    },
+    "扩展未接入" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Extension not connected" } }
+      }
+    },
+    "系统扩展还没装上/批准——去设置里点「启用」并在系统设置里允许后,才会接管流量。" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The system extension isn't installed or approved yet. Click Enable in Settings and allow it in System Settings before traffic is handled." } }
+      }
+    },
+    "扩展安装中…" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Installing extension…" } }
+      }
+    },
+    "扩展待批准 · 系统设置里点允许" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Extension awaiting approval · allow it in System Settings" } }
+      }
+    },
+    "打开「系统设置 → 隐私与安全性」,点「允许」加载 appidge 的系统扩展。" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open System Settings › Privacy & Security and click Allow to load appidge's system extension." } }
+      }
+    },
+    "扩展已停用 · 系统设置里开启" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Extension disabled · enable it in System Settings" } }
+      }
+    },
+    "appidge 的网络扩展在「系统设置 → 通用 → 登录项与扩展」里被停用了,重新打开后即恢复接管(最多 30 秒自动重连,无需重启 app)。" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "appidge's network extension was disabled in System Settings › General › Login Items & Extensions. Turn it back on to resume handling (auto-reconnects within 30 seconds, no app restart needed)." } }
+      }
+    },
+    "扩展未安装" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Extension not installed" } }
+      }
+    },
+    "活动连接 %lld" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Active connections %lld" } }
+      }
+    },
+    "待批准 · 系统设置里点允许" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Awaiting approval · allow it in System Settings" } }
+      }
+    },
+    "「系统设置 → 通用 → 登录项与扩展」里重新打开 appidge 的网络扩展,最多 30 秒自动恢复接管。" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reopen appidge's network extension in System Settings › General › Login Items & Extensions; handling resumes automatically within 30 seconds." } }
+      }
+    },
+    "总流量" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Total Traffic" } }
+      }
+    },
+    "活动连接" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Active Connections" } }
+      }
+    },
+    "流量占用 Top 5" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Top 5 by Traffic" } }
+      }
+    },
+    "暂无流量" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No traffic yet" } }
+      }
+    },
+    "打开" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open" } }
+      }
+    },
+    "紧急恢复直连（重置接管）" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Emergency direct connection (reset handling)" } }
+      }
+    },
+    "停止接管并移除系统里的代理配置——浏览器等应用断网时的恢复出口，无需重启电脑。重启 app 可重新开启接管。" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Stops handling and removes the proxy config from the system — a recovery exit when apps like your browser lose connectivity, no Mac restart needed. Restart the app to re-enable handling." } }
+      }
+    },
+    "设置…" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Settings…" } }
+      }
+    },
+    "退出" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Quit" } }
+      }
+    },
+    "检测到疑似转发环：%@ 被反复捕获，已自动将来源进程旁路直连（见 设置 → 内置规则）。若仍反复出现，请检查上游 / 规则是否形成回路。" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Suspected forwarding loop detected: %@ is being captured repeatedly, so its source process was bypassed to direct automatically (see Settings › Built-in Rules). If it keeps happening, check whether the upstream or rules form a loop." } }
+      }
+    },
+    "忽略" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Ignore" } }
+      }
+    }
+  }
+}

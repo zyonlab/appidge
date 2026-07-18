@@ -36,7 +36,13 @@ struct AppidgeApp: App {
     /// 版本握手自愈的去重:已针对哪个运行版本重启过会话(避免重启后版本仍旧时反复重启)。
     /// nil = 还没自愈过;`extensionNeedsRebind` 为真时 runningExtensionVersion 必非 nil。
     @State private var healedForRunningVersion: String?
+    /// 界面语言（跟随系统 / 简体中文 / English）。`.system` 时不覆盖 locale 环境。
+    /// 在根 scene 对内容套 `.environment(\.locale, ...)`，`Text(LocalizedStringKey)` 即时切换。
+    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
     @Environment(\.scenePhase) private var scenePhase
+
+    /// 当前应覆盖到 `\.locale` 环境的 Locale：非 system 用所选语言，system 回退系统当前。
+    private var localeOverride: Locale { appLanguage.resolvedLocale ?? .autoupdatingCurrent }
 
     // 代理密码存 Keychain，不落 JSON（见 PersistedProxyServer 结构上无 password 字段）。
     private let credentialStore: any CredentialStore = KeychainCredentialStore()
@@ -141,13 +147,16 @@ struct AppidgeApp: App {
                 persistCurrentConfiguration()
             }
         }
+        .environment(\.locale, localeOverride)
 
         Settings {
             SettingsView(store: store)
+                .environment(\.locale, localeOverride)
         }
 
         MenuBarExtra("appidge", systemImage: "network") {
             MenuBarView(store: store, tabSelection: tabSelection)
+                .environment(\.locale, localeOverride)
         }
         // .window 而非默认 .menu：内容是「仪表盘」(状态行 + Top-5 列表 + 开关),
         // 需要完整 SwiftUI 排版(语义色 / caption / 对齐),菜单渲染器会把这些收着。

@@ -21,8 +21,8 @@ struct MenuBarView: View {
     private struct StatusPresentation {
         let symbol: String
         let tint: Color
-        let text: String
-        let help: String?
+        let text: LocalizedStringKey
+        let help: LocalizedStringKey?
     }
 
     /// 先看扩展装没装(未接入/待批准/安装中/未安装都得先说清,否则"引擎正常"会误导),
@@ -53,7 +53,7 @@ struct MenuBarView: View {
                                       help: "「系统设置 → 通用 → 登录项与扩展」里重新打开 appidge 的网络扩展,最多 30 秒自动恢复接管。")
         case .failed(let reason):
             return StatusPresentation(symbol: "xmark.octagon.fill", tint: .red,
-                                      text: "扩展未安装", help: reason)
+                                      text: "扩展未安装", help: "\(reason)")
         }
     }
 
@@ -193,7 +193,7 @@ struct MenuBarView: View {
     }
 
     /// 一行「标签左 · 值右」统计,值用等宽数字。
-    @ViewBuilder private func statRow(_ label: String, _ value: String) -> some View {
+    @ViewBuilder private func statRow(_ label: LocalizedStringKey, _ value: String) -> some View {
         HStack {
             Text(label).foregroundStyle(.secondary)
             Spacer(minLength: 12)

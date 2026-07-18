@@ -15,9 +15,22 @@ enum SystemSettingsOpener {
 /// 内置规则说明。这些是「全局、少改」的项,从主窗口移到这里,让主窗口专注连接监视。
 struct SettingsView: View {
     var store: Store
+    /// 界面语言覆盖，与根 scene 的 `.environment(\.locale, ...)` 共用同一份 @AppStorage。
+    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
 
     var body: some View {
         Form {
+            Section("通用") {
+                Picker("语言", selection: $appLanguage) {
+                    ForEach(AppLanguage.allCases) { language in
+                        Text(language.labelKey).tag(language)
+                    }
+                }
+                Text("默认跟随系统语言，可在此覆盖。")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             Section("代理") {
                 LabeledContent("系统扩展") {
                     HStack(spacing: 8) {
@@ -32,7 +45,7 @@ struct SettingsView: View {
                     }
                 }
                 LabeledContent("引擎状态") {
-                    Text(store.state.isEngineHealthy ? "正常" : "异常，已回退直连")
+                    Text(store.state.isEngineHealthy ? LocalizedStringKey("正常") : LocalizedStringKey("异常，已回退直连"))
                         .foregroundStyle(store.state.isEngineHealthy ? Color.secondary : Color.red)
                 }
                 if case .failed(let reason) = store.state.extensionActivation {
@@ -49,9 +62,7 @@ struct SettingsView: View {
             Section("网络接管") {
                 if store.state.extensionNeedsRebind {
                     Label {
-                        Text("接管会话绑在旧扩展实例上（运行 \(store.state.runningExtensionVersion ?? "?")、"
-                             + "已安装 \(store.state.bundledExtensionVersion ?? "?")）——流量可能被交给僵尸扩展。"
-                             + "已自动尝试重绑；若仍异常，点「重启接管」，或重启电脑清理旧扩展。")
+                        Text("接管会话绑在旧扩展实例上（运行 \(store.state.runningExtensionVersion ?? "?")、已安装 \(store.state.bundledExtensionVersion ?? "?")）——流量可能被交给僵尸扩展。已自动尝试重绑；若仍异常，点「重启接管」，或重启电脑清理旧扩展。")
                             .fixedSize(horizontal: false, vertical: true)
                     } icon: {
                         Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
@@ -72,10 +83,7 @@ struct SettingsView: View {
                     }
                     .controlSize(.small)
                 }
-                Text("网络出问题时的恢复出口，无需重启电脑：「重启接管」把会话重新绑定到最新扩展"
-                     + "（等于在系统设置里关开一次网络扩展，修复「拦到流量却不转发」的僵尸态）；"
-                     + "「停止接管」结束当前会话，所有应用立即恢复原生直连；"
-                     + "「重置」进一步把系统网络设置里的 appidge 代理配置整个移除（系统扩展保持安装）。")
+                Text("网络出问题时的恢复出口，无需重启电脑：「重启接管」把会话重新绑定到最新扩展（等于在系统设置里关开一次网络扩展，修复「拦到流量却不转发」的僵尸态）；「停止接管」结束当前会话，所有应用立即恢复原生直连；「重置」进一步把系统网络设置里的 appidge 代理配置整个移除（系统扩展保持安装）。")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -143,7 +151,8 @@ struct SettingsView: View {
     }
 
     /// 扩展激活状态 → 设置页里的一行文案 + 颜色。待批准用橙色(需用户行动),失败/异常用红,其余次要灰。
-    private static func activation(_ state: ExtensionActivation) -> (label: String, color: Color) {
+    /// 文案是 LocalizedStringKey，随 `\.locale` 环境即时本地化。
+    private static func activation(_ state: ExtensionActivation) -> (label: LocalizedStringKey, color: Color) {
         switch state {
         case .active: ("已接管", .secondary)
         case .inactive: ("未接入", .secondary)
@@ -154,7 +163,7 @@ struct SettingsView: View {
         }
     }
 
-    private static func udpHint(_ policy: UDPPolicy) -> String {
+    private static func udpHint(_ policy: UDPPolicy) -> LocalizedStringKey {
         switch policy {
         case .block: "默认：代理进程的 UDP/QUIC 一律拦截，逼 QUIC 回落 TCP 走代理，不泄漏。"
         case .direct: "放行直连：UDP 可用，但绕过代理、可能暴露访问目标（游戏 / VoIP 需要 UDP 时用）。"

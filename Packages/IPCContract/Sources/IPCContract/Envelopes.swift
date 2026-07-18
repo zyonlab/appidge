@@ -22,4 +22,7 @@ public enum ExtensionToAppMessage: Sendable, Equatable, Codable {
     /// 检测到环后自动创建「该进程 → Direct」置顶规则的自愈行为。补充被动的回环/上游/来源排除,
     /// 是兜底安全网。
     case loopDetected(signature: String, processID: ProcessIdentifierDTO?, executablePath: String?)
+    /// 扩展 `startProxy` 时向 app 报告自己的版本(`CFBundleVersion`)——app 拿它跟包内嵌扩展版本
+    /// 比对,检测"会话绑在旧 provider 上"的僵尸态(反复热升级后系统把流量交给待卸载的旧实例)。
+    case extensionReady(version: String)
 }

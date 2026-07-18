@@ -22,6 +22,9 @@ public final class XPCFlowTransport: NSObject, Transport, ExtensionXPCProtocol, 
     private var appMessageHandler: (@Sendable (AppToExtensionMessage) -> Void)?
     private var currentConnection: NSXPCConnection?
     private var listener: NSXPCListener?
+    /// app 每次(重)连上时自动投递给它的一条消息(如扩展版本握手 `.extensionReady`)——
+    /// 让 app 一连上就知道"是哪个 provider 实例在服务",据此检测会话是否绑在旧扩展上。
+    private var readyMessage: ExtensionToAppMessage?
 
     /// 参数保留只为调用点兼容(曾用于 forward 的逐 chunk 上游探活,见类型注释的 ⚠️)。
     public init(upstreamHost: String, upstreamPort: UInt16) {
@@ -35,6 +38,11 @@ public final class XPCFlowTransport: NSObject, Transport, ExtensionXPCProtocol, 
         bytesDown: Int64,
         via rule: ProxyRuleDTO
     ) async throws {}
+
+    /// 设置 app 每次连上时自动投递的握手消息(见 `readyMessage`);nil 清除。
+    public func setReadyMessage(_ message: ExtensionToAppMessage?) {
+        lock.withLock { readyMessage = message }
+    }
 
     /// 通过当前已连接的 XPC connection 把消息推给 App。拿不到连接（还没人连上、
     /// 或连接已失效）就静默不发——跟 ``NEFlowTransport.deliver`` 在拿不到 UserDefaults
@@ -75,8 +83,15 @@ public final class XPCFlowTransport: NSObject, Transport, ExtensionXPCProtocol, 
             self?.clearConnection(newConnection)
         }
 
-        lock.withLock { currentConnection = newConnection }
+        let ready = lock.withLock { () -> ExtensionToAppMessage? in
+            currentConnection = newConnection
+            return readyMessage
+        }
         newConnection.resume()
+        // app 一连上就投递握手消息(如扩展版本),让它立刻能判断会话绑的是不是最新 provider。
+        if let ready, let data = try? JSONEncoder().encode(ready) {
+            (newConnection.remoteObjectProxyWithErrorHandler { _ in } as? AppXPCProtocol)?.send(data)
+        }
         return true
     }
 

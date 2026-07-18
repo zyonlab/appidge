@@ -51,6 +51,11 @@ public enum Action: Sendable, Equatable {
     /// 进入 / 场景激活时探测到的代理环境快照(系统代理 + 环境变量 + 额外 TUN)。纯状态回灌,
     /// 无副作用——UI 据此解释"appidge 能管哪一层、哪些流量会绕过"。见 ``ProxyEnvironment``。
     case proxyEnvironmentDetected(ProxyEnvironment)
+    /// 正在服务会话的扩展进程 XPC 连上时报告的版本。纯状态回灌;app 层据 `extensionNeedsRebind`
+    /// 判断会话是否绑在旧 provider 上,是则重启会话重绑(升级自愈)。
+    case extensionVersionReported(String)
+    /// app 启动时读到的包内嵌扩展版本(期望的最新)。纯状态回灌。
+    case bundledExtensionVersionSet(String)
     /// 把当前完整配置**全量重推**给扩展(规则表 + 每进程规则 + 代理配置 + 路由模式 + 抓包 +
     /// UDP 策略 + 排除名单)。用途:app↔扩展的 XPC(重)连上时、或启动恢复完成后触发一次,
     /// 保证扩展手里的配置永远是最新的——不然扩展升级/重启/XPC 掉线重连后,它会一直空转

@@ -55,6 +55,9 @@ public enum ExtensionMessageHandling {
                 processID: processID.map { Core.ProcessID($0.value) },
                 executablePath: executablePath
             )]
+
+        case .extensionReady(let version):
+            return [.extensionVersionReported(version)]
         }
     }
 

@@ -22,6 +22,9 @@ struct AppidgeApp: App {
     // 类而非局部变量：`store.onAction` 闭包按引用捕获它,多次 dispatch 之间能共享同一个
     // "有没有待落盘的 Task" 状态(struct 会在每次闭包创建时拿到不同的副本，防抖就失效了)。
     @State private var persistenceDebouncer = PersistenceDebouncer()
+    /// 版本握手自愈的去重:已针对哪个运行版本重启过会话(避免重启后版本仍旧时反复重启)。
+    /// nil = 还没自愈过;`extensionNeedsRebind` 为真时 runningExtensionVersion 必非 nil。
+    @State private var healedForRunningVersion: String?
     @Environment(\.scenePhase) private var scenePhase
 
     // 代理密码存 Keychain，不落 JSON（见 PersistedProxyServer 结构上无 password 字段）。
@@ -76,6 +79,11 @@ struct AppidgeApp: App {
                     }
                 }
                 SystemExtensionActivator.shared.diagnose() // 启动即打印 app 看到的扩展目录(排查 not-found)
+                // 读包内嵌扩展的期望版本,供"会话是否绑在旧 provider 上"的版本握手比对(见下面
+                // extensionVersionReported 的处理)。启用即触发一次自愈判定。
+                if let bundled = Self.bundledExtensionVersion() {
+                    store.dispatch(.bundledExtensionVersionSet(bundled))
+                }
                 await ipcReceiver.start()
                 await restorePersistedConfiguration()
                 await restoreRecentConnectionLog()
@@ -86,6 +94,9 @@ struct AppidgeApp: App {
                 // addMatchRule 等"值得存盘"的 action 来灌回状态的,提前接线只会导致启动时又把刚读出来
                 // 的东西原样存回去一次——浪费一次磁盘 I/O,不是错误,但没必要。
                 store.onAction = { action in
+                    // 扩展 XPC 连上回报版本时,若与包内版本不一致 = 会话绑在旧 provider 上(反复热
+                    // 升级的僵尸态)→ 自动重启会话重绑最新扩展,一次为限(见 maybeHealStaleBinding)。
+                    if case .extensionVersionReported = action { maybeHealStaleBinding() }
                     guard Self.isPersistenceRelevant(action) else { return }
                     persistenceDebouncer.schedule { persistCurrentConfiguration() }
                 }
@@ -137,6 +148,27 @@ struct AppidgeApp: App {
     private func detectProxyEnvironment() async {
         let environment = await SystemProxyEnvironmentProbe().probe()
         store.dispatch(.proxyEnvironmentDetected(environment))
+    }
+
+    /// 读 app 包内嵌扩展(`Contents/Library/SystemExtensions/*.systemextension`)的 `CFBundleVersion`
+    /// ——期望运行的最新版本。读不到返回 nil(不做版本握手,退回旧行为)。
+    private static func bundledExtensionVersion() -> String? {
+        let dir = Bundle.main.bundleURL.appendingPathComponent("Contents/Library/SystemExtensions", isDirectory: true)
+        guard let items = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil),
+              let ext = items.first(where: { $0.pathExtension == "systemextension" }) else { return nil }
+        let info = ext.appendingPathComponent("Contents/Info.plist")
+        return (NSDictionary(contentsOf: info)?["CFBundleVersion"] as? String)
+    }
+
+    /// 版本握手发现会话绑在旧扩展上(`extensionNeedsRebind`)→ 重启会话重绑最新 provider。
+    /// **一次为限**:记住已针对哪个运行版本自愈过——若重启后扩展仍回报同一个旧版本(说明系统
+    /// 那边还没真正换实例,可能要重启电脑),不再反复重启会话空耗,而是留给 UI 提示用户。
+    @MainActor
+    private func maybeHealStaleBinding() {
+        guard store.state.extensionNeedsRebind, let running = store.state.runningExtensionVersion else { return }
+        guard healedForRunningVersion != running else { return }
+        healedForRunningVersion = running
+        Task { await TransparentProxyController.restart() }
     }
 
     /// 启动时把上次保存的配置（扫描到的目录、分配过规则的进程、是否已完成引导）

@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>appidge · 当前界面理解</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101215;
+      --window: #1a1d21;
+      --sidebar: #202329;
+      --panel: #171a1e;
+      --panel-soft: #1d2025;
+      --toolbar: rgba(31, 34, 39, .94);
+      --line: rgba(255, 255, 255, .085);
+      --line-strong: rgba(255, 255, 255, .14);
+      --text: #f2f3f5;
+      --muted: #9ba1aa;
+      --dim: #6e747d;
+      --blue: #4d9cff;
+      --blue-soft: rgba(77, 156, 255, .16);
+      --green: #45cf86;
+      --green-soft: rgba(69, 207, 134, .13);
+      --orange: #f2a84a;
+      --orange-soft: rgba(242, 168, 74, .14);
+      --red: #ff6269;
+      --red-soft: rgba(255, 98, 105, .14);
+      --shadow: 0 34px 90px rgba(0, 0, 0, .52), 0 2px 14px rgba(0, 0, 0, .45);
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { min-height: 100%; }
+
+    body {
+      margin: 0;
+      min-width: 960px;
+      min-height: 720px;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 20% 0%, rgba(64, 92, 125, .24), transparent 34%),
+        radial-gradient(circle at 94% 100%, rgba(49, 110, 94, .16), transparent 28%),
+        linear-gradient(145deg, #14171b, #090b0e 72%);
+    }
+
+    button, input { font: inherit; color: inherit; }
+    button { cursor: default; }
+
+    .stage {
+      height: 100vh;
+      padding: clamp(16px, 2.5vw, 34px);
+      display: grid;
+      place-items: center;
+    }
+
+    .window {
+      width: min(1460px, 100%);
+      height: min(900px, 100%);
+      min-height: 660px;
+      display: grid;
+      grid-template-rows: 42px minmax(0, 1fr) 30px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, .13);
+      border-radius: var(--radius);
+      background: var(--window);
+      box-shadow: var(--shadow);
+      animation: arrive .5s cubic-bezier(.2, .8, .2, 1) both;
+    }
+
+    @keyframes arrive {
+      from { opacity: 0; transform: translateY(10px) scale(.994); }
+      to { opacity: 1; transform: none; }
+    }
+
+    .titlebar {
+      display: grid;
+      grid-template-columns: 176px 1fr 176px;
+      align-items: center;
+      padding: 0 13px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(#2a2d32, #23262b);
+      user-select: none;
+    }
+
+    .traffic-lights { display: flex; gap: 8px; }
+    .light { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .2); }
+    .light.red { background: #ff5f57; }
+    .light.yellow { background: #febc2e; }
+    .light.green { background: #28c840; }
+
+    .window-title { text-align: center; font-size: 13px; font-weight: 600; letter-spacing: -.01em; }
+    .title-state { justify-self: end; color: var(--muted); font-size: 11px; }
+
+    .workspace {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 188px minmax(0, 1fr);
+    }
+
+    .sidebar {
+      min-height: 0;
+      padding: 14px 10px;
+      border-right: 1px solid var(--line);
+      background:
+        linear-gradient(rgba(255,255,255,.015), rgba(255,255,255,0)),
+        var(--sidebar);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 4px 9px 17px;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -.02em;
+    }
+
+    .brand img { width: 24px; height: 24px; border-radius: 6px; box-shadow: 0 2px 7px rgba(0,0,0,.35); }
+    .nav { display: grid; gap: 3px; }
+
+    .nav-item {
+      width: 100%;
+      height: 34px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 7px;
+      color: #d5d8dd;
+      background: transparent;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    .nav-item:hover { background: rgba(255, 255, 255, .055); }
+    .nav-item.active { color: white; background: #3a5c83; }
+    .nav-icon { width: 16px; text-align: center; color: #c5cbd3; font-size: 14px; }
+    .nav-item.active .nav-icon { color: white; }
+
+    .sidebar-foot {
+      position: absolute;
+      left: 18px;
+      bottom: 48px;
+      width: 168px;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(0,0,0,.13);
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.45;
+    }
+
+    .content-shell { min-width: 0; min-height: 0; background: var(--panel); }
+    .page { height: 100%; min-height: 0; display: none; }
+    .page.active { display: grid; }
+
+    .activity-page { grid-template-rows: 48px minmax(0, 1fr); }
+
+    .toolbar {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 11px 0 15px;
+      border-bottom: 1px solid var(--line);
+      background: var(--toolbar);
+    }
+
+    .toolbar h1 { margin: 0 auto 0 0; font-size: 16px; font-weight: 650; letter-spacing: -.015em; }
+
+    .search {
+      width: min(270px, 26vw);
+      height: 28px;
+      padding: 0 10px 0 30px;
+      border: 1px solid var(--line-strong);
+      border-radius: 7px;
+      outline: 0;
+      color: var(--text);
+      background:
+        linear-gradient(90deg, transparent 25px, rgba(255,255,255,.05) 26px, transparent 27px),
+        #15171b;
+    }
+
+    .search-wrap { position: relative; }
+    .search-wrap::before { content: "⌕"; position: absolute; left: 9px; top: 3px; color: var(--muted); font-size: 18px; }
+
+    .tool-button, .small-button {
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 0 9px;
+      border: 1px solid var(--line-strong);
+      border-radius: 7px;
+      color: #e2e4e8;
+      background: linear-gradient(#30343a, #272a2f);
+      box-shadow: inset 0 1px rgba(255,255,255,.04);
+      font-size: 12px;
+    }
+
+    .tool-button:hover, .small-button:hover { background: linear-gradient(#393d44, #2e3238); }
+    .tool-button.on { border-color: rgba(77,156,255,.55); color: #eaf3ff; background: #294d74; }
+    .tool-button.danger:hover { color: #ffd9dc; border-color: rgba(255,98,105,.45); }
+
+    .activity-grid {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(560px, 1fr) 300px;
+    }
+
+    .activity-grid.inspector-off { grid-template-columns: minmax(560px, 1fr); }
+    .activity-grid.inspector-off .inspector { display: none; }
+
+    .primary-stack {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: minmax(250px, 1.65fr) 5px minmax(170px, .85fr);
+    }
+
+    .splitter { border-block: 1px solid var(--line); background: #292c31; }
+    .connections { min-height: 0; overflow: auto; background: #15181c; }
+
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      height: 27px;
+      padding: 0 9px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line-strong);
+      color: #aeb3ba;
+      background: #24272c;
+      font-weight: 500;
+      text-align: left;
+    }
+
+    td {
+      height: 42px;
+      padding: 0 9px;
+      border-bottom: 1px solid rgba(255,255,255,.055);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    tbody tr { background: #171a1e; }
+    tbody tr:nth-child(even) { background: #191c20; }
+    tbody tr:hover { background: #242a31; }
+    tbody tr.selected { background: #294d73; }
+    tbody tr.hidden { display: none; }
+
+    .app-cell { display: grid; grid-template-columns: 27px minmax(0,1fr); gap: 8px; align-items: center; }
+    .app-icon {
+      width: 25px; height: 25px; display: grid; place-items: center;
+      border-radius: 6px; border: 1px solid rgba(255,255,255,.13);
+      background: linear-gradient(145deg, #505965, #2c323a);
+      color: white; font-weight: 750; font-size: 11px;
+    }
+    .app-name { overflow: hidden; text-overflow: ellipsis; font-weight: 540; }
+    .app-id { margin-top: 2px; color: var(--muted); font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; text-overflow: ellipsis; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+    .muted { color: var(--muted); }
+
+    .state { display: inline-flex; align-items: center; gap: 6px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .state.live { color: var(--green); }
+    .state.closed { color: var(--muted); }
+    .state.failed { color: var(--red); }
+    .state.observed { color: var(--orange); }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 22px;
+      padding: 1px 8px;
+      border: 1px solid currentColor;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 620;
+      line-height: 1;
+    }
+    .chip.proxy { color: #78b5ff; background: var(--blue-soft); border-color: rgba(77,156,255,.38); }
+    .chip.direct { color: #68d99a; background: var(--green-soft); border-color: rgba(69,207,134,.35); }
+    .chip.block { color: #ff7c83; background: var(--red-soft); border-color: rgba(255,98,105,.36); }
+    .chip.observe { color: #f5b969; background: var(--orange-soft); border-color: rgba(242,168,74,.38); }
+
+    .traffic-panel { min-height: 0; display: grid; grid-template-rows: 39px minmax(0,1fr); background: #15181c; }
+    .segmented-wrap { display: grid; place-items: center; border-bottom: 1px solid var(--line); background: #1d2024; }
+    .segmented { display: flex; padding: 2px; border: 1px solid var(--line-strong); border-radius: 7px; background: #141619; }
+    .segment { min-width: 66px; padding: 4px 15px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); font-size: 11px; }
+    .segment.active { color: white; background: #3a3e45; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+
+    .traffic-view { min-height: 0; display: grid; grid-template-rows: minmax(0,1fr) 27px; padding: 5px 10px 2px; }
+    .chart { width: 100%; height: 100%; min-height: 90px; overflow: visible; }
+    .chart-grid line { stroke: rgba(255,255,255,.075); stroke-width: 1; }
+    .traffic-caption { display: flex; align-items: center; gap: 20px; color: var(--muted); font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .traffic-caption .up { color: var(--green); }
+    .traffic-caption .down { color: #69aefe; }
+    .apps-view { display: none; overflow: auto; }
+    .apps-view table td { height: 34px; }
+
+    .inspector {
+      min-width: 0;
+      overflow: auto;
+      border-left: 1px solid var(--line);
+      background: #1c1f23;
+    }
+
+    .inspector-head { padding: 14px 16px 10px; border-bottom: 1px solid var(--line); font-size: 13px; font-weight: 650; }
+    .inspector-empty { padding: 70px 28px; color: var(--muted); text-align: center; line-height: 1.55; }
+    .detail { padding: 2px 14px 16px; }
+    .detail-group { padding: 13px 2px; border-bottom: 1px solid var(--line); }
+    .detail-title { margin-bottom: 8px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .07em; }
+    .detail-row { display: grid; grid-template-columns: 66px minmax(0,1fr); gap: 9px; margin: 6px 0; font-size: 11px; }
+    .detail-row > span:first-child { color: var(--muted); }
+    .rule-menu { width: 100%; margin-top: 13px; }
+
+    .standard-page { grid-template-rows: 48px minmax(0,1fr) auto; background: #16191d; }
+    .page-body { min-height: 0; overflow: auto; }
+    .bottom-bar { display: flex; align-items: center; gap: 7px; min-height: 42px; padding: 6px 10px; border-top: 1px solid var(--line); background: #202328; }
+    .bar-icon { width: 28px; padding: 0; font-size: 16px; }
+    .bar-note { margin-left: auto; color: var(--muted); font-size: 10px; }
+
+    .rules-table td, .proxy-table td { height: 39px; }
+    .check { accent-color: var(--blue); }
+    .disabled-rule { opacity: .42; }
+
+    .routing-box { padding: 13px 14px; border-top: 1px solid var(--line); background: #1c1f23; }
+    .routing-box h3 { margin: 0 0 8px; font-size: 12px; }
+    .routing-box p { margin: 8px 0 0; color: var(--muted); font-size: 10px; }
+    .route-modes { display: inline-flex; padding: 2px; border: 1px solid var(--line-strong); border-radius: 7px; background: #141619; }
+    .route-mode { min-width: 78px; padding: 4px 12px; border: 0; border-radius: 5px; color: var(--muted); background: transparent; font-size: 11px; }
+    .route-mode.active { color: white; background: #3b3f46; }
+
+    .profiles { max-width: 780px; padding: 24px; }
+    .profiles h2 { margin: 0 0 5px; font-size: 18px; }
+    .profiles > p { margin: 0 0 19px; color: var(--muted); font-size: 12px; }
+    .profile-list { overflow: hidden; border: 1px solid var(--line); border-radius: 9px; background: #191c20; }
+    .profile-row { display: flex; align-items: center; gap: 9px; min-height: 48px; padding: 0 12px; border-bottom: 1px solid var(--line); }
+    .profile-row:last-child { border-bottom: 0; }
+    .profile-row .grow { flex: 1; }
+    .profile-dot { color: var(--blue); }
+    .new-profile { display: flex; gap: 8px; margin-top: 17px; padding-top: 17px; border-top: 1px solid var(--line); }
+    .new-profile input { width: 270px; height: 29px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 6px; outline: 0; background: #111317; }
+
+    .statusbar {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 0 12px;
+      border-top: 1px solid var(--line);
+      color: #c7cbd1;
+      background: #23262b;
+      font-size: 10px;
+      user-select: none;
+    }
+    .statusbar .spacer { flex: 1; }
+    .health { display: inline-flex; align-items: center; gap: 5px; }
+    .health .dot { color: var(--green); }
+    .divider { width: 1px; height: 12px; background: var(--line-strong); }
+    .totals { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .modal-backdrop {
+      position: fixed; inset: 0; z-index: 20; display: none; place-items: center;
+      background: rgba(0,0,0,.42); backdrop-filter: blur(3px);
+    }
+    .modal-backdrop.show { display: grid; }
+    .modal { width: 390px; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 11px; background: #25282d; box-shadow: 0 24px 70px rgba(0,0,0,.65); }
+    .modal-head, .modal-foot { display: flex; align-items: center; padding: 13px 15px; }
+    .modal-head { border-bottom: 1px solid var(--line); font-weight: 650; }
+    .modal-head .spacer, .modal-foot .spacer { flex: 1; }
+    .modal-body { display: grid; gap: 10px; padding: 16px; }
+    .field { display: grid; grid-template-columns: 82px 1fr; align-items: center; gap: 9px; font-size: 11px; }
+    .field span { color: var(--muted); }
+    .field input, .field select { height: 29px; border: 1px solid var(--line-strong); border-radius: 6px; padding: 0 8px; color: var(--text); background: #16181c; }
+    .modal-foot { gap: 8px; border-top: 1px solid var(--line); }
+    .primary { border-color: #4b91e7; background: linear-gradient(#4d9cff, #327ed7); }
+
+    @media (max-width: 1160px) {
+      .activity-grid { grid-template-columns: minmax(560px, 1fr) 265px; }
+      .sidebar-foot { display: none; }
+      .title-state, .tool-label { display: none; }
+      .search { width: 190px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <section class="window" aria-label="appidge macOS 主窗口 HTML 理解稿">
+      <header class="titlebar">
+        <div class="traffic-lights" aria-hidden="true">
+          <span class="light red"></span><span class="light yellow"></span><span class="light green"></span>
+        </div>
+        <div class="window-title">appidge</div>
+        <div class="title-state">按进程网络转发</div>
+      </header>
+
+      <div class="workspace">
+        <aside class="sidebar">
+          <div class="brand">
+            <img src="App/Assets.xcassets/AppIcon.appiconset/icon_32x32@2x.png" alt="">
+            <span>appidge</span>
+          </div>
+          <nav class="nav" aria-label="主导航">
+            <button class="nav-item active" data-page="activity"><span class="nav-icon">⌁</span>活动</button>
+            <button class="nav-item" data-page="rules"><span class="nav-icon">☷</span>规则</button>
+            <button class="nav-item" data-page="proxies"><span class="nav-icon">▤</span>代理</button>
+            <button class="nav-item" data-page="profiles"><span class="nav-icon">▱</span>档案</button>
+          </nav>
+          <div class="sidebar-foot">所有流量决策集中在同一工作台：先观察，再对单个进程或目的地建立规则。</div>
+        </aside>
+
+        <section class="content-shell">
+          <section class="page activity-page active" data-page-view="activity">
+            <div class="toolbar">
+              <h1>活动</h1>
+              <label class="search-wrap">
+                <input id="filter" class="search" type="search" placeholder="过滤连接（进程 / 主机）" aria-label="过滤连接">
+              </label>
+              <button id="activeOnly" class="tool-button" title="只显示仍在活动的连接"><span>●</span><span class="tool-label">仅活动</span></button>
+              <button id="clearRows" class="tool-button danger" title="清除连接记录"><span>⌫</span></button>
+              <button id="toggleInspector" class="tool-button on" title="显示或隐藏连接详情"><span>▥</span><span class="tool-label">详情</span></button>
+            </div>
+
+            <div id="activityGrid" class="activity-grid">
+              <div class="primary-stack">
+                <div class="connections">
+                  <table aria-label="活动连接">
+                    <colgroup><col style="width:23%"><col style="width:21%"><col style="width:14%"><col style="width:18%"><col style="width:12%"><col style="width:12%"></colgroup>
+                    <thead><tr><th>应用</th><th>目标</th><th>时长 / 状态</th><th>规则 · 代理</th><th>发送</th><th>接收</th></tr></thead>
+                    <tbody id="connectionRows">
+                      <tr class="selected" data-active="true" data-name="xray a.out" data-host="1.1.1.1" data-app="xray" data-id="a.out" data-port="443" data-route="直连" data-state="活动 · 00:42" data-up="68.2 KB" data-down="412 KB">
+                        <td><div class="app-cell"><span class="app-icon">X</span><span><div class="app-name">xray</div><div class="app-id">a.out</div></span></div></td>
+                        <td class="mono">1.1.1.1:443</td><td><span class="state live"><i class="dot"></i>00:42</span></td>
+                        <td><span class="chip direct">→ 直连</span></td><td class="mono">68.2 KB</td><td class="mono">412 KB</td>
+                      </tr>
+                      <tr data-active="true" data-name="wechat com.tencent.xinwechat" data-host="short.weixin.qq.com" data-app="微信" data-id="com.tencent.xinWeChat" data-port="443" data-route="代理 · SOCKS5" data-state="活动 · 01:13" data-up="128 KB" data-down="1.8 MB">
+                        <td><div class="app-cell"><span class="app-icon">微</span><span><div class="app-name">微信</div><div class="app-id">com.tencent.xinWeChat</div></span></div></td>
+                        <td class="mono">short.weixin.qq.com:443</td><td><span class="state live"><i class="dot"></i>01:13</span></td>
+                        <td><span class="chip proxy">⑂ 代理 · SOCKS5</span></td><td class="mono">128 KB</td><td class="mono">1.8 MB</td>
+                      </tr>
+                      <tr data-active="true" data-name="cursor com.todesktop.230313mzl4w4u92" data-host="api.openai.com" data-app="Cursor" data-id="com.todesktop.230313mzl4w4u92" data-port="443" data-route="代理 · SOCKS5" data-state="活动 · 00:08" data-up="42.9 KB" data-down="286 KB">
+                        <td><div class="app-cell"><span class="app-icon">C</span><span><div class="app-name">Cursor</div><div class="app-id">com.todesktop.230313mzl4w4u92</div></span></div></td>
+                        <td class="mono">api.openai.com:443</td><td><span class="state live"><i class="dot"></i>00:08</span></td>
+                        <td><span class="chip proxy">⑂ 代理 · SOCKS5</span></td><td class="mono">42.9 KB</td><td class="mono">286 KB</td>
+                      </tr>
+                      <tr data-active="false" data-name="curl com.apple.curl" data-host="github.com" data-app="curl" data-id="com.apple.curl" data-port="443" data-route="观测" data-state="已放行" data-up="—" data-down="—">
+                        <td><div class="app-cell"><span class="app-icon">›_</span><span><div class="app-name">curl</div><div class="app-id">com.apple.curl</div></span></div></td>
+                        <td class="mono">github.com:443</td><td><span class="state observed">◉ 已放行</span></td>
+                        <td><span class="chip observe">◉ 观测</span></td><td class="mono muted">—</td><td class="mono muted">—</td>
+                      </tr>
+                      <tr data-active="false" data-name="helper com.example.helper" data-host="telemetry.example.net" data-app="Helper" data-id="com.example.helper" data-port="443" data-route="拦截" data-state="失败" data-up="0 B" data-down="0 B">
+                        <td><div class="app-cell"><span class="app-icon">H</span><span><div class="app-name">Helper</div><div class="app-id">com.example.helper</div></span></div></td>
+                        <td class="mono">telemetry.example.net:443</td><td><span class="state failed">⊗ 失败</span></td>
+                        <td><span class="chip block">⊘ 拦截</span></td><td class="mono">0 B</td><td class="mono">0 B</td>
+                      </tr>
+                      <tr data-active="false" data-name="safari com.apple.safari" data-host="developer.apple.com" data-app="Safari" data-id="com.apple.Safari" data-port="443" data-route="直连" data-state="已关闭" data-up="16.4 KB" data-down="742 KB">
+                        <td><div class="app-cell"><span class="app-icon">S</span><span><div class="app-name">Safari</div><div class="app-id">com.apple.Safari</div></span></div></td>
+                        <td class="mono">developer.apple.com:443</td><td><span class="state closed">✓ 已关闭</span></td>
+                        <td><span class="chip direct">→ 直连</span></td><td class="mono">16.4 KB</td><td class="mono">742 KB</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="splitter" aria-hidden="true"></div>
+
+                <section class="traffic-panel">
+                  <div class="segmented-wrap">
+                    <div class="segmented" role="tablist">
+                      <button class="segment active" data-traffic-tab="traffic">流量</button>
+                      <button class="segment" data-traffic-tab="apps">应用</button>
+                    </div>
+                  </div>
+                  <div id="trafficView" class="traffic-view">
+                    <svg class="chart" viewBox="0 0 900 160" preserveAspectRatio="none" aria-label="最近 60 秒上下行流量图">
+                      <defs>
+                        <linearGradient id="downFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4d9cff" stop-opacity=".48"/><stop offset="1" stop-color="#4d9cff" stop-opacity=".03"/></linearGradient>
+                        <linearGradient id="upFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#45cf86" stop-opacity=".40"/><stop offset="1" stop-color="#45cf86" stop-opacity=".02"/></linearGradient>
+                      </defs>
+                      <g class="chart-grid"><line x1="0" x2="900" y1="32" y2="32"/><line x1="0" x2="900" y1="80" y2="80"/><line x1="0" x2="900" y1="128" y2="128"/></g>
+                      <path d="M0 145 C45 144 60 130 96 134 S145 126 176 139 S230 107 266 115 S310 74 344 84 S382 108 420 99 S472 48 511 58 S560 93 605 80 S650 31 695 54 S735 104 779 82 S835 40 900 65 L900 160 L0 160 Z" fill="url(#downFill)" stroke="#5ea9ff" stroke-width="2"/>
+                      <path d="M0 151 C44 150 64 143 104 145 S157 139 194 148 S247 128 284 137 S333 116 371 128 S420 122 460 130 S512 96 554 113 S614 125 654 117 S702 88 746 104 S812 113 900 101 L900 160 L0 160 Z" fill="url(#upFill)" stroke="#45cf86" stroke-width="2"/>
+                    </svg>
+                    <div class="traffic-caption"><span class="up">累计 ↑ 4.7 MB</span><span class="down">累计 ↓ 31.8 MB</span><span>最近 60 秒</span></div>
+                  </div>
+                  <div id="appsView" class="apps-view">
+                    <table><thead><tr><th>应用</th><th>规则</th><th>速率</th><th>累计 ↑</th><th>累计 ↓</th></tr></thead>
+                      <tbody>
+                        <tr><td>微信</td><td><span class="chip proxy">代理</span></td><td class="mono">1.2 MB/s</td><td class="mono">2.1 MB</td><td class="mono">18.4 MB</td></tr>
+                        <tr><td>Cursor</td><td><span class="chip proxy">代理</span></td><td class="mono">428 KB/s</td><td class="mono">1.4 MB</td><td class="mono">7.8 MB</td></tr>
+                        <tr><td>xray</td><td><span class="chip direct">直连</span></td><td class="mono">96 KB/s</td><td class="mono">884 KB</td><td class="mono">3.2 MB</td></tr>
+                        <tr><td>Safari</td><td><span class="chip direct">直连</span></td><td class="mono muted">0 B/s</td><td class="mono">402 KB</td><td class="mono">2.4 MB</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </div>
+
+              <aside class="inspector">
+                <div class="inspector-head">连接详情</div>
+                <div id="inspectorEmpty" class="inspector-empty" hidden>在连接表里选一行，这里显示它的进程、目标、路由与流量。</div>
+                <div id="inspectorDetail" class="detail">
+                  <section class="detail-group"><div class="detail-title">进程</div><div class="detail-row"><span>应用</span><strong id="dApp">xray</strong></div><div class="detail-row"><span>标识</span><code id="dID" class="mono">a.out</code></div></section>
+                  <section class="detail-group"><div class="detail-title">目标</div><div class="detail-row"><span>主机</span><code id="dHost" class="mono">1.1.1.1</code></div><div class="detail-row"><span>端口</span><span id="dPort">443</span></div></section>
+                  <section class="detail-group"><div class="detail-title">路由</div><div class="detail-row"><span>决策</span><strong id="dRoute">直连</strong></div><div class="detail-row"><span>状态</span><span id="dState" class="state live"><i class="dot"></i>活动 · 00:42</span></div></section>
+                  <section class="detail-group"><div class="detail-title">流量</div><div class="detail-row"><span>发送</span><span id="dUp" class="mono">68.2 KB</span></div><div class="detail-row"><span>接收</span><span id="dDown" class="mono">412 KB</span></div></section>
+                  <button id="openRuleModal" class="small-button rule-menu">＋ 为这条连接建规则</button>
+                </div>
+              </aside>
+            </div>
+          </section>
+
+          <section class="page standard-page" data-page-view="rules">
+            <div class="toolbar"><h1>规则</h1><span class="muted" style="font-size:11px">首个命中生效</span></div>
+            <div class="page-body">
+              <table class="rules-table"><colgroup><col style="width:7%"><col style="width:28%"><col style="width:29%"><col style="width:17%"><col style="width:19%"></colgroup>
+                <thead><tr><th>启用</th><th>进程</th><th>主机</th><th>端口</th><th>动作</th></tr></thead>
+                <tbody id="rulesBody">
+                  <tr class="selected"><td><input class="check" type="checkbox" checked></td><td class="mono">com.todesktop.*</td><td class="mono">api.openai.com</td><td>443</td><td><span class="chip proxy">代理</span></td></tr>
+                  <tr><td><input class="check" type="checkbox" checked></td><td class="mono">com.tencent.xinWeChat</td><td class="mono">*</td><td>任意</td><td><span class="chip proxy">代理</span></td></tr>
+                  <tr><td><input class="check" type="checkbox" checked></td><td class="mono">a.out</td><td class="mono">*</td><td>任意</td><td><span class="chip direct">直连</span></td></tr>
+                  <tr class="disabled-rule"><td><input class="check" type="checkbox"></td><td class="mono">*</td><td class="mono">telemetry.*</td><td>任意</td><td><span class="chip block">拦截</span></td></tr>
+                  <tr><td><input class="check" type="checkbox" checked></td><td class="mono">*</td><td class="mono">*</td><td>任意</td><td><span class="chip proxy">代理</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="bottom-bar"><button class="small-button bar-icon" data-modal="rule">＋</button><button class="small-button bar-icon">−</button><button class="small-button bar-icon">✎</button><span class="divider"></span><button class="small-button bar-icon">⌃</button><button class="small-button bar-icon">⌄</button><span class="bar-note">从上到下，首个命中生效</span></div>
+          </section>
+
+          <section class="page standard-page" data-page-view="proxies">
+            <div class="toolbar"><h1>代理服务器</h1></div>
+            <div class="page-body">
+              <table class="proxy-table"><colgroup><col style="width:6%"><col style="width:36%"><col style="width:18%"><col style="width:25%"><col style="width:15%"></colgroup>
+                <thead><tr><th></th><th>地址:端口</th><th>协议</th><th>用户名</th><th>探活</th></tr></thead>
+                <tbody>
+                  <tr class="selected"><td style="color:var(--blue)">●</td><td class="mono">127.0.0.1:16787</td><td>SOCKS5</td><td class="muted">—</td><td style="color:var(--green)">● 可达</td></tr>
+                  <tr><td class="muted">○</td><td class="mono">10.0.0.8:1080</td><td>SOCKS5</td><td>office</td><td class="muted">—</td></tr>
+                  <tr><td class="muted">○</td><td class="mono">proxy.example.com:8443</td><td>HTTP</td><td>appidge</td><td style="color:var(--red)">● 失败</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div>
+              <div class="bottom-bar"><button class="small-button bar-icon">＋</button><button class="small-button bar-icon">−</button><span class="divider"></span><button class="small-button">设为使用中</button><button class="small-button">测试</button></div>
+              <div class="routing-box"><h3>路由模式</h3><div class="route-modes"><button class="route-mode active">单台</button><button class="route-mode">代理链</button><button class="route-mode">故障转移</button><button class="route-mode">负载均衡</button></div><p>所有走代理的连接都使用“使用中”的那台上游。</p></div>
+            </div>
+          </section>
+
+          <section class="page standard-page" data-page-view="profiles">
+            <div class="toolbar"><h1>配置档案</h1></div>
+            <div class="page-body profiles">
+              <h2>配置档案</h2>
+              <p>把当前的代理服务器、规则与目录配置存成命名档案，随时载入切换。</p>
+              <div class="profile-list">
+                <div class="profile-row"><span class="profile-dot">●</span><strong class="grow">工作</strong><button class="small-button">载入</button><button class="small-button">删除</button></div>
+                <div class="profile-row"><span class="muted">○</span><span class="grow">家庭网络</span><button class="small-button">载入</button><button class="small-button">删除</button></div>
+                <div class="profile-row"><span class="muted">○</span><span class="grow">只观测</span><button class="small-button">载入</button><button class="small-button">删除</button></div>
+              </div>
+              <div class="new-profile"><input placeholder="新档案名（同名则更新）"><button class="small-button primary">存为新档案</button></div>
+            </div>
+            <div></div>
+          </section>
+        </section>
+      </div>
+
+      <footer class="statusbar">
+        <span class="health"><i class="dot"></i>引擎正常</span><span class="divider"></span><span id="activeCount">活动连接 3</span><span class="spacer"></span><span class="totals">↑ 4.7 MB&nbsp;&nbsp;&nbsp;↓ 31.8 MB</span>
+      </footer>
+    </section>
+  </main>
+
+  <div id="ruleModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="添加规则">
+    <div class="modal">
+      <div class="modal-head">为连接添加规则<span class="spacer"></span><button class="small-button" data-close-modal>取消</button></div>
+      <div class="modal-body">
+        <label class="field"><span>进程 glob</span><input id="mApp" value="a.out"></label>
+        <label class="field"><span>主机 glob</span><input id="mHost" value="1.1.1.1"></label>
+        <label class="field"><span>端口</span><input id="mPort" value="443"></label>
+        <label class="field"><span>动作</span><select><option>代理</option><option selected>直连</option><option>观测</option><option>拦截</option></select></label>
+      </div>
+      <div class="modal-foot"><span class="spacer"></span><button class="small-button" data-close-modal>取消</button><button class="small-button primary" data-close-modal>添加并立即生效</button></div>
+    </div>
+  </div>
+
+  <script>
+    const navItems = [...document.querySelectorAll('.nav-item')];
+    const pages = [...document.querySelectorAll('[data-page-view]')];
+    navItems.forEach(item => item.addEventListener('click', () => {
+      navItems.forEach(button => button.classList.toggle('active', button === item));
+      pages.forEach(page => page.classList.toggle('active', page.dataset.pageView === item.dataset.page));
+    }));
+
+    const rows = [...document.querySelectorAll('#connectionRows tr')];
+    const filter = document.querySelector('#filter');
+    const activeOnly = document.querySelector('#activeOnly');
+    let onlyActive = false;
+
+    function applyFilter() {
+      const term = filter.value.trim().toLowerCase();
+      rows.forEach(row => {
+        const matchesText = !term || `${row.dataset.name} ${row.dataset.host}`.toLowerCase().includes(term);
+        const matchesState = !onlyActive || row.dataset.active === 'true';
+        row.classList.toggle('hidden', !(matchesText && matchesState));
+      });
+    }
+
+    filter.addEventListener('input', applyFilter);
+    activeOnly.addEventListener('click', () => {
+      onlyActive = !onlyActive;
+      activeOnly.classList.toggle('on', onlyActive);
+      applyFilter();
+    });
+
+    const detail = {
+      app: document.querySelector('#dApp'), id: document.querySelector('#dID'), host: document.querySelector('#dHost'),
+      port: document.querySelector('#dPort'), route: document.querySelector('#dRoute'), state: document.querySelector('#dState'),
+      up: document.querySelector('#dUp'), down: document.querySelector('#dDown')
+    };
+
+    function selectRow(row) {
+      rows.forEach(candidate => candidate.classList.toggle('selected', candidate === row));
+      detail.app.textContent = row.dataset.app;
+      detail.id.textContent = row.dataset.id;
+      detail.host.textContent = row.dataset.host;
+      detail.port.textContent = row.dataset.port;
+      detail.route.textContent = row.dataset.route;
+      detail.state.textContent = row.dataset.state;
+      detail.up.textContent = row.dataset.up;
+      detail.down.textContent = row.dataset.down;
+      document.querySelector('#mApp').value = row.dataset.id;
+      document.querySelector('#mHost').value = row.dataset.host;
+      document.querySelector('#mPort').value = row.dataset.port;
+    }
+    rows.forEach(row => row.addEventListener('click', () => selectRow(row)));
+
+    document.querySelector('#toggleInspector').addEventListener('click', event => {
+      document.querySelector('#activityGrid').classList.toggle('inspector-off');
+      event.currentTarget.classList.toggle('on');
+    });
+
+    document.querySelector('#clearRows').addEventListener('click', () => {
+      rows.forEach(row => row.remove());
+      document.querySelector('#inspectorDetail').hidden = true;
+      document.querySelector('#inspectorEmpty').hidden = false;
+      document.querySelector('#activeCount').textContent = '活动连接 0';
+    });
+
+    document.querySelectorAll('[data-traffic-tab]').forEach(tab => tab.addEventListener('click', () => {
+      document.querySelectorAll('[data-traffic-tab]').forEach(item => item.classList.toggle('active', item === tab));
+      document.querySelector('#trafficView').style.display = tab.dataset.trafficTab === 'traffic' ? 'grid' : 'none';
+      document.querySelector('#appsView').style.display = tab.dataset.trafficTab === 'apps' ? 'block' : 'none';
+    }));
+
+    document.querySelectorAll('.route-mode').forEach(mode => mode.addEventListener('click', () => {
+      document.querySelectorAll('.route-mode').forEach(item => item.classList.toggle('active', item === mode));
+      const text = {
+        '单台': '所有走代理的连接都使用“使用中”的那台上游。',
+        '代理链': '连接按选定顺序穿过多台上游，再到达目标。',
+        '故障转移': '按顺序尝试上游，失败时自动切换到下一台。',
+        '负载均衡': '每条新连接在选中的上游之间轮流分配。'
+      };
+      mode.closest('.routing-box').querySelector('p').textContent = text[mode.textContent];
+    }));
+
+    document.querySelectorAll('#rulesBody .check').forEach(check => check.addEventListener('change', () => {
+      check.closest('tr').classList.toggle('disabled-rule', !check.checked);
+    }));
+
+    const modal = document.querySelector('#ruleModal');
+    document.querySelector('#openRuleModal').addEventListener('click', () => modal.classList.add('show'));
+    document.querySelectorAll('[data-modal="rule"]').forEach(button => button.addEventListener('click', () => modal.classList.add('show')));
+    document.querySelectorAll('[data-close-modal]').forEach(button => button.addEventListener('click', () => modal.classList.remove('show')));
+    modal.addEventListener('click', event => { if (event.target === modal) modal.classList.remove('show'); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') modal.classList.remove('show'); });
+  </script>
+</body>
+</html>

@@ -66,18 +66,15 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     /// 我们自己组件(扩展 + 主 app)的进程身份集合,用于按来源做转发环硬化:这些身份发起的
     /// 连接强制直连,不再被自己抓回来代理(见 ``ProcessOriginExclusion``,与基于地址的
     /// ``UpstreamExclusion`` 正交)。扩展自己的 bundle id 从 Bundle 取,主 app 是它的父级
-    /// (bundle id 去掉最后一段)。待人工回填:自己 app 的 flow 究竟以 bundle id 还是 team 前缀
-    /// 身份出现在 sourceAppSigningIdentifier——不匹配时只是不排除(fail-open,同今天行为)。
+    /// (bundle id 去掉最后一段)。
     private static let ownProcessIdentifiers: Set<String> = {
         guard let ext = Bundle.main.bundleIdentifier else { return [] }
         let parent = ext.split(separator: ".").dropLast().joined(separator: ".")
         return parent.isEmpty ? [ext] : [ext, parent]
     }()
 
-    /// 同上,但按可执行文件路径——`ProcessPathResolver` 从 flow 的 audit token 解出来的第二信号,
-    /// 和签名标识各自独立比对(见 `ownExecutablePaths` 计算属性、`ProcessPathResolver` 的类型注释)。
-    /// 只收自己扩展这一个:主 app 走的是 App Group IPC(UserDefaults),不产生会被 flow 拦截的
-    /// TCP/UDP 连接,没有可执行文件路径需要排除。
+    /// 同上,但按可执行文件路径——从 flow 的 audit token 解出来的第二信号,和签名标识各自独立
+    /// 比对(见 `ownExecutablePaths` 计算属性、`ProcessPathResolver` 的类型注释)。只收自己扩展这一个。
     private static let ownProcessExecutablePaths: Set<String> = {
         guard let path = Bundle.main.executablePath else { return [] }
         return [path]
@@ -174,6 +171,9 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     override func startProxy(options: [String: Any]?, completionHandler: @escaping (Error?) -> Void) {
         ExtDiag.log("startProxy called")
         let transport = XPCFlowTransport(upstreamHost: "127.0.0.1", upstreamPort: 1080)
+        // 版本握手:app 每次连上就收到"是哪个版本的 provider 在服务",据此检测会话是否绑在旧扩展上。
+        let version = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown"
+        transport.setReadyMessage(.extensionReady(version: version))
         self.transport = transport
         router = FlowRouter(transport: transport, flushInterval: 0.5, now: Date())
         diagnosticsRunner = makeDiagnosticsRunner(upstreamHost: "127.0.0.1", upstreamPort: 1080)

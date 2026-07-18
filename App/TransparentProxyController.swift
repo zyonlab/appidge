@@ -33,6 +33,28 @@ enum TransparentProxyController {
         }
     }
 
+    /// **重启会话 = 重新绑定到当前(最新)扩展 provider**。反复热升级后系统可能把运行中的
+    /// 会话继续绑在待卸载的旧 provider 实例上(流量被交给僵尸扩展 → 黑洞),等价于用户手动在
+    /// 系统设置里关开一次网络扩展。这里程序化地做:停会话 → 等它真的断开 → 重新起。
+    /// 用于:版本握手发现会话绑了旧扩展、或用户点「重启接管」。
+    static func restart() async {
+        emit("restart(): stopping session to rebind to the current provider")
+        do {
+            let mgr = try await loadOrCreate()
+            mgr.connection.stopVPNTunnel()
+            // 等到真的 disconnected 再起(最多 ~5s);不等的话 startVPNTunnel 可能被忽略。
+            for _ in 0..<50 {
+                if mgr.connection.status == .disconnected || mgr.connection.status == .invalid { break }
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+            try mgr.connection.startVPNTunnel()
+            emit("restart(): startVPNTunnel() called — session should now bind to the latest provider")
+        } catch {
+            let ns = error as NSError
+            emit("restart FAILED: domain=\(ns.domain) code=\(ns.code) desc=\(ns.localizedDescription)")
+        }
+    }
+
     /// 停止会话(不删配置)。没有活动会话 = 扩展不再收到任何 flow,所有应用立即恢复原生联网。
     /// 之前只停缓存的 manager,本会话没 start 过(比如上次 app 异常退出后重开)就停了个寂寞——
     /// 现在先 load 系统偏好里的配置再停,保证停的是真正在跑的那个会话。

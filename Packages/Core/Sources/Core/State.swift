@@ -37,6 +37,20 @@ public struct AppState: Sendable, Equatable {
     /// 进入 / 场景激活时探测到的代理环境(系统代理 + 环境变量 + 额外 TUN)——UI 据此解释
     /// "appidge 能管哪一层、哪些流量会绕过"。运行时状态,不持久化。见 ``ProxyEnvironment``。
     public var proxyEnvironment: ProxyEnvironment
+    /// **正在服务当前会话的扩展进程**报告的版本(XPC 连上时回报);nil = 还没连上/没回报。
+    /// 与 `bundledExtensionVersion` 比对,检测"会话绑在旧 provider 上"的僵尸态(反复热升级后
+    /// 系统可能把流量交给待卸载的旧实例 → 黑洞)。运行时状态,不持久化。
+    public var runningExtensionVersion: String?
+    /// **app 包内嵌的扩展**版本(启动时从 embedded `.systemextension` 读)——期望的最新版本。
+    /// 运行时状态,不持久化。
+    public var bundledExtensionVersion: String?
+
+    /// 会话绑定的扩展是不是旧的:两者都已知且不相等 = 会话绑在旧 provider 上,需重启会话重绑。
+    /// 任一未知(还没握手 / 读不到包内版本)时返回 false——不确定就不误报。
+    public var extensionNeedsRebind: Bool {
+        guard let running = runningExtensionVersion, let bundled = bundledExtensionVersion else { return false }
+        return running != bundled
+    }
 
     /// 下发给扩展的两档排除(直连档 = 端口发现;完全旁路档 = 环自愈)。
     public var originExclusionsPush: Effect {
@@ -64,7 +78,9 @@ public struct AppState: Sendable, Equatable {
         extensionActivation: ExtensionActivation = .inactive,
         dynamicOriginExclusion: OriginExclusionDiscovery = OriginExclusionDiscovery(),
         loopAutoExclusions: OriginExclusionDiscovery = OriginExclusionDiscovery(),
-        proxyEnvironment: ProxyEnvironment = ProxyEnvironment()
+        proxyEnvironment: ProxyEnvironment = ProxyEnvironment(),
+        runningExtensionVersion: String? = nil,
+        bundledExtensionVersion: String? = nil
     ) {
         self.isEngineHealthy = isEngineHealthy
         self.processes = processes
@@ -84,5 +100,7 @@ public struct AppState: Sendable, Equatable {
         self.dynamicOriginExclusion = dynamicOriginExclusion
         self.loopAutoExclusions = loopAutoExclusions
         self.proxyEnvironment = proxyEnvironment
+        self.runningExtensionVersion = runningExtensionVersion
+        self.bundledExtensionVersion = bundledExtensionVersion
     }
 }

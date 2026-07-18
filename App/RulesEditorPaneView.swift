@@ -15,19 +15,37 @@ struct RulesEditorPaneView: View {
 
     private var rules: [ProxyMatchRule] { store.state.rules }
 
+    /// 是否有系统自动维护的旁路(回环自愈 / 端口发现)——有才显示只读的「自动旁路」区。
+    private var hasAutoBypass: Bool {
+        let d = store.state.dynamicOriginExclusion, l = store.state.loopAutoExclusions
+        return !d.identifiers.isEmpty || !d.executablePaths.isEmpty
+            || !l.identifiers.isEmpty || !l.executablePaths.isEmpty
+    }
+
     var body: some View {
-        Group {
-            if rules.isEmpty {
-                ContentUnavailableView(
-                    "还没有规则",
-                    systemImage: "list.bullet.rectangle",
-                    description: Text("点「＋」加一条，比如「主机 *.google.com → 代理」。规则从上到下、首个命中生效。")
+        VStack(spacing: 0) {
+            Group {
+                if rules.isEmpty {
+                    ContentUnavailableView(
+                        "还没有规则",
+                        systemImage: "list.bullet.rectangle",
+                        description: Text("点「＋」加一条，比如「主机 *.google.com → 代理」。规则从上到下、首个命中生效。")
+                    )
+                } else {
+                    rulesTable
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // 你的规则之外,系统还会自动维护两类旁路(都是强制/完全直连,不占用户规则表):
+            // 回环自愈发现的来源进程、端口发现识别的本地代理进程。这里只读列出,标清「来源」。
+            if hasAutoBypass {
+                Divider()
+                AutoBypassSection(
+                    direct: store.state.dynamicOriginExclusion,
+                    loop: store.state.loopAutoExclusions
                 )
-            } else {
-                rulesTable
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         // 工具栏用 safeAreaInset 固定在面板底部,始终可见。之前它是 VStack 的末尾元素,空态的
         // ContentUnavailableView 会把它挤出可视区(叠加窗底状态栏的 safeAreaInset)——「＋」消失、
         // 没法加规则。改为底部 inset 后与状态栏各占一层、永远露出来。
@@ -272,5 +290,56 @@ private struct MatchRuleSheet: View {
         return range.lowerBound == range.upperBound
             ? "\(range.lowerBound)"
             : "\(range.lowerBound)-\(range.upperBound)"
+    }
+}
+
+/// 「自动旁路」只读区:系统自动维护的两类强制 / 完全直连,列出并标清**来源**——
+/// 「自动 · 回环」= 环检测自愈加入的来源进程(完全旁路);「自动 · 本地代理」= 端口发现识别的
+/// 本地代理进程(强制直连)。这些不进用户规则表、不可编辑,是「让代理程序自己的流量不打转」的
+/// 安全兜底(与设置「内置规则」同一真相,在规则页也露一份,便于就地对照)。默认折叠。
+private struct AutoBypassSection: View {
+    let direct: OriginExclusionDiscovery
+    let loop: OriginExclusionDiscovery
+    @State private var expanded = false
+
+    private var loopEntries: [String] { loop.identifiers.union(loop.executablePaths).sorted() }
+    private var directEntries: [String] { direct.identifiers.union(direct.executablePaths).sorted() }
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $expanded) {
+            VStack(alignment: .leading, spacing: 5) {
+                ForEach(loopEntries, id: \.self) { row($0, source: "自动 · 回环", tint: .orange) }
+                ForEach(directEntries, id: \.self) { row($0, source: "自动 · 本地代理", tint: .accentColor) }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+        } label: {
+            HStack(spacing: 8) {
+                Label("自动旁路", systemImage: "wand.and.stars").font(.callout.weight(.medium))
+                Text("\(loopEntries.count + directEntries.count) 项")
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Text("系统维护 · 只读").font(.caption).foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+        }
+        .background(.bar)
+    }
+
+    private func row(_ entry: String, source: String, tint: Color) -> some View {
+        HStack(spacing: 8) {
+            Text(entry)
+                .font(.caption).monospaced()
+                .lineLimit(1).truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(source)
+                .font(.caption2.weight(.medium)).foregroundStyle(tint)
+                .padding(.horizontal, 7).padding(.vertical, 1)
+                .background(tint.opacity(0.14), in: Capsule())
+                .overlay(Capsule().strokeBorder(tint.opacity(0.30), lineWidth: 0.5))
+            Text("直连").font(.caption.weight(.medium))
+                .foregroundStyle(RuleActionStyle.color(.direct))
+        }
     }
 }

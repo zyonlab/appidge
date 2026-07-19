@@ -70,6 +70,8 @@ struct ProxyServersPaneView: View {
                 Button("删除", role: .destructive) { store.dispatch(.removeProxyServer(id)) }
             }
         }
+        // 表格内容字号与其它 tab 的表 + 底部日志统一(caption ≈ 11pt)。
+        .font(.caption)
     }
 
     private var toolbar: some View {

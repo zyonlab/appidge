@@ -63,6 +63,8 @@ struct AppsPaneView: View {
                     }
                 }
             }
+            // 表格内容字号与其它 tab 的表 + 底部日志统一(caption ≈ 11pt)。
+            .font(.caption)
         }
     }
 

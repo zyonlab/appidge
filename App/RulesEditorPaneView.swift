@@ -94,6 +94,8 @@ struct RulesEditorPaneView: View {
                 Button("删除", role: .destructive) { store.dispatch(.removeMatchRule(id)) }
             }
         }
+        // 表格内容字号与其它 tab 的表 + 底部日志统一(caption ≈ 11pt)。
+        .font(.caption)
     }
 
     /// 单元格内容 + 停用时半透明。**不挂双击手势**:cell 上的 `simultaneousGesture` 会接管命中测试、

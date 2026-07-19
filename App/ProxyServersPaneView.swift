@@ -53,11 +53,13 @@ struct ProxyServersPaneView: View {
             }
             .width(26)
 
-            TableColumn("地址:端口") { s in Text("\(s.host):\(s.port)").monospaced() }
-            TableColumn("协议") { s in Text(Self.kindLabel(s.kind)) }.width(80)
+            TableColumn("地址:端口") { s in Text("\(s.host):\(s.port)").monospaced().lineLimit(1) }
+                .width(min: 140, ideal: 210)
+            TableColumn("协议") { s in Text(Self.kindLabel(s.kind)) }.width(min: 60, ideal: 80)
             TableColumn("用户名") { s in
-                Text((s.username?.isEmpty == false) ? s.username! : "—").foregroundStyle(.secondary)
+                Text((s.username?.isEmpty == false) ? s.username! : "—").foregroundStyle(.secondary).lineLimit(1)
             }
+            .width(min: 80, ideal: 120)
             TableColumn("探活") { s in checkCell(checks[s.id] ?? .idle) }.width(56)
         }
         .contextMenu(forSelectionType: ProxyServer.ID.self) { ids in
@@ -130,34 +132,56 @@ struct ProxyServersPaneView: View {
 private struct RoutingModeSection: View {
     var store: Store
     let servers: [ProxyServer]
+    /// 默认折叠——展开的整段(分段选择 + 说明 + 成员勾选)在窄 / 矮窗口里会撑高底部区、把上面的
+    /// 服务器表挤到裁切(首行 / 表头被工具栏盖住)。折叠后底部只剩一行标题,表格拿回垂直空间。
+    @State private var expanded = false
 
     private var mode: ProxyRoutingMode { store.state.proxyRoutingMode }
     private var kind: RoutingModeKind { RoutingModeKind(mode) }
     private var selectedIDs: [ProxyServerID] { mode.orderedServerIDs }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("路由模式").font(.subheadline)
+        DisclosureGroup(isExpanded: $expanded) {
+            VStack(alignment: .leading, spacing: 8) {
+                Picker("路由模式", selection: kindBinding) {
+                    Text("单台").tag(RoutingModeKind.single)
+                    Text("代理链").tag(RoutingModeKind.chain)
+                    Text("故障转移").tag(RoutingModeKind.failover)
+                    Text("负载均衡").tag(RoutingModeKind.loadBalance)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
 
-            Picker("路由模式", selection: kindBinding) {
-                Text("单台").tag(RoutingModeKind.single)
-                Text("代理链").tag(RoutingModeKind.chain)
-                Text("故障转移").tag(RoutingModeKind.failover)
-                Text("负载均衡").tag(RoutingModeKind.loadBalance)
+                Text(Self.explanation(kind))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if kind != .single {
+                    memberPicker
+                }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-
-            Text(Self.explanation(kind))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if kind != .single {
-                memberPicker
+            .padding(.top, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            HStack(spacing: 8) {
+                Text("路由模式").font(.subheadline)
+                // 折叠时也一眼看到当前模式,不用展开。
+                Text(Self.modeShortLabel(kind)).font(.caption).foregroundStyle(.secondary)
+                Spacer()
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 折叠标题右侧的当前模式短名。
+    private static func modeShortLabel(_ kind: RoutingModeKind) -> LocalizedStringKey {
+        switch kind {
+        case .single: "单台"
+        case .chain: "代理链"
+        case .failover: "故障转移"
+        case .loadBalance: "负载均衡"
+        }
     }
 
     @ViewBuilder

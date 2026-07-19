@@ -8,6 +8,11 @@ import AppFeature
 /// 用户只能重启电脑(见 TransparentProxyController.stopCachedSessionForTermination)。
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// 启动最早期(UI 尚未构建、本地化尚未读取):把界面语言对齐到用户所选,必要时重启一次生效。
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        LanguageBootstrap.applyAtLaunch()
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         TransparentProxyController.stopCachedSessionForTermination()
     }
@@ -36,13 +41,9 @@ struct AppidgeApp: App {
     /// 版本握手自愈的去重:已针对哪个运行版本重启过会话(避免重启后版本仍旧时反复重启)。
     /// nil = 还没自愈过;`extensionNeedsRebind` 为真时 runningExtensionVersion 必非 nil。
     @State private var healedForRunningVersion: String?
-    /// 界面语言（跟随系统 / 简体中文 / English）。`.system` 时不覆盖 locale 环境。
-    /// 在根 scene 对内容套 `.environment(\.locale, ...)`，`Text(LocalizedStringKey)` 即时切换。
-    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
+    // 界面语言不在这里做 locale 环境覆盖了——改由 `LanguageBootstrap` 在启动早期对齐 AppleLanguages
+    // + 切换时重启生效(见 AppDelegate.applicationWillFinishLaunching / SettingsView 的语言 Picker)。
     @Environment(\.scenePhase) private var scenePhase
-
-    /// 当前应覆盖到 `\.locale` 环境的 Locale：非 system 用所选语言，system 回退系统当前。
-    private var localeOverride: Locale { appLanguage.resolvedLocale ?? .autoupdatingCurrent }
 
     // 代理密码存 Keychain，不落 JSON（见 PersistedProxyServer 结构上无 password 字段）。
     private let credentialStore: any CredentialStore = KeychainCredentialStore()
@@ -147,16 +148,13 @@ struct AppidgeApp: App {
                 persistCurrentConfiguration()
             }
         }
-        .environment(\.locale, localeOverride)
 
         Settings {
             SettingsView(store: store)
-                .environment(\.locale, localeOverride)
         }
 
         MenuBarExtra("appidge", systemImage: "network") {
             MenuBarView(store: store, tabSelection: tabSelection)
-                .environment(\.locale, localeOverride)
         }
         // .window 而非默认 .menu：内容是「仪表盘」(状态行 + Top-5 列表 + 开关),
         // 需要完整 SwiftUI 排版(语义色 / caption / 对齐),菜单渲染器会把这些收着。

@@ -10,6 +10,13 @@ import AppFeature
 struct TrafficPane: View {
     var store: Store
     @State private var expanded = true
+    /// 展开态日志区的高度(可拖顶部把手调整)。折叠时不用——整个抽屉只剩头部,不留空白。
+    @State private var height: CGFloat = 190
+    /// 拖拽起点的基准高度(DragGesture.translation 是相对起点的累计量,需基于起点算)。
+    @State private var dragBaseHeight: CGFloat?
+
+    private let minHeight: CGFloat = 110
+    private let maxHeight: CGFloat = 460
 
     /// 事件日志按时间倒序(最新在前),与连接表默认排序一致。
     private var events: [ConnectionLogEntry] {
@@ -18,17 +25,42 @@ struct TrafficPane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            if expanded { resizeHandle }
             header
             Divider()
             if expanded {
-                if events.isEmpty {
-                    emptyState
-                } else {
-                    logList
+                Group {
+                    if events.isEmpty {
+                        emptyState
+                    } else {
+                        logList
+                    }
                 }
+                .frame(height: height)
             }
         }
         .background(.background)
+    }
+
+    /// 顶部拖拽把手:仅展开时出现,上下拖调整日志区高度(夹在 min…max)。给底部抽屉一个可调高度,
+    /// 找回旧 VSplitView 的可调性,同时不带它折叠留白的毛病。
+    private var resizeHandle: some View {
+        Capsule()
+            .fill(.quaternary)
+            .frame(width: 36, height: 4)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 3)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        let base = dragBaseHeight ?? height
+                        if dragBaseHeight == nil { dragBaseHeight = base }
+                        height = min(maxHeight, max(minHeight, base - value.translation.height))
+                    }
+                    .onEnded { _ in dragBaseHeight = nil }
+            )
+            .help("拖动调整日志区高度")
     }
 
     /// 折叠头:三角 + 标题 + 计数徽标,右侧「在访达中显示」「清除」。整条(除按钮外)可点击折叠/展开。

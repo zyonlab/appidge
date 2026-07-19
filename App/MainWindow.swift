@@ -12,10 +12,12 @@ struct MainWindow: View {
     /// 选中的顶层分段提升为跨窗口共享状态(见 MainTabSelection):菜单栏「打开入口」也改它,
     /// 所以主窗口在(可能已开着的)时也会跟着切 tab。`@Bindable` 让 Picker 能双向绑定其属性。
     @Bindable var tabSelection: MainTabSelection
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var filter = ""
     @State private var selection: Set<ConnectionLogEntry.ID> = []
-    @State private var showInspector = true
+    /// 详情抽屉默认收起——它是覆盖式的,盖住表右侧;需要时用工具栏「详情」或选中连接后打开。
+    @State private var showInspector = false
     @State private var showingClearConfirmation = false
     @State private var showingProfiles = false
     /// 连接表只看活动连接(对齐 Proxifier:上表活跃、历史沉底)。默认关(全部可见)。
@@ -29,10 +31,6 @@ struct MainWindow: View {
                     // 保持不变,消除切 tab 时的工具栏 reconcile 抖动(切换卡顿主因之一)。「活动」专属能力
                     // (搜索 / 详情 / 清除)用条件控制「是否生效 / 显示」,而不是「是否存在」。
                     .searchable(text: $filter, placement: .toolbar, prompt: "过滤连接（进程 / 主机）")
-                    .inspector(isPresented: inspectorPresented) {
-                        ConnectionDetail(store: store, entry: selectedConnection)
-                            .inspectorColumnWidth(min: 260, ideal: 300, max: 420)
-                    }
                     .toolbar { mainToolbar }
                     .confirmationDialog(
                         "清除全部连接记录？", isPresented: $showingClearConfirmation, titleVisibility: .visible
@@ -84,24 +82,43 @@ struct MainWindow: View {
         .frame(width: 460, height: 420)
     }
 
-    /// 「活动」:连接表(主) + 底部流量(次)。搜索 / 详情 / 清除 / Inspector 等能力已上移到稳定层
-    /// 常挂(见 body),此处只留纯内容,切换时不再增删工具栏结构。
+    /// 「活动」:连接表(主)占满,底部日志抽屉,右侧详情覆盖抽屉。
+    /// - 详情用**覆盖式抽屉**(盖在表上、不改表宽),取代旧 `.inspector` 列——那个开合会把表挤窄、
+    ///   触发整表列重排,正是抖动源。
+    /// - 日志是**底部抽屉**,高度由它自己(展开态 + 拖拽)决定,折叠只剩薄头,不再有 VSplitView
+    ///   固定分区留下的孤立空白。
     private var activity: some View {
-        VSplitView {
-            ConnectionsTable(store: store, filter: filter, showActiveOnly: showActiveOnly, selection: $selection)
-                .frame(minHeight: 220)
-            TrafficPane(store: store)
-                .frame(minHeight: 130, idealHeight: 170, maxHeight: 320)
+        ZStack(alignment: .trailing) {
+            VStack(spacing: 0) {
+                ConnectionsTable(store: store, filter: filter, showActiveOnly: showActiveOnly, selection: $selection)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                Divider()
+                TrafficPane(store: store)
+            }
+
+            if showInspector {
+                detailDrawer
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .zIndex(1)
+            }
         }
+        .animation(reduceMotion ? nil : .snappy(duration: 0.26), value: showInspector)
+    }
+
+    /// 右侧详情抽屉:固定宽度、覆盖在连接表之上,带左侧分隔线与投影,读作「浮在内容上的抽屉」。
+    private var detailDrawer: some View {
+        HStack(spacing: 0) {
+            Divider()
+            ConnectionDetail(store: store, entry: selectedConnection)
+                .frame(width: 320)
+                .background(.windowBackground)
+        }
+        .frame(maxHeight: .infinity, alignment: .top)
+        .shadow(color: .black.opacity(0.12), radius: 8, x: -2, y: 0)
     }
 
     /// 当前是否在「活动」分段——常挂的搜索 / 详情 / 清除等仅在此生效,其余分段其内容置空(结构不变)。
     private var isActivity: Bool { tabSelection.section == .activity }
-
-    /// Inspector 常挂,但只在「活动」跟随 `showInspector` 打开;切到其它分段自动收起(不拆卸整列,免抖动)。
-    private var inspectorPresented: Binding<Bool> {
-        Binding(get: { isActivity && showInspector }, set: { showInspector = $0 })
-    }
 
     /// 主窗口工具栏:`ToolbarItem` 集合跨分段**恒定**(分段 Picker + 档案常在;活动专属的仅活动/清除/详情
     /// 用条件内容——非活动时置空但保留其 item 占位,不增删结构)。稳定结构 = 切换时无工具栏 reconcile 抖动。

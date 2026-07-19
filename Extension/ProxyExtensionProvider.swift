@@ -193,6 +193,11 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     }
 
     override func stopProxy(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
+        ExtDiag.log("stopProxy called reason=\(reason.rawValue)")
+        // 先 invalidate 旧 XPC 监听器,释放 mach service——否则它泄漏、仍占着服务,下次 startProxy
+        // 新建的监听器与它抢同一服务,新 app 连上被路由到旧监听器,flow 投到新 transport 全丢
+        // (退出重开「会话通却收不到 flow」的真因)。
+        transport?.invalidate()
         router = nil
         transport = nil
         diagnosticsRunner = nil

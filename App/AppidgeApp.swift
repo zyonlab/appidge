@@ -14,8 +14,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // 先强制同步存盘(退出前把最新配置落地,防 400ms 防抖没触发就退出丢改动),再停会话。
+        AppTermination.persist?()
         TransparentProxyController.stopCachedSessionForTermination()
     }
+}
+
+/// 退出时的同步存盘钩子。`applicationWillTerminate` 在 AppDelegate 里、拿不到 `store`;由 App 的
+/// `.task` 在窗口出现时注入一个捕获了 store 的同步存盘闭包(规则/代理只能在主窗口里改,窗口没开过
+/// 就没有需要抢救的改动,所以在 `.task` 注入已足够)。只在主线程读写,满足 Swift 6 严格并发。
+@MainActor
+enum AppTermination {
+    static var persist: (() -> Void)?
 }
 
 /// 主窗口选中的顶层分段(活动/应用/规则/代理)提升为**跨窗口共享状态**:主窗口的分段 Picker 与
@@ -88,6 +98,10 @@ struct AppidgeApp: App {
                 }
             }
             .task {
+                // 退出强制存盘钩子:捕获 store,同步落地最新配置(见 AppTermination / applicationWillTerminate)。
+                AppTermination.persist = { [store] in
+                    FilePersistenceStore().saveSynchronously(PersistedConfiguration(from: store.state))
+                }
                 // 扩展激活状态经 activator 的 delegate 回调回灌 store（状态栏据此如实显示）。
                 SystemExtensionActivator.shared.onStateChange = { activation in
                     store.dispatch(.extensionActivationChanged(activation))

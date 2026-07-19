@@ -9,6 +9,8 @@ public enum Action: Sendable, Equatable {
     case requestDiagnostic(processID: ProcessID, kinds: [DiagnosticKind])
     case diagnosticResultReceived(processID: ProcessID, kind: DiagnosticKind, passed: Bool, detail: String)
     case onboardingCompleted
+    /// 重新进入首次引导(测试/评估用):把 `hasCompletedOnboarding` 置回 false,主窗口据此显示引导流程。
+    case reopenOnboarding
     case appLaunched
     case addProxyServer(ProxyServer)
     case updateProxyServer(ProxyServer)

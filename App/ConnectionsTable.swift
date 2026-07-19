@@ -101,7 +101,6 @@ struct ConnectionsTable: View {
                 Section("为 \(first.host):\(first.port) 建规则") {
                     Button("走代理") { makeRules(targets, .proxied) }
                     Button("直连") { makeRules(targets, .direct) }
-                    Button("观测") { makeRules(targets, .observe) }
                     Button("拦截", role: .destructive) { makeRules(targets, .block) }
                 }
             }
@@ -235,7 +234,9 @@ enum RouteText {
         switch (rule, kind) {
         case (.direct, _): "直连"
         case (.block, _): "拦截"
-        case (.observe, _): "观测"
+        // .observe 只由本地代理来源(xray/云梯自身流量)内部产生——记录后放行、不接管数据通路。
+        // 文案用「放行」比「观测」更直白(用户不再能手动选它,见规则/右键菜单已去掉观测项)。
+        case (.observe, _): "放行"
         case (.proxied, .some(.socks5)): "代理 · SOCKS5"
         case (.proxied, .some(.httpConnect)): "代理 · HTTP"
         case (.proxied, .none): "代理（回落直连）"

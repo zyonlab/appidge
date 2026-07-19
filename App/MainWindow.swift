@@ -167,16 +167,37 @@ struct MainWindow: View {
         .background(.bar)
     }
 
-    /// 主窗口工具栏:只剩分段 Picker + 「档案」,跨分段**恒定**(无条件增删)= 切换时无 reconcile 抖动。
-    /// 活动专属的搜索 / 仅活动 / 清除记录都已移进活动表头过滤条(见 activityFilterBar)。
-    @ToolbarContentBuilder private var mainToolbar: some ToolbarContent {
-        // 顶层区域切换分段(对齐 HIG「小工具用 segmented control 切视图」)。
-        ToolbarItem(placement: .principal) {
-            Picker("区域", selection: $tabSelection.section) {
-                ForEach(MainTab.allCases) { tab in Text(tab.title).tag(tab) }
+    /// 顶部区域切换:自定义 plain 按钮组,无系统 hover 高亮。选中态用次强调底色胶囊标示。
+    private var tabPicker: some View {
+        HStack(spacing: 2) {
+            ForEach(MainTab.allCases) { tab in
+                let selected = tabSelection.section == tab
+                Button {
+                    tabSelection.section = tab
+                } label: {
+                    Text(tab.title)
+                        .font(.callout)
+                        .foregroundStyle(selected ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4)
+                        .background(
+                            selected ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear),
+                            in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        )
+                        .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                }
+                .buttonStyle(.plain)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+        }
+    }
+
+    /// 主窗口工具栏:分段切换(自定义无 hover)+ 「档案」+「设置」,跨分段**恒定**(无条件增删)=
+    /// 切换时无 reconcile 抖动。活动专属的搜索 / 仅活动 / 清除记录都已移进活动表头过滤条(见 activityFilterBar)。
+    @ToolbarContentBuilder private var mainToolbar: some ToolbarContent {
+        // 顶层区域切换分段。用自定义 plain 按钮组而非原生 `.segmented` Picker——后者有系统 hover
+        // 高亮去不掉;plain button 无 hover 背景,选中态用胶囊底色标示,视觉一致但不闪。
+        ToolbarItem(placement: .principal) {
+            tabPicker
         }
         // 「档案」:弹 sheet,4 个分段不含它但功能保留,任何分段都可见。
         ToolbarItem(placement: .automatic) {
@@ -267,7 +288,6 @@ private struct ConnectionDetail: View {
                     Menu {
                         Button("走代理") { makeRule(e, .proxied) }
                         Button("直连") { makeRule(e, .direct) }
-                        Button("观测") { makeRule(e, .observe) }
                         Button("拦截", role: .destructive) { makeRule(e, .block) }
                     } label: {
                         Label("为这条连接建规则", systemImage: "plus.rectangle.on.folder")

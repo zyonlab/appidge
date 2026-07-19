@@ -232,7 +232,7 @@ struct TrafficPane: View {
         switch (rule, kind) {
         case (.direct, _): String(localized: "直连")
         case (.block, _): String(localized: "拦截")
-        case (.observe, _): String(localized: "观测")
+        case (.observe, _): String(localized: "放行")   // 见 RouteText.label 的说明
         case (.proxied, .some(.socks5)): String(localized: "代理 · SOCKS5")
         case (.proxied, .some(.httpConnect)): String(localized: "代理 · HTTP")
         case (.proxied, .none): String(localized: "代理（回落直连）")

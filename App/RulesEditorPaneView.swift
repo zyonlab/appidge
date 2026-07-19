@@ -189,7 +189,7 @@ enum RuleActionStyle {
         case .proxied: "代理"
         case .direct: "直连"
         case .block: "拦截"
-        case .observe: "观测"
+        case .observe: "放行"   // 仅本地代理来源内部产生;文案「放行」比「观测」直白(用户不再可手选)
         }
     }
 
@@ -259,7 +259,6 @@ private struct MatchRuleSheet: View {
                     Text("代理").tag(ProxyRule.proxied)
                     Text("直连").tag(ProxyRule.direct)
                     Text("拦截").tag(ProxyRule.block)
-                    Text("观测").tag(ProxyRule.observe)
                 }
                 .pickerStyle(.segmented)
             }

@@ -78,6 +78,8 @@ public enum Reducer {
             return diagnosticResultReceived(processID: processID, kind: kind, passed: passed, detail: detail, state)
         case .onboardingCompleted:
             return onboardingCompleted(state)
+        case .reopenOnboarding:
+            return reopenOnboarding(state)
         case .appLaunched:
             return appLaunched(state)
         case .connectionEventReceived(let entry):
@@ -197,6 +199,13 @@ public enum Reducer {
     private static func onboardingCompleted(_ state: AppState) -> (AppState, [Effect]) {
         var state = state
         state.hasCompletedOnboarding = true
+        return (state, [])
+    }
+
+    /// 重新进入引导(测试用):置回未完成,主窗口据此重显 OnboardingView。仅翻状态,不动其它配置。
+    private static func reopenOnboarding(_ state: AppState) -> (AppState, [Effect]) {
+        var state = state
+        state.hasCompletedOnboarding = false
         return (state, [])
     }
 

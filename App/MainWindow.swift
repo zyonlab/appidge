@@ -123,6 +123,17 @@ struct MainWindow: View {
             ConnectionDetail(store: store, entry: selectedConnection)
                 .frame(width: 320)
                 .background(.windowBackground)
+                // 右上角关闭图标:与「点空白行 / Esc」并列的显式关闭出口(清空选中即收起抽屉)。
+                .overlay(alignment: .topTrailing) {
+                    Button { selection.removeAll() } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(12)
+                    .help("关闭详情")
+                }
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .shadow(color: .black.opacity(0.12), radius: 8, x: -2, y: 0)

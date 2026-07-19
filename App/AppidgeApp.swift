@@ -186,7 +186,7 @@ struct AppidgeApp: App {
             SettingsView(store: store)
         }
 
-        MenuBarExtra("appidge", systemImage: "network") {
+        MenuBarExtra("appidge", image: "MenuBarIcon") {
             MenuBarView(store: store, tabSelection: tabSelection)
         }
         // .window 而非默认 .menu：内容是「仪表盘」(状态行 + Top-5 列表 + 开关),

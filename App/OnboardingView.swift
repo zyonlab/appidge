@@ -24,9 +24,11 @@ struct OnboardingView: View {
     /// 图标 + 标题 + 一句平白说明。
     private var header: some View {
         VStack(spacing: 12) {
-            Image(systemName: "network")
-                .font(.system(size: 48))
-                .foregroundStyle(.tint)
+            Image("PigeonLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 72, height: 72)
+                .accessibilityLabel("appidge")
 
             Text("appidge · 按进程代理")
                 .font(.title2)

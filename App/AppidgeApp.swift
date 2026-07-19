@@ -65,9 +65,6 @@ struct AppidgeApp: App {
     @State private var profilesModel: ProfilesModel
     /// 主窗口分段选中态,菜单栏「打开入口」与主窗口 Picker 共享同一份(见 MainTabSelection)。
     @State private var tabSelection = MainTabSelection()
-    // 类而非局部变量：`store.onAction` 闭包按引用捕获它,多次 dispatch 之间能共享同一个
-    // "有没有待落盘的 Task" 状态(struct 会在每次闭包创建时拿到不同的副本，防抖就失效了)。
-    @State private var persistenceDebouncer = PersistenceDebouncer()
     /// 版本握手自愈的去重:已针对哪个运行版本重启过会话(避免重启后版本仍旧时反复重启)。
     /// nil = 还没自愈过;`extensionNeedsRebind` 为真时 runningExtensionVersion 必非 nil。
     @State private var healedForRunningVersion: String?
@@ -151,7 +148,9 @@ struct AppidgeApp: App {
                     // 升级的僵尸态)→ 自动重启会话重绑最新扩展,一次为限(见 maybeHealStaleBinding)。
                     if case .extensionVersionReported = action { maybeHealStaleBinding() }
                     guard Self.isPersistenceRelevant(action) else { return }
-                    persistenceDebouncer.schedule { persistCurrentConfiguration() }
+                    // 立即同步落盘(去掉 400ms 防抖):每次改动一发生就在磁盘上,crash / 强杀也不丢。
+                    // 规则调序是离散按钮点击(非连续拖拽流),JSON 又小,每次同步原子写代价可忽略。
+                    persistCurrentConfiguration()
                 }
                 store.dispatch(.appLaunched)
                 // 启动恢复完成后,把最终的完整配置全量重推给扩展一次。onConnect 那次可能发生在
@@ -272,13 +271,12 @@ struct AppidgeApp: App {
 
     @MainActor
     private func persistCurrentConfiguration() {
-        let configuration = PersistedConfiguration(from: store.state)
+        // 配置 JSON **同步立即**落盘——改动一发生就在磁盘上,crash / 强杀不丢(退出钩子同一条路径)。
+        FilePersistenceStore().saveSynchronously(PersistedConfiguration(from: store.state))
+        // 密码进 Keychain:只有代理增改才变化,异步保存不拖住 JSON 的即时落地。
         let servers = Array(store.state.proxyServers.values)
         let credentialStore = credentialStore
-        Task {
-            await FilePersistenceStore().save(configuration)            // 无密码落盘
-            await PersistedConfiguration.saveCredentials(from: servers, to: credentialStore) // 密码进 Keychain
-        }
+        Task { await PersistedConfiguration.saveCredentials(from: servers, to: credentialStore) }
     }
 
     /// `Store` 的 effectHandler 本体——从 `init` 里的闭包拆出来只是压 `function_body_length`
@@ -339,22 +337,5 @@ struct AppidgeApp: App {
         )
         let discovery = await LocalProxyOriginDiscovery.discover(state: discoveryState, using: resolver)
         return .proxyProcessIdentitiesResolved(discovery)
-    }
-}
-
-/// 防抖动的存盘触发器：连续多次"值得持久化"的 action(比如拖拽重排规则表连续触发
-/// `reorderMatchRules`)只在停顿下来之后落盘一次，避免每条 dispatch 都读写一次磁盘。
-/// 类而非 struct——`AppidgeApp.store.onAction` 闭包要按引用捕获同一份"待落盘 Task"状态。
-@MainActor
-final class PersistenceDebouncer {
-    private var pendingTask: Task<Void, Never>?
-
-    func schedule(delay: Duration = .milliseconds(400), _ action: @escaping @MainActor () -> Void) {
-        pendingTask?.cancel()
-        pendingTask = Task {
-            try? await Task.sleep(for: delay)
-            guard !Task.isCancelled else { return }
-            action()
-        }
     }
 }

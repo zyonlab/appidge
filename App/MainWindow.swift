@@ -103,6 +103,11 @@ struct MainWindow: View {
             }
         }
         .animation(reduceMotion ? nil : .snappy(duration: 0.26), value: showInspector)
+        // 单击某行即弹出详情抽屉(恰好选中一条时开、点空白/多选时收起)——比「选中再点按钮」少一步,
+        // 且用选中态驱动、无双击消抖延迟。工具栏「详情」按钮仍可手动开合。
+        .onChange(of: selection) { _, newSelection in
+            showInspector = newSelection.count == 1
+        }
     }
 
     /// 右侧详情抽屉:固定宽度、覆盖在连接表之上,带左侧分隔线与投影,读作「浮在内容上的抽屉」。

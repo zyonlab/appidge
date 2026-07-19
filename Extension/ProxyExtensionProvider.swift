@@ -20,7 +20,8 @@ enum TCPFlowDecision: Equatable {
     /// 完全不碰:返回 false 让系统原生处理,活动栏看不到(自身组件 / 回环 / 私网 / 上游)。
     case bypass
     /// 接管数据通路:`.proxied` 走上游、`.direct` 自己拨号直连、`.block` 拒绝——都在活动栏可见、可计量。
-    case handle(ProxyRuleDTO)
+    /// `proxyServerID`:命中规则指定走哪个上游 server(仅 `.proxied` 有意义);nil = 跟随全局活动/路由模式。
+    case handle(ProxyRuleDTO, proxyServerID: String?)
     /// 观测(B):不接管数据通路,但在活动栏记一条连接事件(进程+目的地),随即返回 false 放行。
     /// 看得见"连了哪里"、零转发开销,代价是没有逐连接速率/字节。
     case observe
@@ -311,14 +312,15 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
                 processID: processID, displayName: name, host: remoteHostname ?? hostPort?.0, port: hostPort?.1
             )
             return false
-        case .handle(let rule):
+        case .handle(let rule, let proxyServerID):
             flowLogger.log("""
             handleNewTCPFlow INTERCEPT src=\(sourceID, privacy: .public) \
             rule=\(String(describing: rule), privacy: .public) host=\(hostPort?.0 ?? "-", privacy: .public)
             """)
             beginHandledFlow(
                 tcpFlow: tcpFlow,
-                origin: FlowOrigin(processID: processID, displayName: name, executablePath: sourcePath, rule: rule),
+                origin: FlowOrigin(processID: processID, displayName: name, executablePath: sourcePath,
+                                   rule: rule, proxyServerID: proxyServerID),
                 to: remoteEndpoint, remoteHostname: remoteHostname, router: router
             )
             return true
@@ -389,7 +391,8 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         }
 
         do {
-            let remote = try await openRemote(to: remoteEndpoint, remoteHostname: remoteHostname, rule: rule)
+            let remote = try await openRemote(to: remoteEndpoint, remoteHostname: remoteHostname,
+                                              rule: rule, proxyServerID: origin.proxyServerID)
             emitConnectionEvent(context, phase: .opened)
             pumpClientToRemote(tcpFlow: tcpFlow, remote: remote, context: context, router: router)
             pumpRemoteToClient(tcpFlow: tcpFlow, remote: remote, context: context, router: router)

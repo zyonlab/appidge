@@ -1,6 +1,6 @@
 public enum Action: Sendable, Equatable {
     case processDiscovered(id: ProcessID, displayName: String, executablePath: String)
-    case assignRule(processID: ProcessID, rule: ProxyRule)
+    case assignRule(processID: ProcessID, rule: ProxyRule, proxyServerID: ProxyServerID? = nil)
     /// 一批流量增量 + 这一批覆盖的真实时间窗(秒)。reducer 据此更新累计字节,并算出每进程瞬时速率
     /// (增量 ÷ 时间窗);`intervalSeconds <= 0` 时只累计、不更新速率。
     case flowStatsDeltaReceived([ProcessID: FlowStatsDelta], intervalSeconds: Double)
@@ -21,7 +21,7 @@ public enum Action: Sendable, Equatable {
     /// 就地编辑一条已有规则(按 id 定位):替换 进程/主机/端口/动作,**保留原位置与启用态**。
     /// 用于「双击某行改规则」——区别于 `addMatchRule`(那是新增或按三元组去重后置顶)。id 不存在
     /// 时 no-op。
-    case updateMatchRule(id: RuleID, appPattern: String, hostPattern: String, portRange: ClosedRange<UInt16>?, action: ProxyRule)
+    case updateMatchRule(id: RuleID, appPattern: String, hostPattern: String, portRange: ClosedRange<UInt16>?, action: ProxyRule, proxyServerID: ProxyServerID? = nil)
     case removeMatchRule(RuleID)
     case reorderMatchRules([RuleID])
     /// 启用/停用一条规则(保留在表里,不删除)。禁用的规则下发前被过滤,永不参与匹配。

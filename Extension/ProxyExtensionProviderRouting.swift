@@ -110,12 +110,14 @@ extension ProxyExtensionProvider {
         }
         // ⑤ 解出动作:细粒度规则表(首个命中)优先于每进程规则;都没有 → 默认 .direct(策略 A:
         //    默认就接管并直连计量,活动栏能看到每条连接)。
-        let (action, ruleSource) = resolveAction(sourceID: sourceID, hosts: candidates, port: port)
+        let (action, serverID, ruleSource) = resolveAction(sourceID: sourceID, hosts: candidates, port: port)
         switch action {
         case .observe:
             return (.observe, "observe:\(ruleSource)")
         case .direct, .proxied, .block:
-            return (.handle(action), "handle:\(ruleSource)(\(action))")
+            // 规则指定的上游 server 只对 .proxied 有意义;其余动作忽略。
+            return (.handle(action, proxyServerID: action == .proxied ? serverID : nil),
+                    "handle:\(ruleSource)(\(action))")
         }
     }
 
@@ -146,16 +148,17 @@ extension ProxyExtensionProvider {
     }
 
     /// 规则表(首个命中,hostname/endpoint host 两候选各试一次)→ 每进程规则 → 默认 `.direct`(策略 A)。
-    private func resolveAction(sourceID: String, hosts: [String], port: UInt16?) -> (ProxyRuleDTO, String) {
+    private func resolveAction(sourceID: String, hosts: [String], port: UInt16?) -> (ProxyRuleDTO, String?, String) {
         if let port {
             for host in hosts {
-                if let matched = RuleMatcher.firstMatch(matchRules, app: sourceID, host: host, port: port) {
-                    return (matched, "matchRule(\(host))")
+                // firstMatchRule(非 firstMatch)拿到整条规则,才能读出它指定的 proxyServerID。
+                if let matched = RuleMatcher.firstMatchRule(matchRules, app: sourceID, host: host, port: port) {
+                    return (matched.rule, matched.proxyServerID, "matchRule(\(host))")
                 }
             }
         }
-        if let perProcess = perProcessRules[sourceID] { return (perProcess, "perProcess") }
-        return (.direct, "default")
+        if let perProcess = perProcessRules[sourceID] { return (perProcess, nil, "perProcess") }
+        return (.direct, nil, "default")
     }
 
     /// 来源是不是 app 动态查到的本地代理进程(签名标识或可执行文件路径任一命中,直连档)。
@@ -208,15 +211,24 @@ extension ProxyExtensionProvider {
     /// 直连目的地。实际拨号交给无状态的 ``ProxyDialer``。目标地址经 ``ProxyTargetSelector`` 优先取
     /// 原始主机名(DNS-over-proxy,让代理去解析)。
     func openRemote(
-        to endpoint: Network.NWEndpoint, remoteHostname: String?, rule: ProxyRuleDTO
+        to endpoint: Network.NWEndpoint, remoteHostname: String?, rule: ProxyRuleDTO,
+        proxyServerID: String? = nil
     ) async throws -> NWConnection {
         guard rule == .proxied, let (endpointHost, port) = ProxyDialer.hostPort(from: endpoint) else {
             return try await ProxyDialer.openDirect(to: endpoint)
         }
         let config = proxyConfig
-        let route = ProxyRouteResolver.resolve(
-            mode: routingMode, servers: config?.servers ?? [], activeServerID: config?.activeServerID
-        )
+        let servers = config?.servers ?? []
+        // 规则指定了具体上游 server 且存在 → 强制走它(single);否则按全局路由模式/活动 server 解析。
+        // 指定的 id 认不得(server 被删)→ 回落全局,不致命。
+        let route: ResolvedRoute
+        if let proxyServerID, let picked = servers.first(where: { $0.id == proxyServerID }) {
+            route = .single(picked)
+        } else {
+            route = ProxyRouteResolver.resolve(
+                mode: routingMode, servers: servers, activeServerID: config?.activeServerID
+            )
+        }
         let target = ProxyTargetSelector.selectTarget(
             remoteHostname: remoteHostname, endpointHost: endpointHost, port: port
         )

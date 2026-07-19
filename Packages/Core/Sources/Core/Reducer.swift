@@ -34,10 +34,10 @@ public enum Reducer {
         switch action {
         case .addMatchRule(let rule):
             return addMatchRule(rule, state)
-        case .updateMatchRule(let id, let appPattern, let hostPattern, let portRange, let action):
+        case .updateMatchRule(let id, let appPattern, let hostPattern, let portRange, let action, let proxyServerID):
             return updateMatchRule(
                 ProxyMatchRule(id: id, appPattern: appPattern, hostPattern: hostPattern,
-                               portRange: portRange, action: action),
+                               portRange: portRange, action: action, proxyServerID: proxyServerID),
                 state
             )
         case .removeMatchRule(let id):
@@ -56,8 +56,8 @@ public enum Reducer {
         switch action {
         case .processDiscovered(let id, let displayName, let executablePath):
             return processDiscovered(id: id, displayName: displayName, executablePath: executablePath, state)
-        case .assignRule(let processID, let rule):
-            return assignRule(processID: processID, rule: rule, state)
+        case .assignRule(let processID, let rule, let proxyServerID):
+            return assignRule(processID: processID, rule: rule, proxyServerID: proxyServerID, state)
         case .flowStatsDeltaReceived(let deltas, let intervalSeconds):
             return flowStatsDeltaReceived(deltas, intervalSeconds, state)
         case .engineFailure(let reason):
@@ -130,12 +130,13 @@ public enum Reducer {
     /// 「直连」也因此可表达、可下发(以前 `.direct` 在下发时被剥掉,只能靠"缺席"表示)。
     /// 派生规则的 id 确定(`process:<id>`)——reduce 是纯函数,不能造随机 UUID;去重键命中时
     /// 沿用表里现有那条,id 只在首次创建时用到。
-    private static func assignRule(processID: ProcessID, rule: ProxyRule, _ state: AppState) -> (AppState, [Effect]) {
+    private static func assignRule(processID: ProcessID, rule: ProxyRule, proxyServerID: ProxyServerID? = nil, _ state: AppState) -> (AppState, [Effect]) {
         var state = state
         state.processes[processID]?.rule = rule
         let derived = ProxyMatchRule(
             id: derivedRuleID(for: processID),
-            appPattern: processID.value, hostPattern: "*", portRange: nil, action: rule
+            appPattern: processID.value, hostPattern: "*", portRange: nil, action: rule,
+            proxyServerID: rule == .proxied ? proxyServerID : nil
         )
         state = upsertingMatchRule(derived, state)
         return (state, [ruleSetPush(state)])

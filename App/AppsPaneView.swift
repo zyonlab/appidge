@@ -57,7 +57,20 @@ struct AppsPaneView: View {
             .contextMenu(forSelectionType: MonitoredProcess.ID.self) { ids in
                 if !ids.isEmpty {
                     Section("此应用（\(ids.count) 个）") {
-                        Button("走代理") { assign(ids, .proxied) }
+                        // 有多个代理时「走代理」展开成子菜单选具体上游;只有 0/1 个代理时直接走默认。
+                        if servers.isEmpty {
+                            Button("走代理") { assign(ids, .proxied) }
+                        } else {
+                            Menu("走代理") {
+                                Button("默认（跟随活动）") { assign(ids, .proxied) }
+                                Divider()
+                                ForEach(servers) { server in
+                                    Button("\(server.host):\(server.port)") {
+                                        assign(ids, .proxied, proxyServerID: server.id)
+                                    }
+                                }
+                            }
+                        }
                         Button("直连") { assign(ids, .direct) }
                         Button("拦截", role: .destructive) { assign(ids, .block) }
                     }
@@ -68,7 +81,12 @@ struct AppsPaneView: View {
         }
     }
 
-    private func assign(_ ids: Set<MonitoredProcess.ID>, _ rule: ProxyRule) {
-        for id in ids { store.dispatch(.assignRule(processID: id, rule: rule)) }
+    /// 代理服务器,按主机名排序,供「走代理」子菜单列出。
+    private var servers: [ProxyServer] {
+        store.state.proxyServers.values.sorted { $0.host.localizedCompare($1.host) == .orderedAscending }
+    }
+
+    private func assign(_ ids: Set<MonitoredProcess.ID>, _ rule: ProxyRule, proxyServerID: ProxyServerID? = nil) {
+        for id in ids { store.dispatch(.assignRule(processID: id, rule: rule, proxyServerID: proxyServerID)) }
     }
 }

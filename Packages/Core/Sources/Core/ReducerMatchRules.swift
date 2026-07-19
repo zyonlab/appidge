@@ -40,6 +40,7 @@ extension Reducer {
         state.rules[index].hostPattern = updated.hostPattern
         state.rules[index].portRange = updated.portRange
         state.rules[index].action = updated.action
+        state.rules[index].proxyServerID = updated.proxyServerID
         return (state, [ruleSetPush(state)])
     }
 

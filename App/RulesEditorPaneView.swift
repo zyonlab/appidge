@@ -15,6 +15,12 @@ struct RulesEditorPaneView: View {
 
     private var rules: [ProxyMatchRule] { store.state.rules }
 
+    /// 规则指定的上游 server 的主机名(供动作列附标签);nil / 认不得的 id → nil(显示成默认)。
+    private func serverHost(_ id: ProxyServerID?) -> String? {
+        guard let id, let server = store.state.proxyServers[id] else { return nil }
+        return server.host
+    }
+
     /// 是否有系统自动维护的旁路(回环自愈 / 端口发现)——有才显示只读的「自动旁路」区。
     private var hasAutoBypass: Bool {
         let d = store.state.dynamicOriginExclusion, l = store.state.loopAutoExclusions
@@ -72,9 +78,15 @@ struct RulesEditorPaneView: View {
             TableColumn("端口") { r in editableCell(r) { Text(Self.portText(r.portRange)) } }.width(90)
             TableColumn("动作") { r in
                 editableCell(r) {
-                    Text(RuleActionStyle.label(r.action)).foregroundStyle(RuleActionStyle.color(r.action))
+                    HStack(spacing: 4) {
+                        Text(RuleActionStyle.label(r.action)).foregroundStyle(RuleActionStyle.color(r.action))
+                        // 代理动作若指定了具体上游,附一个「· host」标签(默认/跟随活动则不显示)。
+                        if r.action == .proxied, let host = serverHost(r.proxyServerID) {
+                            Text("· \(host)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                    }
                 }
-            }.width(70)
+            }.width(min: 70, ideal: 140)
         }
         // 编辑入口:选中一行后按 Return(与工具栏铅笔、右键「编辑…」等价)。不再在每个单元格上挂双击
         // 手势——那会接管命中测试、和 Table 原生单击选中打架,导致点其它行选中高亮延迟更新(卡顿感)。
@@ -214,6 +226,8 @@ private struct MatchRuleSheet: View {
     @State private var hostPattern: String
     @State private var portText: String
     @State private var action: ProxyRule
+    /// 动作=代理时走哪个上游 server;nil = 默认(跟随全局活动 server / 路由模式)。
+    @State private var proxyServerID: ProxyServerID?
 
     init(store: Store, editing: ProxyMatchRule?) {
         self.store = store
@@ -222,6 +236,12 @@ private struct MatchRuleSheet: View {
         _hostPattern = State(initialValue: editing?.hostPattern ?? "*")
         _portText = State(initialValue: editing.map { Self.portField($0.portRange) } ?? "")
         _action = State(initialValue: editing?.action ?? .proxied)
+        _proxyServerID = State(initialValue: editing?.proxyServerID)
+    }
+
+    /// 代理服务器,按名字排序,供 sheet 的 Picker 列出。
+    private var servers: [ProxyServer] {
+        store.state.proxyServers.values.sorted { $0.host.localizedCompare($1.host) == .orderedAscending }
     }
 
     private var isEditing: Bool { editing != nil }
@@ -261,6 +281,15 @@ private struct MatchRuleSheet: View {
                     Text("拦截").tag(ProxyRule.block)
                 }
                 .pickerStyle(.segmented)
+                // 动作=代理时,可指定走哪个上游 server(不同规则/进程走不同代理);默认跟随全局活动。
+                if action == .proxied {
+                    Picker("代理服务器", selection: $proxyServerID) {
+                        Text("默认（跟随活动）").tag(ProxyServerID?.none)
+                        ForEach(servers) { server in
+                            Text("\(server.host):\(server.port)").tag(ProxyServerID?.some(server.id))
+                        }
+                    }
+                }
             }
             .formStyle(.grouped)
             Divider()
@@ -279,14 +308,18 @@ private struct MatchRuleSheet: View {
         guard case .some(let range) = parsedPort else { return }
         let app = appPattern.trimmingCharacters(in: .whitespaces)
         let host = hostPattern.trimmingCharacters(in: .whitespaces)
+        // 只有代理动作带 server;切到直连/拦截时把选择清掉,避免残留误导。
+        let server = action == .proxied ? proxyServerID : nil
         if let editing {
             store.dispatch(.updateMatchRule(
-                id: editing.id, appPattern: app, hostPattern: host, portRange: range, action: action
+                id: editing.id, appPattern: app, hostPattern: host, portRange: range,
+                action: action, proxyServerID: server
             ))
         } else {
             store.dispatch(.addMatchRule(ProxyMatchRule(
                 id: RuleID(UUID().uuidString),
-                appPattern: app, hostPattern: host, portRange: range, action: action
+                appPattern: app, hostPattern: host, portRange: range,
+                action: action, proxyServerID: server
             )))
         }
         dismiss()

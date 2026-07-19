@@ -123,9 +123,8 @@ struct AppidgeApp: App {
                 SystemExtensionActivator.shared.onStateChange = { activation in
                     store.dispatch(.extensionActivationChanged(activation))
                     // 扩展获批(.active)后,必须由 app 侧启动透明代理会话,系统才会把流量交给 provider。
-                    // 走 startOnLaunch:本进程首次强制 restart() 重绑(修退出重开无活动连接),之后幂等 start()。
                     if case .active = activation {
-                        Task { await TransparentProxyController.startOnLaunch() }
+                        Task { await TransparentProxyController.start() }
                     }
                 }
                 SystemExtensionActivator.shared.diagnose() // 启动即打印 app 看到的扩展目录(排查 not-found)
@@ -167,8 +166,7 @@ struct AppidgeApp: App {
                     if case .disabled = state { return }
                     if store.state.hasCompletedOnboarding {
                         SystemExtensionActivator.shared.activate()
-                        // 启动路径统一走 startOnLaunch:本进程首次强制 restart() 重绑会话,修「退出重开无活动连接」。
-                        Task { await TransparentProxyController.startOnLaunch() }
+                        Task { await TransparentProxyController.start() }
                     }
                 }
             }

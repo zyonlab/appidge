@@ -44,25 +44,6 @@ enum TransparentProxyController {
         }
     }
 
-    /// 本进程是否已在启动路径做过一次会话重绑(见 startOnLaunch)。static = 进程级,新进程重置为 false。
-    private static var didLaunchBind = false
-
-    /// 启动路径统一入口(onStateChange 的 .active 与 checkStatus 都走这里):
-    /// **本进程首次**调用做 `restart()`(停→等断开→起)——退出时会话已被停干净(见
-    /// stopCachedSessionForTermination),重开若只 `start()`,它见 status 还是 connected/connecting
-    /// 的余波就跳过 startVPNTunnel,provider 不再转发 → 活动栏空白(真机实锤的「退出重开无活动连接」)。
-    /// restart() 强制干净重绑;**之后**同进程内(如关窗再开)退化为幂等 `start()`,不再每次都停一下闪断。
-    /// 在 @MainActor 上串行:同步先占住 didLaunchBind 再 await,并发两次调用也只 restart 一次。
-    static func startOnLaunch() async {
-        let firstBind = !didLaunchBind
-        didLaunchBind = true
-        if firstBind {
-            await restart()
-        } else {
-            await start()
-        }
-    }
-
     /// **重启会话 = 重新绑定到当前(最新)扩展 provider**。反复热升级后系统可能把运行中的
     /// 会话继续绑在待卸载的旧 provider 实例上(流量被交给僵尸扩展 → 黑洞),等价于用户手动在
     /// 系统设置里关开一次网络扩展。这里程序化地做:停会话 → 等它真的断开 → 重新起。
@@ -174,20 +155,32 @@ enum TransparentProxyController {
 
     private static func loadOrCreate() async throws -> NETransparentProxyManager {
         let managers = try await NETransparentProxyManager.loadAllFromPreferences()
-        let mgr = managers.first ?? NETransparentProxyManager()
+        let existing = managers.first
+        let mgr = existing ?? NETransparentProxyManager()
         // NETransparentProxyManager 用 NETunnelProviderProtocol + providerBundleIdentifier 指向系统扩展。
-        let proto = (mgr.protocolConfiguration as? NETunnelProviderProtocol) ?? NETunnelProviderProtocol()
-        proto.providerBundleIdentifier = extensionBundleID
-        // serverAddress 必须非空;透明代理里只是占位、不代表真实服务器。
-        proto.serverAddress = "appidge (per-process)"
-        mgr.protocolConfiguration = proto
-        mgr.localizedDescription = "appidge · 按进程代理"
-        mgr.isEnabled = true
-        try await mgr.saveToPreferences()   // 首次在此弹「添加配置」授权
-        try await mgr.loadFromPreferences() // 存后必须重新 load 才能 start
+        let currentProto = mgr.protocolConfiguration as? NETunnelProviderProtocol
+        // **幂等**:只有「新建」或「已存在但配置不对」才 saveToPreferences。每次都存会让 NE 守护重新加载
+        // 配置、把 provider 的 setTunnelNetworkSettings 冲掉——启动路径多次 loadOrCreate 连环存,会话
+        // connected 却不再拦截任何流量(真机实锤的「会话通、活动栏空」)。已正确就直接复用,不再重存。
+        let needsSave = existing == nil
+            || currentProto?.providerBundleIdentifier != extensionBundleID
+            || mgr.isEnabled != true
+        if needsSave {
+            let proto = currentProto ?? NETunnelProviderProtocol()
+            proto.providerBundleIdentifier = extensionBundleID
+            // serverAddress 必须非空;透明代理里只是占位、不代表真实服务器。
+            proto.serverAddress = "appidge (per-process)"
+            mgr.protocolConfiguration = proto
+            mgr.localizedDescription = "appidge · 按进程代理"
+            mgr.isEnabled = true
+            try await mgr.saveToPreferences()   // 首次在此弹「添加配置」授权
+            try await mgr.loadFromPreferences() // 存后必须重新 load 才能 start
+            emit("manager saved+loaded (created/reconfigured); provider=\(extensionBundleID)")
+        } else {
+            emit("manager reused (config already correct, no re-save)")
+        }
         // 记住全部已知会话(新建时也把这台记进去),供退出全量停会话。
         remember(managers.isEmpty ? [mgr] : managers)
-        emit("manager saved+loaded; provider=\(extensionBundleID) enabled=\(mgr.isEnabled)")
         return mgr
     }
 

@@ -15,6 +15,17 @@ private let tpLog = Logger(subsystem: "com.appidge.app", category: "TransparentP
 enum TransparentProxyController {
     private static let extensionBundleID = "com.appidge.app.ProxyExtension"
     private static var manager: NETransparentProxyManager?
+    /// 本进程**见过的所有** appidge 会话 manager(每次 `loadAllFromPreferences` 后更新)。退出时要
+    /// 同步停掉全部——只停缓存的单个 `manager` 不够:会话可能由别的实例(如语言切换重启出的新实例)
+    /// 持有,漏停就留下僵尸接管、全系统断网直到下次启动。`reset()` 移除配置后清空。
+    private static var knownManagers: [NETransparentProxyManager] = []
+
+    /// 记住这一批加载到的 manager(供退出时全量停会话)。非空才覆盖,避免一次偶发的空加载把已知的抹掉;
+    /// 顺带把主 `manager` 对齐到第一个。
+    private static func remember(_ managers: [NETransparentProxyManager]) {
+        if !managers.isEmpty { knownManagers = managers }
+        manager = managers.first ?? manager
+    }
 
     /// 建/存配置并启动会话。幂等:已在跑就不重复启。
     static func start() async {
@@ -61,6 +72,7 @@ enum TransparentProxyController {
     static func stop() async {
         do {
             let managers = try await NETransparentProxyManager.loadAllFromPreferences()
+            remember(managers)
             for mgr in managers {
                 mgr.connection.stopVPNTunnel()
             }
@@ -85,6 +97,7 @@ enum TransparentProxyController {
             guard !managers.isEmpty else {
                 manager?.connection.stopVPNTunnel()
                 manager = nil
+                knownManagers = []
                 emit("reset: no saved managers; stopped cached session if any")
                 return
             }
@@ -93,18 +106,27 @@ enum TransparentProxyController {
                 try await mgr.removeFromPreferences()
             }
             manager = nil
+            knownManagers = []   // 配置已整个移除,退出时没有会话需要再停
             emit("reset: stopped and removed \(managers.count) manager(s) — interception fully torn down")
         } catch {
             emit("RESET FAILED: \(error.localizedDescription)")
         }
     }
 
-    /// app 退出路径的同步兜底(`applicationWillTerminate` 里没法 await):直接停本会话缓存的
-    /// manager 的会话。宗旨:**UI 不在,接管就不该在**——规则没人管、出问题没人能停,catch-all
-    /// 拦截挂在系统上直到重启,正是"Chrome 断网只能重启电脑"的处境。配置保留,下次启动照常接管。
+    /// app 退出路径的同步兜底(`applicationWillTerminate` 里没法 await):停掉本进程见过的**所有**
+    /// 会话 manager,而不只是缓存的那一个——会话可能由别的实例(如语言切换重启出的新实例)持有,
+    /// 只停一个会漏掉、留下僵尸接管全系统断网。宗旨:**UI 不在,接管就不该在**——规则没人管、出问题
+    /// 没人能停,catch-all 拦截挂在系统上直到重启,正是"Chrome 断网只能重启电脑"的处境。
+    /// 只停会话、不删配置,下次启动照常静默接管。
     static func stopCachedSessionForTermination() {
-        manager?.connection.stopVPNTunnel()
-        emit("stopVPNTunnel() on app termination")
+        // knownManagers 覆盖本进程 start/stop/restart 期间 loadAllFromPreferences 见过的全部会话;
+        // 极端情况下(本进程从没加载过)回落到停缓存的 manager,尽最大努力不留僵尸接管。
+        var targets = knownManagers
+        if targets.isEmpty, let cached = manager { targets = [cached] }
+        for mgr in targets {
+            mgr.connection.stopVPNTunnel()
+        }
+        emit("stopVPNTunnel() on app termination — stopped \(targets.count) session(s)")
     }
 
     /// 当前会话是否在跑(UI 可据此显示是否真正在接管流量)。
@@ -115,7 +137,7 @@ enum TransparentProxyController {
 
     private static func loadOrLoadFirst() async throws -> NETransparentProxyManager? {
         let managers = try await NETransparentProxyManager.loadAllFromPreferences()
-        manager = managers.first ?? manager
+        remember(managers)
         return manager
     }
 
@@ -132,7 +154,8 @@ enum TransparentProxyController {
         mgr.isEnabled = true
         try await mgr.saveToPreferences()   // 首次在此弹「添加配置」授权
         try await mgr.loadFromPreferences() // 存后必须重新 load 才能 start
-        manager = mgr
+        // 记住全部已知会话(新建时也把这台记进去),供退出全量停会话。
+        remember(managers.isEmpty ? [mgr] : managers)
         emit("manager saved+loaded; provider=\(extensionBundleID) enabled=\(mgr.isEnabled)")
         return mgr
     }

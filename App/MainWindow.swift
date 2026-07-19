@@ -27,10 +27,9 @@ struct MainWindow: View {
         VStack(spacing: 0) {
             NavigationStack {
                 detail
-                    // searchable / inspector / 工具栏一律**常挂**在此稳定层,不随分段切换增删——结构跨切换
-                    // 保持不变,消除切 tab 时的工具栏 reconcile 抖动(切换卡顿主因之一)。「活动」专属能力
-                    // (搜索 / 详情 / 清除)用条件控制「是否生效 / 显示」,而不是「是否存在」。
-                    .searchable(text: $filter, placement: .toolbar, prompt: "过滤连接（进程 / 主机）")
+                    // 工具栏结构跨分段**恒定**(见 mainToolbar),不随切换增删,消除切 tab 的 reconcile 抖动。
+                    // 「搜索 / 仅活动」是活动专属,已移进活动表自己的头部过滤条(见 activityFilterBar)——只在
+                    // 活动出现、其它 tab 干净,也不再把 .searchable 挂在稳定层污染所有 tab 的工具栏。
                     .toolbar { mainToolbar }
                     .confirmationDialog(
                         "清除全部连接记录？", isPresented: $showingClearConfirmation, titleVisibility: .visible
@@ -90,6 +89,8 @@ struct MainWindow: View {
     private var activity: some View {
         ZStack(alignment: .trailing) {
             VStack(spacing: 0) {
+                activityFilterBar
+                Divider()
                 ConnectionsTable(store: store, filter: filter, showActiveOnly: showActiveOnly, selection: $selection)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 Divider()
@@ -127,11 +128,43 @@ struct MainWindow: View {
         .shadow(color: .black.opacity(0.12), radius: 8, x: -2, y: 0)
     }
 
-    /// 当前是否在「活动」分段——常挂的搜索 / 详情 / 清除等仅在此生效,其余分段其内容置空(结构不变)。
+    /// 活动表专属的头部过滤条:搜索(按进程/主机过滤)+ 仅活动开关。只在活动分段出现——搜索本来
+    /// 就只有活动需要,放进表头既避免把 `.searchable` 挂在稳定层污染所有 tab,也把过滤能力和它作用的
+    /// 表格摆到一起。
+    private var activityFilterBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary).font(.caption)
+            TextField("过滤连接（进程 / 主机）", text: $filter)
+                .textFieldStyle(.plain)
+                .font(.caption)
+            if !filter.isEmpty {
+                Button { filter = "" } label: {
+                    Image(systemName: "xmark.circle.fill").font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("清空过滤")
+            }
+            Spacer(minLength: 12)
+            Toggle(isOn: $showActiveOnly) {
+                Label("仅活动", systemImage: "circle.fill")
+            }
+            .toggleStyle(.button)
+            .controlSize(.small)
+            .font(.caption)
+            .help("只显示仍在活动的连接(隐藏已关闭 / 失败的历史记录)")
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(.bar)
+    }
+
+    /// 当前是否在「活动」分段——工具栏里活动专属项(清除)仅在此显示,其余分段置空(结构不变)。
     private var isActivity: Bool { tabSelection.section == .activity }
 
-    /// 主窗口工具栏:`ToolbarItem` 集合跨分段**恒定**(分段 Picker + 档案常在;活动专属的仅活动/清除/详情
-    /// 用条件内容——非活动时置空但保留其 item 占位,不增删结构)。稳定结构 = 切换时无工具栏 reconcile 抖动。
+    /// 主窗口工具栏:`ToolbarItem` 集合跨分段**恒定**(分段 Picker + 档案常在;活动专属的「清除」用条件
+    /// 内容——非活动时置空但保留其 item 占位,不增删结构)。稳定结构 = 切换时无工具栏 reconcile 抖动。
+    /// 搜索 / 仅活动已移出工具栏、进活动表头(见 activityFilterBar)。
     @ToolbarContentBuilder private var mainToolbar: some ToolbarContent {
         // 顶层区域切换分段(对齐 HIG「小工具用 segmented control 切视图」)。
         ToolbarItem(placement: .principal) {
@@ -140,12 +173,6 @@ struct MainWindow: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-        }
-        ToolbarItem(placement: .primaryAction) {
-            if isActivity {
-                Toggle(isOn: $showActiveOnly) { Label("仅活动", systemImage: "circle.fill") }
-                    .help("只显示仍在活动的连接(隐藏已关闭 / 失败的历史记录)")
-            }
         }
         ToolbarItem(placement: .primaryAction) {
             if isActivity {

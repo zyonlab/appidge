@@ -32,6 +32,21 @@ set +a
 }
 
 # ---------------------------------------------------------------------------
+# 0.5 自增 build 号(CURRENT_PROJECT_VERSION)——每次出包 +1。
+#   为什么必须自增:系统扩展按 (short/build) 元组判新旧。build 号不变 → macOS 认为扩展没升级、
+#   不把新包里的扩展换上去 → 新 app 的会话仍绑在旧扩展 / 旧 app 的 XPC 上,表现为「新包没有活动
+#   连接」;app 的版本握手(运行版本 vs 包内版本)也因两边相等而永不触发重绑。自增后:macOS 正常
+#   升级扩展(同团队升级无需重新批准)+ 版本握手触发重绑,活动连接恢复。
+#   工程四个 build 配置共用同一个数,统一 +1;pbxproj 的改动留在工作区,由人决定何时提交。
+# ---------------------------------------------------------------------------
+PBXPROJ="appidge.xcodeproj/project.pbxproj"
+CUR_BUILD="$(grep -m1 -oE 'CURRENT_PROJECT_VERSION = [0-9]+;' "$PBXPROJ" | grep -oE '[0-9]+' || true)"
+: "${CUR_BUILD:?无法从 $PBXPROJ 读出 CURRENT_PROJECT_VERSION}"
+NEXT_BUILD=$((CUR_BUILD + 1))
+/usr/bin/sed -i '' -E "s/CURRENT_PROJECT_VERSION = ${CUR_BUILD};/CURRENT_PROJECT_VERSION = ${NEXT_BUILD};/g" "$PBXPROJ"
+note "build 号 ${CUR_BUILD} → ${NEXT_BUILD}(每次出包自增,确保系统扩展被替换、版本握手触发重绑)"
+
+# ---------------------------------------------------------------------------
 # 1. 公证凭证：xcrun notarytool 支持两种认证方式，这里都支持，任选其一。
 #    在 archive 之前就检查完，凭证不全直接报错退出，不浪费一次完整 Release 构建
 #    的时间。

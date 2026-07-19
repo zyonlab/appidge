@@ -4,7 +4,11 @@ import Foundation
 /// 风格,KB/MB/…),速率在其后缀 `/s`。纯展示,无状态。
 enum TrafficFormat {
     static func bytes(_ count: Int64) -> String {
-        ByteCountFormatter.string(fromByteCount: max(0, count), countStyle: .binary)
+        let n = max(0, count)
+        // `ByteCountFormatter` 对 0 会输出本地化的「Zero KB」——特判成「0 KB」,与其它值(带空格的
+        // 「10 KB」/「393 bytes」)风格一致。这是所有流量数字的单一格式化入口,一处改、全局生效。
+        if n == 0 { return "0 KB" }
+        return ByteCountFormatter.string(fromByteCount: n, countStyle: .binary)
     }
 
     /// 每秒字节数格式化成「1.2 MB/s」。负值(理论不该出现)夹到 0。

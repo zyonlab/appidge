@@ -76,6 +76,13 @@ struct RulesEditorPaneView: View {
                 }
             }.width(70)
         }
+        // 编辑入口:选中一行后按 Return(与工具栏铅笔、右键「编辑…」等价)。不再在每个单元格上挂双击
+        // 手势——那会接管命中测试、和 Table 原生单击选中打架,导致点其它行选中高亮延迟更新(卡顿感)。
+        .onKeyPress(.return) {
+            guard let id = selection, let rule = rules.first(where: { $0.id == id }) else { return .ignored }
+            editingRule = rule
+            return .handled
+        }
         .contextMenu(forSelectionType: ProxyMatchRule.ID.self) { ids in
             if let id = ids.first, let rule = rules.first(where: { $0.id == id }) {
                 Button("编辑…") { editingRule = rule }
@@ -89,7 +96,9 @@ struct RulesEditorPaneView: View {
         }
     }
 
-    /// 单元格内容 + 双击进入编辑 + 停用时半透明。双击手势不吞掉单击选中(simultaneousGesture)。
+    /// 单元格内容 + 停用时半透明。**不挂双击手势**:cell 上的 `simultaneousGesture` 会接管命中测试、
+    /// 和 `Table` 原生单击选中竞争,导致选中高亮延迟更新(点其它行像卡住)。编辑改走选中后按 Return /
+    /// 工具栏铅笔 / 右键「编辑…」三条不与选中打架的入口。
     private func editableCell<Content: View>(
         _ rule: ProxyMatchRule, @ViewBuilder _ content: () -> Content
     ) -> some View {
@@ -97,8 +106,6 @@ struct RulesEditorPaneView: View {
             .lineLimit(1)
             .opacity(rule.isEnabled ? 1 : 0.45)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .simultaneousGesture(TapGesture(count: 2).onEnded { editingRule = rule })
     }
 
     /// 每行前置的启用勾选框:点掉即停用(规则保留、不删除),下发前会被过滤,不再参与匹配。
@@ -133,7 +140,7 @@ struct RulesEditorPaneView: View {
                 if let id = selection, let rule = rules.first(where: { $0.id == id }) { editingRule = rule }
             } label: { Image(systemName: "pencil") }
                 .disabled(selection == nil)
-                .help("编辑选中（也可双击某行）")
+                .help("编辑选中（也可选中后按 Return）")
             Divider().frame(height: 14)
             Button { if let id = selection { move(id, by: -1) } } label: { Image(systemName: "chevron.up") }
                 .disabled(selection == nil)

@@ -25,24 +25,22 @@ struct MainWindow: View {
         VStack(spacing: 0) {
             NavigationStack {
                 detail
-                    .toolbar {
-                        // 顶层区域切换从侧栏改为工具栏分段(对齐 HIG「小工具用 segmented control 切视图」)。
-                        ToolbarItem(placement: .principal) {
-                            Picker("区域", selection: $tabSelection.section) {
-                                ForEach(MainTab.allCases) { tab in
-                                    Text(tab.title).tag(tab)
-                                }
-                            }
-                            .pickerStyle(.segmented)
-                            .labelsHidden()
-                        }
-                        // 「档案」从侧栏顶层降级为工具栏按钮弹出的 sheet:4 个分段不含它,但功能保留。
-                        ToolbarItem(placement: .automatic) {
-                            Button { showingProfiles = true } label: {
-                                Label("配置档案", systemImage: "square.stack.3d.up")
-                            }
-                            .help("把当前代理 / 规则 / 目录配置存成命名档案,随时载入切换")
-                        }
+                    // searchable / inspector / 工具栏一律**常挂**在此稳定层,不随分段切换增删——结构跨切换
+                    // 保持不变,消除切 tab 时的工具栏 reconcile 抖动(切换卡顿主因之一)。「活动」专属能力
+                    // (搜索 / 详情 / 清除)用条件控制「是否生效 / 显示」,而不是「是否存在」。
+                    .searchable(text: $filter, placement: .toolbar, prompt: "过滤连接（进程 / 主机）")
+                    .inspector(isPresented: inspectorPresented) {
+                        ConnectionDetail(store: store, entry: selectedConnection)
+                            .inspectorColumnWidth(min: 260, ideal: 300, max: 420)
+                    }
+                    .toolbar { mainToolbar }
+                    .confirmationDialog(
+                        "清除全部连接记录？", isPresented: $showingClearConfirmation, titleVisibility: .visible
+                    ) {
+                        Button("清除", role: .destructive) { store.dispatch(.clearConnectionLog) }
+                        Button("取消", role: .cancel) {}
+                    } message: {
+                        Text("只清空「活动」页显示的连接记录，不影响已生效的规则或累计流量统计。")
                     }
             }
             .safeAreaInset(edge: .top, spacing: 0) {
@@ -64,7 +62,7 @@ struct MainWindow: View {
     /// 分段选中区域 → 对应内容。各自挂一个窗口标题。
     @ViewBuilder private var detail: some View {
         switch tabSelection.section {
-        case .activity: activity
+        case .activity: activity.navigationTitle("活动")
         case .apps: AppsPaneView(store: store).navigationTitle("应用")
         case .rules: RulesEditorPaneView(store: store).navigationTitle("规则")
         case .proxies: ProxyServersPaneView(store: store).navigationTitle("代理服务器")
@@ -86,8 +84,8 @@ struct MainWindow: View {
         .frame(width: 460, height: 420)
     }
 
-    /// 「活动」:连接表(主) + 底部流量(次),右侧 Inspector 看选中连接详情。搜索、Inspector 开关挂在这一层的工具栏,
-    /// 所以只在「活动」出现;全局代理开关挂在外层,任何区域都可见。
+    /// 「活动」:连接表(主) + 底部流量(次)。搜索 / 详情 / 清除 / Inspector 等能力已上移到稳定层
+    /// 常挂(见 body),此处只留纯内容,切换时不再增删工具栏结构。
     private var activity: some View {
         VSplitView {
             ConnectionsTable(store: store, filter: filter, showActiveOnly: showActiveOnly, selection: $selection)
@@ -95,40 +93,54 @@ struct MainWindow: View {
             TrafficPane(store: store)
                 .frame(minHeight: 130, idealHeight: 170, maxHeight: 320)
         }
-        .navigationTitle("活动")
-        .searchable(text: $filter, placement: .toolbar, prompt: "过滤连接（进程 / 主机）")
-        .inspector(isPresented: $showInspector) {
-            ConnectionDetail(store: store, entry: selectedConnection)
-                .inspectorColumnWidth(min: 260, ideal: 300, max: 420)
-        }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Toggle(isOn: $showActiveOnly) {
-                    Label("仅活动", systemImage: "circle.fill")
-                }
-                .help("只显示仍在活动的连接(隐藏已关闭 / 失败的历史记录)")
+    }
+
+    /// 当前是否在「活动」分段——常挂的搜索 / 详情 / 清除等仅在此生效,其余分段其内容置空(结构不变)。
+    private var isActivity: Bool { tabSelection.section == .activity }
+
+    /// Inspector 常挂,但只在「活动」跟随 `showInspector` 打开;切到其它分段自动收起(不拆卸整列,免抖动)。
+    private var inspectorPresented: Binding<Bool> {
+        Binding(get: { isActivity && showInspector }, set: { showInspector = $0 })
+    }
+
+    /// 主窗口工具栏:`ToolbarItem` 集合跨分段**恒定**(分段 Picker + 档案常在;活动专属的仅活动/清除/详情
+    /// 用条件内容——非活动时置空但保留其 item 占位,不增删结构)。稳定结构 = 切换时无工具栏 reconcile 抖动。
+    @ToolbarContentBuilder private var mainToolbar: some ToolbarContent {
+        // 顶层区域切换分段(对齐 HIG「小工具用 segmented control 切视图」)。
+        ToolbarItem(placement: .principal) {
+            Picker("区域", selection: $tabSelection.section) {
+                ForEach(MainTab.allCases) { tab in Text(tab.title).tag(tab) }
             }
-            ToolbarItem(placement: .primaryAction) {
+            .pickerStyle(.segmented)
+            .labelsHidden()
+        }
+        ToolbarItem(placement: .primaryAction) {
+            if isActivity {
+                Toggle(isOn: $showActiveOnly) { Label("仅活动", systemImage: "circle.fill") }
+                    .help("只显示仍在活动的连接(隐藏已关闭 / 失败的历史记录)")
+            }
+        }
+        ToolbarItem(placement: .primaryAction) {
+            if isActivity {
                 Button(role: .destructive) { showingClearConfirmation = true } label: {
                     Label("清除记录", systemImage: "trash")
                 }
                 .disabled(store.state.connectionLog.isEmpty)
                 .help("清空当前显示的连接记录（不影响已生效的规则/流量统计）")
             }
-            ToolbarItem(placement: .primaryAction) {
-                Button { showInspector.toggle() } label: {
-                    Label("详情", systemImage: "sidebar.right")
-                }
-                .help("显示 / 隐藏连接详情")
+        }
+        ToolbarItem(placement: .primaryAction) {
+            if isActivity {
+                Button { showInspector.toggle() } label: { Label("详情", systemImage: "sidebar.right") }
+                    .help("显示 / 隐藏连接详情")
             }
         }
-        .confirmationDialog(
-            "清除全部连接记录？", isPresented: $showingClearConfirmation, titleVisibility: .visible
-        ) {
-            Button("清除", role: .destructive) { store.dispatch(.clearConnectionLog) }
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("只清空「活动」页显示的连接记录，不影响已生效的规则或累计流量统计。")
+        // 「档案」:弹 sheet,4 个分段不含它但功能保留,任何分段都可见。
+        ToolbarItem(placement: .automatic) {
+            Button { showingProfiles = true } label: {
+                Label("配置档案", systemImage: "square.stack.3d.up")
+            }
+            .help("把当前代理 / 规则 / 目录配置存成命名档案,随时载入切换")
         }
     }
 

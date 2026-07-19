@@ -185,6 +185,11 @@ struct MainWindow: View {
             }
             .help("把当前代理 / 规则 / 目录配置存成命名档案,随时载入切换")
         }
+        // 「设置」:紧挨档案,打开设置窗口(⌘, 场景),与菜单栏的 SettingsLink 同一入口。
+        ToolbarItem(placement: .automatic) {
+            SettingsLink { Label("设置", systemImage: "gearshape") }
+                .help("打开设置")
+        }
     }
 
     /// 扩展没在跑且需要用户去系统设置操作时,顶部给一条带直达按钮的横幅(对齐 Proxifier 的

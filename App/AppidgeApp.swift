@@ -13,6 +13,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         LanguageBootstrap.applyAtLaunch()
     }
 
+    /// 单实例强制:代理工具**不能多开**——两个实例会抢同一个扩展的 XPC 连接与透明代理会话
+    /// (重复 resync、并发 start/stop 会话、活动栏重复/错乱)。已有一个更早启动的实例在跑,就激活它、
+    /// 自己退出。**例外**:语言切换重启出的新实例带 `APPIDGE_LANG_RELAUNCHED`,是有意的接班者
+    /// (旧实例正随即退出),不能自杀。
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        guard ProcessInfo.processInfo.environment["APPIDGE_LANG_RELAUNCHED"] == nil else { return }
+        guard let bundleID = Bundle.main.bundleIdentifier else { return }
+        let current = NSRunningApplication.current
+        // 只在存在「更早启动」的实例时退让 → 存活者确定是最早那个,避免两个几乎同时启动互相退出。
+        let incumbent = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+            .first { other in
+                guard other != current else { return false }
+                guard let mine = current.launchDate, let theirs = other.launchDate else { return true }
+                return theirs < mine
+            }
+        guard let incumbent else { return }
+        incumbent.activate()
+        NSApp.terminate(nil)
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         // 先强制同步存盘(退出前把最新配置落地,防 400ms 防抖没触发就退出丢改动),再停会话。
         AppTermination.persist?()
@@ -106,8 +126,9 @@ struct AppidgeApp: App {
                 SystemExtensionActivator.shared.onStateChange = { activation in
                     store.dispatch(.extensionActivationChanged(activation))
                     // 扩展获批(.active)后,必须由 app 侧启动透明代理会话,系统才会把流量交给 provider。
+                    // 走 startOnLaunch:本进程首次强制 restart() 重绑(修退出重开无活动连接),之后幂等 start()。
                     if case .active = activation {
-                        Task { await TransparentProxyController.start() }
+                        Task { await TransparentProxyController.startOnLaunch() }
                     }
                 }
                 SystemExtensionActivator.shared.diagnose() // 启动即打印 app 看到的扩展目录(排查 not-found)
@@ -147,7 +168,8 @@ struct AppidgeApp: App {
                     if case .disabled = state { return }
                     if store.state.hasCompletedOnboarding {
                         SystemExtensionActivator.shared.activate()
-                        Task { await TransparentProxyController.start() }
+                        // 启动路径统一走 startOnLaunch:本进程首次强制 restart() 重绑会话,修「退出重开无活动连接」。
+                        Task { await TransparentProxyController.startOnLaunch() }
                     }
                 }
             }

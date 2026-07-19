@@ -44,11 +44,42 @@ enum TransparentProxyController {
         }
     }
 
+    /// 本进程是否已在启动路径做过一次会话重绑(见 startOnLaunch)。static = 进程级,新进程重置为 false。
+    private static var didLaunchBind = false
+
+    /// 启动路径统一入口(onStateChange 的 .active 与 checkStatus 都走这里):
+    /// **本进程首次**调用做 `restart()`(停→等断开→起)——退出时会话已被停干净(见
+    /// stopCachedSessionForTermination),重开若只 `start()`,它见 status 还是 connected/connecting
+    /// 的余波就跳过 startVPNTunnel,provider 不再转发 → 活动栏空白(真机实锤的「退出重开无活动连接」)。
+    /// restart() 强制干净重绑;**之后**同进程内(如关窗再开)退化为幂等 `start()`,不再每次都停一下闪断。
+    /// 在 @MainActor 上串行:同步先占住 didLaunchBind 再 await,并发两次调用也只 restart 一次。
+    static func startOnLaunch() async {
+        let firstBind = !didLaunchBind
+        didLaunchBind = true
+        if firstBind {
+            await restart()
+        } else {
+            await start()
+        }
+    }
+
     /// **重启会话 = 重新绑定到当前(最新)扩展 provider**。反复热升级后系统可能把运行中的
     /// 会话继续绑在待卸载的旧 provider 实例上(流量被交给僵尸扩展 → 黑洞),等价于用户手动在
     /// 系统设置里关开一次网络扩展。这里程序化地做:停会话 → 等它真的断开 → 重新起。
     /// 用于:版本握手发现会话绑了旧扩展、或用户点「重启接管」。
+    /// 是否已有一次 restart 在进行中(@MainActor 上同步先占,防并发)。
+    private static var restartInFlight = false
+
     static func restart() async {
+        // 版本升级时 startOnLaunch 的 restart 与版本握手 maybeHealStaleBinding 的 restart 可能同时触发;
+        // 并发的 stop→等→start 会互相打架(一个在停、一个在起)。同一时刻只允许一次,余者跳过——
+        // 那一次已经把会话干净重绑,跳过无损。
+        guard !restartInFlight else {
+            emit("restart(): 已有重启在进行,跳过本次(避免并发 stop/start 抖动)")
+            return
+        }
+        restartInFlight = true
+        defer { restartInFlight = false }
         emit("restart(): stopping session to rebind to the current provider")
         do {
             let mgr = try await loadOrCreate()

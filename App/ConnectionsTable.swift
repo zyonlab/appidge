@@ -15,18 +15,25 @@ struct ConnectionsTable: View {
         KeyPathComparator(\.openedAt, order: .reverse)
     ]
 
-    /// 过滤(进程名/主机 + 可选仅活动)后按当前列排序;默认按时间倒序(最新在前),点列头切换排序。
+    /// 过滤(应用列内容 / 主机 + 可选仅活动)后按当前列排序;默认按时间倒序(最新在前),点列头切换排序。
+    /// 匹配范围对齐「应用」列**实际展示的内容**:显示名(`云梯`)+ 括号里的标识(`com.example.yunti`)
+    /// ——之前只匹配显示名,搜 `yunti`/`com.example` 命不中。子串匹配(大小写不敏感)+ 目标主机。
     private var rows: [ConnectionLogEntry] {
         let key = filter.trimmingCharacters(in: .whitespaces).lowercased()
         var filtered = key.isEmpty
             ? store.state.connectionLog
-            : store.state.connectionLog.filter {
-                appName($0).lowercased().contains(key) || $0.host.lowercased().contains(key)
-            }
+            : store.state.connectionLog.filter { matches($0, key) }
         if showActiveOnly {
             filtered = filtered.filter { $0.phase == .opened }
         }
         return filtered.sorted(using: sortOrder)
+    }
+
+    /// 一条连接是否命中过滤词:应用显示名、进程标识(应用列括号内容)、或目标主机任一含 `key`。
+    private func matches(_ entry: ConnectionLogEntry, _ key: String) -> Bool {
+        appName(entry).lowercased().contains(key)
+            || entry.processID.value.lowercased().contains(key)
+            || entry.host.lowercased().contains(key)
     }
 
     var body: some View {

@@ -153,18 +153,22 @@ struct MainWindow: View {
             .controlSize(.small)
             .font(.caption)
             .help("只显示仍在活动的连接(隐藏已关闭 / 失败的历史记录)")
+            // 「清除记录」从顶部工具栏挪到这里,与搜索/仅活动等活动专属控件放一处。
+            Button(role: .destructive) { showingClearConfirmation = true } label: {
+                Image(systemName: "trash").font(.caption)
+            }
+            .buttonStyle(.borderless)
+            .controlSize(.small)
+            .disabled(store.state.connectionLog.isEmpty)
+            .help("清空当前显示的连接记录（不影响已生效的规则/流量统计）")
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
         .background(.bar)
     }
 
-    /// 当前是否在「活动」分段——工具栏里活动专属项(清除)仅在此显示,其余分段置空(结构不变)。
-    private var isActivity: Bool { tabSelection.section == .activity }
-
-    /// 主窗口工具栏:`ToolbarItem` 集合跨分段**恒定**(分段 Picker + 档案常在;活动专属的「清除」用条件
-    /// 内容——非活动时置空但保留其 item 占位,不增删结构)。稳定结构 = 切换时无工具栏 reconcile 抖动。
-    /// 搜索 / 仅活动已移出工具栏、进活动表头(见 activityFilterBar)。
+    /// 主窗口工具栏:只剩分段 Picker + 「档案」,跨分段**恒定**(无条件增删)= 切换时无 reconcile 抖动。
+    /// 活动专属的搜索 / 仅活动 / 清除记录都已移进活动表头过滤条(见 activityFilterBar)。
     @ToolbarContentBuilder private var mainToolbar: some ToolbarContent {
         // 顶层区域切换分段(对齐 HIG「小工具用 segmented control 切视图」)。
         ToolbarItem(placement: .principal) {
@@ -173,15 +177,6 @@ struct MainWindow: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-        }
-        ToolbarItem(placement: .primaryAction) {
-            if isActivity {
-                Button(role: .destructive) { showingClearConfirmation = true } label: {
-                    Label("清除记录", systemImage: "trash")
-                }
-                .disabled(store.state.connectionLog.isEmpty)
-                .help("清空当前显示的连接记录（不影响已生效的规则/流量统计）")
-            }
         }
         // 「档案」:弹 sheet,4 个分段不含它但功能保留,任何分段都可见。
         ToolbarItem(placement: .automatic) {

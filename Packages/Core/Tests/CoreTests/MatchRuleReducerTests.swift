@@ -41,6 +41,27 @@ struct MatchRuleReducerTests {
         #expect(effects == [.applyRuleSet(assignments: [:], matchRules: next.rules)])
     }
 
+    @Test("removeMatchRule for an app-derived rule resets the process route to .direct (no resurrection on restore)")
+    func removeDerivedRuleResetsProcessRoute() {
+        let pid = ProcessID("com.example.yunti")
+        var (state, _) = Reducer.reduce(
+            AppState(), .processDiscovered(id: pid, displayName: "云梯", executablePath: "/x")
+        )
+        // 应用页设「走代理」= assignRule:设 process.rule + 派生 id="process:<pid>" 的规则。
+        (state, _) = Reducer.reduce(state, .assignRule(processID: pid, rule: .proxied))
+        #expect(state.processes[pid]?.rule == .proxied)
+        let derivedID = RuleID("process:\(pid.value)")
+        #expect(state.rules.contains { $0.id == derivedID })
+
+        // 在「规则」页删掉这条派生规则:规则消失,且**进程走法复位为 .direct**——否则 process.rule
+        // 仍留着旧走法,持久化后重启时 restorationActions 会用它重放 assignRule、把已删规则重新派生
+        // 出来(真机实锤的「删了规则重启又出现」)。
+        let (next, effects) = Reducer.reduce(state, .removeMatchRule(derivedID))
+        #expect(next.rules.contains { $0.id == derivedID } == false)
+        #expect(next.processes[pid]?.rule == .direct)
+        #expect(effects == [.applyRuleSet(assignments: [:], matchRules: next.rules)])
+    }
+
     @Test("removeMatchRule for an unknown id is a no-op with no push")
     func removeUnknown() {
         let (state, _) = Reducer.reduce(AppState(), .addMatchRule(rule("1")))

@@ -144,9 +144,11 @@ struct TrafficPane: View {
         func seg(_ text: String, _ color: NSColor) {
             line.append(NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color]))
         }
-        seg(entry.openedAt.formatted(date: .omitted, time: .standard) + "  ", .secondaryLabelColor)
-        seg(appName(entry) + "  ", .labelColor)
-        seg("→ \(entry.host):\(entry.port)  ", .labelColor)
+        // 非彩色字段一律用同一门灰(= 原因「命中规则…」的 tertiary):时间 / 进程名 / 目标都收成灰,
+        // 只让走法与状态的语义色跳出来。原来进程名 / 目标是黑色(labelColor),按需求统一成灰。
+        seg(entry.openedAt.formatted(date: .omitted, time: .standard) + "  ", .tertiaryLabelColor)
+        seg(appName(entry) + "  ", .tertiaryLabelColor)
+        seg("→ \(entry.host):\(entry.port)  ", .tertiaryLabelColor)
         seg(Self.routeLabelText(rule: entry.rule, kind: entry.proxyKind) + "  ", Self.routeColor(entry.rule))
         let (statusText, statusColor) = Self.statusPresentation(entry)
         seg(statusText, statusColor)
@@ -252,7 +254,8 @@ struct TrafficPane: View {
         if entry.rule == .observe { return (String(localized: "已放行"), .systemOrange) }
         switch entry.phase {
         case .opened: return (String(localized: "活跃"), .systemGreen)
-        case .closed: return (String(localized: "已关闭"), .secondaryLabelColor)
+        // 「已关闭」不是语义色、归入统一灰(与时间/进程/目标/原因同一门 tertiary);活跃/失败仍上色。
+        case .closed: return (String(localized: "已关闭"), .tertiaryLabelColor)
         case .failed: return (String(localized: "失败"), .systemRed)
         }
     }

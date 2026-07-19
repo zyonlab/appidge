@@ -132,7 +132,7 @@ public enum Reducer {
         var state = state
         state.processes[processID]?.rule = rule
         let derived = ProxyMatchRule(
-            id: RuleID("process:\(processID.value)"),
+            id: derivedRuleID(for: processID),
             appPattern: processID.value, hostPattern: "*", portRange: nil, action: rule
         )
         state = upsertingMatchRule(derived, state)

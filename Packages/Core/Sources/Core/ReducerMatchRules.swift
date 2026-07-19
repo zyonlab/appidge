@@ -43,10 +43,31 @@ extension Reducer {
         return (state, [ruleSetPush(state)])
     }
 
+    /// 应用页派生的「进程级」规则用确定 id `process:<processID>`(见 `assignRule` / `derivedRuleID`)——
+    /// 删这类规则时必须同时把该进程的 `rule` 复位为 `.direct`,否则 `process.rule` 与规则表脱节:
+    /// 持久化把两者一起存,重启时 `restorationActions` 又按 `process.rule` 重放 `assignRule`、
+    /// 把这条已删规则重新派生出来(真机实锤「删了规则重启又出现」)。
+    static let derivedRuleIDPrefix = "process:"
+
+    /// 某进程的派生规则的确定 id。`assignRule` 建规则、`removeMatchRule` 反查进程,共用这一处。
+    static func derivedRuleID(for processID: ProcessID) -> RuleID {
+        RuleID("\(derivedRuleIDPrefix)\(processID.value)")
+    }
+
+    /// 若 id 是派生规则 id(`process:<processID>`)则解出其进程;否则 nil(手动建的 UUID 规则)。
+    static func derivedProcessID(from id: RuleID) -> ProcessID? {
+        guard id.value.hasPrefix(derivedRuleIDPrefix) else { return nil }
+        return ProcessID(String(id.value.dropFirst(derivedRuleIDPrefix.count)))
+    }
+
     static func removeMatchRule(_ id: RuleID, _ state: AppState) -> (AppState, [Effect]) {
         var state = state
         guard state.rules.contains(where: { $0.id == id }) else { return (state, []) }
         state.rules.removeAll { $0.id == id }
+        // 派生规则:同步把来源进程的走法复位为 .direct,断掉「删了又被重放复活」的链路。
+        if let processID = derivedProcessID(from: id) {
+            state.processes[processID]?.rule = .direct
+        }
         return (state, [ruleSetPush(state)])
     }
 

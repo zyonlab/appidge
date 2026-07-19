@@ -100,11 +100,16 @@ struct MainWindow: View {
                 detailDrawer
                     .transition(.move(edge: .trailing).combined(with: .opacity))
                     .zIndex(1)
+                // Esc 关闭抽屉(清空选中即收起)——已去掉顶部「详情」按钮,这是与「点空白行区域」并列的
+                // 一条可靠关闭出口;隐藏按钮只借它的 .cancelAction 键位,不占工具栏。
+                Button("关闭详情") { selection.removeAll() }
+                    .keyboardShortcut(.cancelAction)
+                    .hidden()
             }
         }
         .animation(reduceMotion ? nil : .snappy(duration: 0.26), value: showInspector)
-        // 单击某行即弹出详情抽屉(恰好选中一条时开、点空白/多选时收起)——比「选中再点按钮」少一步,
-        // 且用选中态驱动、无双击消抖延迟。工具栏「详情」按钮仍可手动开合。
+        // 单击某行即弹出详情抽屉、切换行即换内容;点空白行区域(取消选中)或按 Esc 收起。用选中态驱动、
+        // 无双击消抖延迟,不再需要顶部按钮。
         .onChange(of: selection) { _, newSelection in
             showInspector = newSelection.count == 1
         }
@@ -149,12 +154,6 @@ struct MainWindow: View {
                 }
                 .disabled(store.state.connectionLog.isEmpty)
                 .help("清空当前显示的连接记录（不影响已生效的规则/流量统计）")
-            }
-        }
-        ToolbarItem(placement: .primaryAction) {
-            if isActivity {
-                Button { showInspector.toggle() } label: { Label("详情", systemImage: "sidebar.right") }
-                    .help("显示 / 隐藏连接详情")
             }
         }
         // 「档案」:弹 sheet,4 个分段不含它但功能保留,任何分段都可见。

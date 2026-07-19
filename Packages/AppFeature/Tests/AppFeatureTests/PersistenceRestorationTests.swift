@@ -122,6 +122,31 @@ struct PersistenceRestorationTests {
         ])
     }
 
+    /// 真机实锤的「删了规则重启又出现」端到端回归:应用页设走法(assignRule 派生规则 + 置 process.rule)
+    /// → 规则页删掉那条派生规则 → 存盘快照 → 重启重放。修复前 process.rule 没随删除复位,重放 assignRule
+    /// 把规则复活;修复后 removeMatchRule 复位 process.rule,重放不再产出这条规则。
+    @Test("deleting an app-derived rule then round-tripping through persistence does not resurrect it")
+    func deletingDerivedRuleSurvivesRestore() {
+        let pid = ProcessID("com.example.yunti")
+        var state = AppState()
+        state = Reducer.reduce(state, .processDiscovered(id: pid, displayName: "云梯", executablePath: "/x")).0
+        state = Reducer.reduce(state, .assignRule(processID: pid, rule: .proxied)).0
+        let derivedID = RuleID("process:\(pid.value)")
+        #expect(state.rules.contains { $0.id == derivedID })
+
+        // 规则页删掉派生规则。
+        state = Reducer.reduce(state, .removeMatchRule(derivedID)).0
+        #expect(state.rules.isEmpty)
+
+        // 存盘 → 重启:重放持久化快照,规则必须仍不存在(不复活)。
+        var restored = AppState()
+        for action in PersistedConfiguration(from: state).restorationActions() {
+            restored = Reducer.reduce(restored, action).0
+        }
+        #expect(restored.rules.contains { $0.id == derivedID } == false)
+        #expect(restored.rules.isEmpty)
+    }
+
     @Test("hasCompletedOnboarding true appends a trailing onboardingCompleted action")
     func onboardingCompletedIsAppendedLast() {
         let config = PersistedConfiguration(hasCompletedOnboarding: true)

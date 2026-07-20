@@ -82,11 +82,19 @@ struct ProxyServersPaneView: View {
                 .disabled(selection == nil)
                 .help("删除选中")
             Divider().frame(height: 14)
-            Button("设为使用中") { if let id = selection { store.dispatch(.setActiveProxyServer(id)) } }
-                .disabled(selection == nil)
-            Button("测试") { if let id = selection { runCheck(id) } }
-                .disabled(selection == nil)
+            Button { if let id = selection { store.dispatch(.setActiveProxyServer(id)) } } label: {
+                Image(systemName: "checkmark.circle")
+            }
+            .disabled(selection == nil)
+            .help("设为使用中（不指定代理的规则默认走它）")
+            Button { if let id = selection { runCheck(id) } } label: {
+                Image(systemName: "antenna.radiowaves.left.and.right")
+            }
+            .disabled(selection == nil)
+            .help("测试可达性")
             Spacer()
+            // 一句话说清「使用中」是什么,消除「默认/使用中」的措辞困惑。
+            Text("勾选圈 = 使用中的代理").font(.caption).foregroundStyle(.secondary)
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 8)

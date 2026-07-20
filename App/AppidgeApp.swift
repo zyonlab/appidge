@@ -2,6 +2,7 @@ import SwiftUI
 import Core
 import IPCContract
 import AppFeature
+import Sparkle
 
 /// 只为一件事存在:app 退出时同步停掉透明代理会话(SwiftUI 生命周期没有等价钩子)。
 /// UI 不在,接管就不该在——否则 catch-all 拦截挂在系统上没人能管,扩展一异常全系统断网,
@@ -74,6 +75,12 @@ struct AppidgeApp: App {
     // + 切换时重启生效(见 AppDelegate.applicationWillFinishLaunching / SettingsView 的语言 Picker)。
     @Environment(\.scenePhase) private var scenePhase
 
+    // Sparkle 自动升级:startingUpdater=true 一构造即启动后台自动检查;菜单栏「检查更新…」用其
+    // `updater` 手动触发。feed URL / EdDSA 公钥读自 App/Info.plist(SUFeedURL / SUPublicEDKey)。
+    // Developer ID 非沙盒 app 用标准配置即可,无需 XPC 服务分离。
+    private let updaterController = SPUStandardUpdaterController(
+        startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil
+    )
     // 代理密码存 Keychain，不落 JSON（见 PersistedProxyServer 结构上无 password 字段）。
     private let credentialStore: any CredentialStore = KeychainCredentialStore()
     // 连接日志落盘：每条连接事件顺带写 rolling JSONL，启动时 loadRecent 回灌（重启不丢历史）。
@@ -193,7 +200,7 @@ struct AppidgeApp: App {
         // 菜单栏用 SF Symbol 鸟形字形:菜单栏图标必须是单色模板,完整彩色鸽子图标(app/程序坞用)
         // 当模板会被填成实心方块。彩色鸽子仍是 AppIcon;这里用干净的 bird.fill 剪影,随明暗自适应。
         MenuBarExtra("appidge", systemImage: "bird.fill") {
-            MenuBarView(store: store, tabSelection: tabSelection)
+            MenuBarView(store: store, tabSelection: tabSelection, updater: updaterController.updater)
         }
         // .window 而非默认 .menu：内容是「仪表盘」(状态行 + Top-5 列表 + 开关),
         // 需要完整 SwiftUI 排版(语义色 / caption / 对齐),菜单渲染器会把这些收着。

@@ -1,6 +1,7 @@
 import SwiftUI
 import Core
 import AppFeature
+import Sparkle
 
 /// 主界面已改为 Console 风的 `MainWindow`(见 MainWindow.swift):单窗口连接监视 + 底部流量 + 状态栏,
 /// 配置弹 sheet、全局设置进 `Settings` 场景。这里只保留仍被复用的两个小件:菜单栏内容 + 环告警条。
@@ -13,6 +14,9 @@ struct MenuBarView: View {
     var store: Store
     /// 与主窗口共享的分段选中态:点「打开入口」即改它,主窗口(新开或已在)据此切到对应 tab。
     var tabSelection: MainTabSelection
+    /// Sparkle 自动升级器:由 App 持有 `SPUStandardUpdaterController` 并把其 `updater` 传进来,
+    /// 「检查更新…」菜单项据此手动触发一次检查(自动检查由 controller 后台按计划进行)。
+    var updater: SPUUpdater
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.openWindow) private var openWindow
 
@@ -155,6 +159,18 @@ struct MenuBarView: View {
             .buttonStyle(.borderless)
             .font(.callout)
             .help("停止接管并移除系统里的代理配置——浏览器等应用断网时的恢复出口，无需重启电脑。重启 app 可重新开启接管。")
+
+            Divider()
+
+            // 6b. 检查更新:手动触发一次 Sparkle 检查(后台自动检查由 SPUStandardUpdaterController 负责)。
+            //     升级下载后会退出重装,新扩展经 app 侧版本握手重绑会话(见 AppidgeApp.maybeHealStaleBinding)。
+            Button {
+                updater.checkForUpdates()
+            } label: {
+                Label("检查更新…", systemImage: "arrow.down.circle")
+            }
+            .buttonStyle(.borderless)
+            .font(.callout)
 
             Divider()
 

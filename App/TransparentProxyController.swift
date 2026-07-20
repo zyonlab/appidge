@@ -27,8 +27,21 @@ enum TransparentProxyController {
         manager = managers.first ?? manager
     }
 
+    /// 是否已有一次 start 在进行中(@MainActor 上 await 前同步占旗,防并发)。
+    private static var startInFlight = false
+
     /// 建/存配置并启动会话。幂等:已在跑就不重复启。
     static func start() async {
+        // 防并发:`loadOrCreate()` 有 await,两次并发 start()(checkStatus + onStateChange)都会在
+        // await 后读到 disconnected → 都 startVPNTunnel → 两次 startProxy → 两个 XPC 监听器抢同一
+        // mach service → flow 投错监听器全丢(真机「会话卡 connecting、收不到 flow」的真因)。
+        // 同一时刻只允许一次 start,余者跳过。
+        guard !startInFlight else {
+            emit("start(): 已有 start 在进行,跳过本次(防并发双 startVPNTunnel)")
+            return
+        }
+        startInFlight = true
+        defer { startInFlight = false }
         do {
             let mgr = try await loadOrCreate()
             switch mgr.connection.status {

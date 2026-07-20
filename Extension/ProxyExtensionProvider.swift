@@ -171,6 +171,10 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
 
     override func startProxy(options: [String: Any]?, completionHandler: @escaping (Error?) -> Void) {
         ExtDiag.log("startProxy called")
+        // 防御:startProxy 若被再次调用(app 侧双 start 竞争等),先 invalidate 上一个监听器,
+        // 否则新旧两个 NSXPCListener 抢同一 mach service,app 连到旧的、flow 投到新 transport 全丢。
+        // stopProxy 的 invalidate 只挡 stop→start;这里补挡 start→start。
+        transport?.invalidate()
         let transport = XPCFlowTransport(upstreamHost: "127.0.0.1", upstreamPort: 1080)
         // 版本握手:app 每次连上就收到"是哪个版本的 provider 在服务",据此检测会话是否绑在旧扩展上。
         let version = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown"

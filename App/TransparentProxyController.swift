@@ -83,24 +83,6 @@ enum TransparentProxyController {
         }
     }
 
-    /// 本进程是否已在启动时做过一次强制重绑。
-    private static var didRebindOnLaunch = false
-
-    /// **启动路径专用**:本进程**首次**强制 `restart()`(停→等断开→起),把会话重绑到**当前** provider。
-    /// 为什么必须重绑而不是直接 start:升级(含自动升级)后旧 provider 正在终止,若会话还绑在它上面
-    /// 且状态是 stale-`connected`,`start()` 会看到「已连接」就跳过,会话继续绑死 provider = **黑洞**
-    /// (拦流量但转发不了 → 全系统断网)。首次 restart 强制断开重绑到最新 provider,消除这个黑洞。
-    /// 之后(同进程再收到 `.active` 等)退化为幂等 `start()`,不重复折腾会话。
-    static func startOnLaunch() async {
-        if didRebindOnLaunch {
-            await start()
-            return
-        }
-        didRebindOnLaunch = true
-        emit("startOnLaunch(): 本进程首次 → 强制重绑到当前 provider(消除升级后绑旧 provider 的黑洞)")
-        await restart()
-    }
-
     /// 停止会话(不删配置)。没有活动会话 = 扩展不再收到任何 flow,所有应用立即恢复原生联网。
     /// 之前只停缓存的 manager,本会话没 start 过(比如上次 app 异常退出后重开)就停了个寂寞——
     /// 现在先 load 系统偏好里的配置再停,保证停的是真正在跑的那个会话。

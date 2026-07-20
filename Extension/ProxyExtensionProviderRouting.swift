@@ -233,15 +233,15 @@ extension ProxyExtensionProvider {
     func applyActualUpstream(_ context: ConnectionContext, used: ProxyServerDTO?, ruleServer: String?) {
         guard let used else { return }
         context.proxyKind = used.kind
-        let hp = "\(used.host):\(used.port)"
-        // 规则指定了单台 → 只显示 host:port;否则按当前路由模式加前缀,让模式与实际那台都可见。
+        context.upstreamLabel = "\(used.host):\(used.port)"   // 内容部分,模式前缀由 app 本地化
+        // 规则指定了单台 → 单台(无前缀);否则按当前路由模式给出实际那台的模式。
         if ruleServer != nil {
-            context.upstreamLabel = hp
+            context.upstreamKind = .single
         } else {
             switch routingMode {
-            case .loadBalance: context.upstreamLabel = "负载均衡 · \(hp)"
-            case .failover: context.upstreamLabel = "故障转移 · \(hp)"
-            case .single, .chain: context.upstreamLabel = hp
+            case .loadBalance: context.upstreamKind = .loadBalance
+            case .failover: context.upstreamKind = .failover
+            case .single, .chain: context.upstreamKind = .single
             }
         }
     }
@@ -282,15 +282,16 @@ extension ProxyExtensionProvider {
         )
     }
 
-    /// 路由 → 活动栏/日志用的可读上游标签。直连 nil;单台 host:port;链/故障转移/负载均衡标出模式 + 候选。
-    func routeLabel(_ route: ResolvedRoute) -> String? {
+    /// 路由 → 上游标签的(内容, 模式)。内容语言中立(host:port 或 `A → B`),模式前缀由 app 本地化。
+    /// 直连 nil;单台 host:port;链列出跳序;故障转移/负载均衡列出候选。
+    func routeLabel(_ route: ResolvedRoute) -> (content: String, kind: UpstreamKindDTO)? {
         func hp(_ s: ProxyServerDTO) -> String { "\(s.host):\(s.port)" }
         switch route {
         case .direct: return nil
-        case .single(let s): return hp(s)
-        case .chain(let list): return "链 · " + list.map(hp).joined(separator: " → ")
-        case .failover(let list): return "故障转移 · " + list.map(hp).joined(separator: ", ")
-        case .loadBalance(let list): return "负载均衡 · " + list.map(hp).joined(separator: ", ")
+        case .single(let s): return (hp(s), .single)
+        case .chain(let list): return (list.map(hp).joined(separator: " → "), .chain)
+        case .failover(let list): return (list.map(hp).joined(separator: ", "), .failover)
+        case .loadBalance(let list): return (list.map(hp).joined(separator: ", "), .loadBalance)
         }
     }
 
@@ -301,7 +302,7 @@ extension ProxyExtensionProvider {
             id: context.id, processID: context.processID, targetHost: context.host, targetPort: context.port,
             rule: context.rule, proxyKind: context.proxyKind, phase: phase, bytesUp: bytes.up, bytesDown: bytes.down,
             openedAt: context.openedAt, processDisplayName: context.processDisplayName,
-            upstreamLabel: context.upstreamLabel
+            upstreamLabel: context.upstreamLabel, upstreamKind: context.upstreamKind
         )
         Task { await transport.deliver(.connectionEvent(event)) }
     }

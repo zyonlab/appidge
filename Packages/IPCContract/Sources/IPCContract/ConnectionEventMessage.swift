@@ -9,6 +9,11 @@ public enum ConnectionPhaseDTO: String, Sendable, Equatable, Codable {
 /// 单条连接的生命周期事件:extension → app。每条 TCP flow 在建立(`opened`)与
 /// 结束(`closed`/`failed`)时各发一条,app 侧据此渲染"每连接一行"的日志
 /// (对齐 Proxifier 的 Connections 视图:进程 / 目标 / 命中动作 / 所用代理 / 状态 / 字节)。
+/// 上游路由模式的 wire 表示(供 app 侧本地化上游标签前缀)。`.single` 无前缀,其余带模式前缀。
+public enum UpstreamKindDTO: String, Sendable, Equatable, Codable {
+    case single, chain, failover, loadBalance
+}
+
 public struct ConnectionEventDTO: Sendable, Equatable, Codable {
     public let id: String
     public let processID: ProcessIdentifierDTO
@@ -17,9 +22,12 @@ public struct ConnectionEventDTO: Sendable, Equatable, Codable {
     public let rule: ProxyRuleDTO
     /// 实际所用上游代理协议;直连(或代理未配好而回落直连)时为 nil。
     public let proxyKind: ProxyKindDTO?
-    /// 实际走的上游可读标签:单台=`host:port`、代理链=`链 · A → B`、故障转移/负载均衡标出候选;
-    /// 直连时为 nil。让活动栏/日志能看出「走了哪台、哪种路由模式」。Optional → 旧 wire 数据解码为 nil。
+    /// 实际走的上游的**内容部分**(语言中立):单台/故障转移/负载均衡=`host:port`、代理链=`A → B`。
+    /// 模式前缀不在这里(见 `upstreamKind`)——由 app 侧按当前语言本地化拼接。直连时为 nil。
     public let upstreamLabel: String?
+    /// 上游的路由模式(用于 app 侧本地化「代理链/故障转移/负载均衡」前缀);单台 = `.single`(无前缀),
+    /// 直连 = nil。Optional → 旧 wire 数据解码为 nil。
+    public let upstreamKind: UpstreamKindDTO?
     public let phase: ConnectionPhaseDTO
     public let bytesUp: Int64
     public let bytesDown: Int64
@@ -43,7 +51,8 @@ public struct ConnectionEventDTO: Sendable, Equatable, Codable {
         bytesDown: Int64,
         openedAt: Date = Date(timeIntervalSince1970: 0),
         processDisplayName: String? = nil,
-        upstreamLabel: String? = nil
+        upstreamLabel: String? = nil,
+        upstreamKind: UpstreamKindDTO? = nil
     ) {
         self.id = id
         self.processID = processID
@@ -57,5 +66,6 @@ public struct ConnectionEventDTO: Sendable, Equatable, Codable {
         self.openedAt = openedAt
         self.processDisplayName = processDisplayName
         self.upstreamLabel = upstreamLabel
+        self.upstreamKind = upstreamKind
     }
 }

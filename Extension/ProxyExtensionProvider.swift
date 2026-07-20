@@ -402,8 +402,10 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         }
 
         do {
-            let remote = try await openRemote(to: remoteEndpoint, remoteHostname: remoteHostname,
-                                              rule: rule, proxyServerID: origin.proxyServerID)
+            let (remote, used) = try await openRemote(to: remoteEndpoint, remoteHostname: remoteHostname,
+                                                       rule: rule, proxyServerID: origin.proxyServerID)
+            // 拨号后把上游/协议回填成实际用的那台(负载均衡才看得出轮询),再发 .opened。
+            applyActualUpstream(context, used: used, ruleServer: origin.proxyServerID)
             emitConnectionEvent(context, phase: .opened)
             pumpClientToRemote(tcpFlow: tcpFlow, remote: remote, context: context, router: router)
             pumpRemoteToClient(tcpFlow: tcpFlow, remote: remote, context: context, router: router)

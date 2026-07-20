@@ -210,12 +210,13 @@ extension ProxyExtensionProvider {
     /// pump 的连接;`.direct`(含 proxied 但没配上游的 fail-open、以及本地代理被降级的那一路)则
     /// 直连目的地。实际拨号交给无状态的 ``ProxyDialer``。目标地址经 ``ProxyTargetSelector`` 优先取
     /// 原始主机名(DNS-over-proxy,让代理去解析)。
+    /// 返回:已就绪连接 + 本次实际用的那台上游(负载均衡/单台带出;直连/故障转移/链为 nil)。
     func openRemote(
         to endpoint: Network.NWEndpoint, remoteHostname: String?, rule: ProxyRuleDTO,
         proxyServerID: String? = nil
-    ) async throws -> NWConnection {
+    ) async throws -> (connection: NWConnection, usedServer: ProxyServerDTO?) {
         guard rule == .proxied, let (endpointHost, port) = ProxyDialer.hostPort(from: endpoint) else {
-            return try await ProxyDialer.openDirect(to: endpoint)
+            return (try await ProxyDialer.openDirect(to: endpoint), nil)
         }
         let route = resolvedRoute(rule: rule, proxyServerID: proxyServerID)
         let target = ProxyTargetSelector.selectTarget(
@@ -224,6 +225,17 @@ extension ProxyExtensionProvider {
         return try await ProxyDialer.open(
             route: route, to: target, directEndpoint: endpoint, roundRobin: roundRobinSelector
         )
+    }
+
+    /// 拨号后把连接事件的上游/协议回填成**实际用的那台**——负载均衡时每条连接落到不同上游,活动栏
+    /// 因此如实显示轮询(而不是永远显示第一台的协议)。规则指定单台 / 单台模式只显示 host:port;
+    /// 负载均衡带「负载均衡 · 」前缀,让模式与实际那台都可见。故障转移/链的 usedServer 为 nil,保留原标签。
+    func applyActualUpstream(_ context: ConnectionContext, used: ProxyServerDTO?, ruleServer: String?) {
+        guard let used else { return }
+        context.proxyKind = used.kind
+        let hp = "\(used.host):\(used.port)"
+        let isLoadBalance: Bool = { if case .loadBalance = routingMode { return true }; return false }()
+        context.upstreamLabel = (isLoadBalance && ruleServer == nil) ? "负载均衡 · \(hp)" : hp
     }
 
     /// 接管(A):`.proxied` 走上游、`.direct` 自己拨号直连、`.block` 拒绝——都进 pump、可计量。

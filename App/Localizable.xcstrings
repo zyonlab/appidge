@@ -2271,6 +2271,516 @@
           }
         }
       }
+    },
+    "关闭详情" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close details"
+          }
+        }
+      }
+    },
+    "清空过滤" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear filter"
+          }
+        }
+      }
+    },
+    "设置" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings"
+          }
+        }
+      }
+    },
+    "打开设置" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Settings"
+          }
+        }
+      }
+    },
+    "上游" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upstream"
+          }
+        }
+      }
+    },
+    "为每个应用单独指定走代理或直连,还能让不同应用走不同代理。代理异常时自动回退直连。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Route each app through a proxy or direct, and even send different apps through different proxies. Falls back to direct automatically if a proxy fails."
+          }
+        }
+      }
+    },
+    "下面几步带你启用扩展、配好代理与规则,大概一分钟。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The next few steps get the extension enabled and your proxies and rules set up — about a minute."
+          }
+        }
+      }
+    },
+    "启用网络扩展" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable Network Extension"
+          }
+        }
+      }
+    },
+    "appidge 靠一个系统网络扩展接管流量。macOS 要求你**首次批准一次**——这是苹果的安全机制,任何同类工具都免不了。批准后永久生效,不用每次开都点。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "appidge relies on a system network extension to handle traffic. macOS requires you to **approve it once** the first time — that's Apple's security model, unavoidable for any tool like this. Approval is permanent; you won't be asked every launch."
+          }
+        }
+      }
+    },
+    "启用扩展" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable Extension"
+          }
+        }
+      }
+    },
+    "点「启用扩展」后,在弹出的系统提示或「系统设置 → 隐私与安全性 / 登录项与扩展 → 网络扩展」里允许 appidge。状态会在上面实时更新;显示「已启用」即可继续(没批准也能先往下走,回头再允许)。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "After clicking Enable Extension, allow appidge in the system prompt or under System Settings › Privacy & Security / Login Items & Extensions › Network Extensions. The status above updates live; once it shows Enabled you can continue (you can also proceed without approving and allow it later)."
+          }
+        }
+      }
+    },
+    "设置规则" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set Up Rules"
+          }
+        }
+      }
+    },
+    "默认规则已经是「任意应用 → 走代理」,装好就能用。想更精细再调:" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The default rule is already “any app → proxy”, so it works out of the box. To refine it:"
+          }
+        }
+      }
+    },
+    "让某些应用直连" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send some apps direct"
+          }
+        }
+      }
+    },
+    "在「应用」或「规则」页把它设为「直连」(比如公司内网、下载工具)。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set them to “Direct” on the Apps or Rules page (e.g. corporate intranet, download tools)."
+          }
+        }
+      }
+    },
+    "不同应用走不同代理" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Different apps, different proxies"
+          }
+        }
+      }
+    },
+    "规则动作选「代理」时可指定走哪台上游——进程 X 走代理 A、进程 Y 走代理 B。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When a rule's action is “Proxy”, pick which upstream it uses — process X via proxy A, process Y via proxy B."
+          }
+        }
+      }
+    },
+    "按主机/端口细分" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Split by host / port"
+          }
+        }
+      }
+    },
+    "「规则」页可加「进程 × 主机 × 端口 → 动作」的细粒度规则,从上到下首个命中生效。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Rules page lets you add fine-grained “process × host × port → action” rules, evaluated top-down with the first match winning."
+          }
+        }
+      }
+    },
+    "这些都能在主界面随时改,现在跳过也没关系。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can change all of this anytime from the main window — skipping now is fine."
+          }
+        }
+      }
+    },
+    "准备就绪" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You're all set"
+          }
+        }
+      }
+    },
+    "扩展批准并有流量后,「活动」页会实时列出每条连接。状态栏显示「引擎正常」即在接管。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Once the extension is approved and traffic flows, the Activity page lists every connection in real time. “Engine OK” in the status bar means it's handling traffic."
+          }
+        }
+      }
+    },
+    "上一步" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back"
+          }
+        }
+      }
+    },
+    "下一步" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next"
+          }
+        }
+      }
+    },
+    "继续" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue"
+          }
+        }
+      }
+    },
+    "已启用,可以继续" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enabled — you can continue"
+          }
+        }
+      }
+    },
+    "未接入——点「启用扩展」" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not connected — click Enable Extension"
+          }
+        }
+      }
+    },
+    "待批准——去系统设置点「允许」" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Awaiting approval — allow it in System Settings"
+          }
+        }
+      }
+    },
+    "已停用——去系统设置重新开启" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disabled — re-enable it in System Settings"
+          }
+        }
+      }
+    },
+    "安装失败:%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Install failed: %@"
+          }
+        }
+      }
+    },
+    "填一台你的上游代理(SOCKS5 / HTTP)。可以加多台,之后规则里能指定谁走哪台。没有也能跳过,以后在「代理」页补。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add one of your upstream proxies (SOCKS5 / HTTP). You can add several and later choose which app uses which in Rules. No proxy? Skip this and add one later on the Proxy page."
+          }
+        }
+      }
+    },
+    "添加这台" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add this one"
+          }
+        }
+      }
+    },
+    "出口 IP" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exit IP"
+          }
+        }
+      }
+    },
+    "出口 IP 检测" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check Exit IP"
+          }
+        }
+      }
+    },
+    "设为使用中（不指定代理的规则默认走它）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set as active (rules that don't specify a proxy use it by default)"
+          }
+        }
+      }
+    },
+    "测试可达性" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test reachability"
+          }
+        }
+      }
+    },
+    "出口 IP 检测（通过这台代理访问 ip-echo，看它从哪个地址出网；代理链的出口 = 最后一跳那台）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check exit IP (reach an ip-echo service through this proxy to see which address it exits from; a proxy chain's exit is its last hop)"
+          }
+        }
+      }
+    },
+    "勾选圈 = 使用中的代理" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checked circle = active proxy"
+          }
+        }
+      }
+    },
+    "检测中…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking…"
+          }
+        }
+      }
+    },
+    "失败：%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed: %@"
+          }
+        }
+      }
+    },
+    "切换路由模式？" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch routing mode?"
+          }
+        }
+      }
+    },
+    "切到「%@」" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch to “%@”"
+          }
+        }
+      }
+    },
+    "会改变所有「走代理」连接的上游选择方式。现有连接不受影响，新连接按「%@」。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This changes how every proxied connection picks its upstream. Existing connections are unaffected; new ones follow “%@”."
+          }
+        }
+      }
+    },
+    "编辑选中（也可选中后按 Return）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit selected (or select and press Return)"
+          }
+        }
+      }
+    },
+    "放行" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pass"
+          }
+        }
+      }
+    },
+    "默认（跟随活动）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default (follow active)"
+          }
+        }
+      }
+    },
+    "切换语言会重启 app 后生效。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changing the language takes effect after the app restarts."
+          }
+        }
+      }
+    },
+    "首次引导" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Onboarding"
+          }
+        }
+      }
+    },
+    "查看引导流程" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View onboarding"
+          }
+        }
+      }
+    },
+    "重新进入首次引导流程用于测试 / 评估;主窗口会切到引导页,走完即恢复。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Re-enter the onboarding flow for testing / evaluation; the main window switches to the onboarding pages and returns when done."
+          }
+        }
+      }
+    },
+    "拖动调整日志区高度" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drag to resize the log area"
+          }
+        }
+      }
     }
   }
 }

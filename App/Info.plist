@@ -24,5 +24,15 @@
 	<string></string>
 	<key>NSSystemExtensionUsageDescription</key>
 	<string>appidge 需要一个系统扩展来按进程转发 / 拦截网络流量。</string>
+	<!-- Sparkle 自动升级 · appcast feed 地址。TODO: 换成真实托管地址(见 docs/sparkle-autoupdate.md)。 -->
+	<key>SUFeedURL</key>
+	<string>https://appidge.app/appcast.xml</string>
+	<!-- Sparkle EdDSA(ed25519)更新签名公钥。TODO: 用 Sparkle 的 generate_keys 生成密钥对后,
+	     把 base64 公钥填到这里;私钥永不进 git(存 macOS 钥匙串,见 docs/sparkle-autoupdate.md)。 -->
+	<key>SUPublicEDKey</key>
+	<string>TODO-REPLACE-WITH-ED-PUBLIC-KEY</string>
+	<!-- 自动检查更新(用户仍可在首次弹窗里改;详细策略见 docs/sparkle-autoupdate.md)。 -->
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
 </dict>
 </plist>

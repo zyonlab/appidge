@@ -186,7 +186,9 @@ struct AppidgeApp: App {
             SettingsView(store: store)
         }
 
-        MenuBarExtra("appidge", image: "MenuBarIcon") {
+        // 菜单栏用 SF Symbol 鸟形字形:菜单栏图标必须是单色模板,完整彩色鸽子图标(app/程序坞用)
+        // 当模板会被填成实心方块。彩色鸽子仍是 AppIcon;这里用干净的 bird.fill 剪影,随明暗自适应。
+        MenuBarExtra("appidge", systemImage: "bird.fill") {
             MenuBarView(store: store, tabSelection: tabSelection)
         }
         // .window 而非默认 .menu：内容是「仪表盘」(状态行 + Top-5 列表 + 开关),

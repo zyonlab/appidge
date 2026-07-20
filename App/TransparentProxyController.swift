@@ -27,21 +27,19 @@ enum TransparentProxyController {
         manager = managers.first ?? manager
     }
 
-    /// 是否已有一次 start 在进行中(@MainActor 上 await 前同步占旗,防并发)。
-    private static var startInFlight = false
+    /// 会话操作(start / restart)是否已有一次在进行中(@MainActor 上 await 前同步占旗)。
+    /// **start 与 restart 共用同一把锁**:否则并发时 restart 在停、start 在起,互相打架、会话卡死或
+    /// 绑错 provider。同一时刻只允许一次会话操作,余者跳过——那一次已把会话带到正确状态。
+    private static var sessionOpInFlight = false
 
     /// 建/存配置并启动会话。幂等:已在跑就不重复启。
     static func start() async {
-        // 防并发:`loadOrCreate()` 有 await,两次并发 start()(checkStatus + onStateChange)都会在
-        // await 后读到 disconnected → 都 startVPNTunnel → 两次 startProxy → 两个 XPC 监听器抢同一
-        // mach service → flow 投错监听器全丢(真机「会话卡 connecting、收不到 flow」的真因)。
-        // 同一时刻只允许一次 start,余者跳过。
-        guard !startInFlight else {
-            emit("start(): 已有 start 在进行,跳过本次(防并发双 startVPNTunnel)")
+        guard !sessionOpInFlight else {
+            emit("start(): 已有会话操作在进行,跳过本次(防并发双 startVPNTunnel / 与 restart 打架)")
             return
         }
-        startInFlight = true
-        defer { startInFlight = false }
+        sessionOpInFlight = true
+        defer { sessionOpInFlight = false }
         do {
             let mgr = try await loadOrCreate()
             switch mgr.connection.status {
@@ -60,20 +58,14 @@ enum TransparentProxyController {
     /// **重启会话 = 重新绑定到当前(最新)扩展 provider**。反复热升级后系统可能把运行中的
     /// 会话继续绑在待卸载的旧 provider 实例上(流量被交给僵尸扩展 → 黑洞),等价于用户手动在
     /// 系统设置里关开一次网络扩展。这里程序化地做:停会话 → 等它真的断开 → 重新起。
-    /// 用于:版本握手发现会话绑了旧扩展、或用户点「重启接管」。
-    /// 是否已有一次 restart 在进行中(@MainActor 上同步先占,防并发)。
-    private static var restartInFlight = false
-
+    /// 用于:启动首次重绑(startOnLaunch)、版本握手发现会话绑了旧扩展、或用户点「重启接管」。
     static func restart() async {
-        // 版本升级时 startOnLaunch 的 restart 与版本握手 maybeHealStaleBinding 的 restart 可能同时触发;
-        // 并发的 stop→等→start 会互相打架(一个在停、一个在起)。同一时刻只允许一次,余者跳过——
-        // 那一次已经把会话干净重绑,跳过无损。
-        guard !restartInFlight else {
-            emit("restart(): 已有重启在进行,跳过本次(避免并发 stop/start 抖动)")
+        guard !sessionOpInFlight else {
+            emit("restart(): 已有会话操作在进行,跳过本次(与 start / 另一个 restart 打架)")
             return
         }
-        restartInFlight = true
-        defer { restartInFlight = false }
+        sessionOpInFlight = true
+        defer { sessionOpInFlight = false }
         emit("restart(): stopping session to rebind to the current provider")
         do {
             let mgr = try await loadOrCreate()
@@ -89,6 +81,24 @@ enum TransparentProxyController {
             let ns = error as NSError
             emit("restart FAILED: domain=\(ns.domain) code=\(ns.code) desc=\(ns.localizedDescription)")
         }
+    }
+
+    /// 本进程是否已在启动时做过一次强制重绑。
+    private static var didRebindOnLaunch = false
+
+    /// **启动路径专用**:本进程**首次**强制 `restart()`(停→等断开→起),把会话重绑到**当前** provider。
+    /// 为什么必须重绑而不是直接 start:升级(含自动升级)后旧 provider 正在终止,若会话还绑在它上面
+    /// 且状态是 stale-`connected`,`start()` 会看到「已连接」就跳过,会话继续绑死 provider = **黑洞**
+    /// (拦流量但转发不了 → 全系统断网)。首次 restart 强制断开重绑到最新 provider,消除这个黑洞。
+    /// 之后(同进程再收到 `.active` 等)退化为幂等 `start()`,不重复折腾会话。
+    static func startOnLaunch() async {
+        if didRebindOnLaunch {
+            await start()
+            return
+        }
+        didRebindOnLaunch = true
+        emit("startOnLaunch(): 本进程首次 → 强制重绑到当前 provider(消除升级后绑旧 provider 的黑洞)")
+        await restart()
     }
 
     /// 停止会话(不删配置)。没有活动会话 = 扩展不再收到任何 flow,所有应用立即恢复原生联网。

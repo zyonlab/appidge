@@ -27,10 +27,15 @@ enum ProxyDialer {
             return (try await openSingleTunnel(to: target, via: server), server)
         case .failover(let servers):
             // 按序尝试,首个握手成功的胜出;全失败抛最后一个错(调用方 fail-open 关流)。
+            // 捕获赢家:只有 openSingleTunnel 成功那台才走到 `winner = server`(失败的先抛),活动栏据此
+            // 显示实际落到哪台。
+            var winner: ProxyServerDTO?
             let conn = try await FailoverConnector.connect(proxies: servers) { server in
-                try await openSingleTunnel(to: target, via: server)
+                let c = try await openSingleTunnel(to: target, via: server)
+                winner = server
+                return c
             }
-            return (conn, nil)
+            return (conn, winner)
         case .loadBalance(let servers):
             let index = await roundRobin.next(count: servers.count) ?? 0
             let picked = servers[index]

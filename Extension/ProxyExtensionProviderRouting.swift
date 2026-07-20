@@ -234,8 +234,16 @@ extension ProxyExtensionProvider {
         guard let used else { return }
         context.proxyKind = used.kind
         let hp = "\(used.host):\(used.port)"
-        let isLoadBalance: Bool = { if case .loadBalance = routingMode { return true }; return false }()
-        context.upstreamLabel = (isLoadBalance && ruleServer == nil) ? "负载均衡 · \(hp)" : hp
+        // 规则指定了单台 → 只显示 host:port;否则按当前路由模式加前缀,让模式与实际那台都可见。
+        if ruleServer != nil {
+            context.upstreamLabel = hp
+        } else {
+            switch routingMode {
+            case .loadBalance: context.upstreamLabel = "负载均衡 · \(hp)"
+            case .failover: context.upstreamLabel = "故障转移 · \(hp)"
+            case .single, .chain: context.upstreamLabel = hp
+            }
+        }
     }
 
     /// 接管(A):`.proxied` 走上游、`.direct` 自己拨号直连、`.block` 拒绝——都进 pump、可计量。

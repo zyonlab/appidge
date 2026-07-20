@@ -145,6 +145,8 @@ private struct RoutingModeSection: View {
     /// 默认折叠——展开的整段(分段选择 + 说明 + 成员勾选)在窄 / 矮窗口里会撑高底部区、把上面的
     /// 服务器表挤到裁切(首行 / 表头被工具栏盖住)。折叠后底部只剩一行标题,表格拿回垂直空间。
     @State private var expanded = false
+    /// 待确认切换到的路由模式;非 nil = 弹确认对话框(切换会改变所有走代理连接的上游选择方式,加一道确认)。
+    @State private var pendingKind: RoutingModeKind?
 
     private var mode: ProxyRoutingMode { store.state.proxyRoutingMode }
     private var kind: RoutingModeKind { RoutingModeKind(mode) }
@@ -182,6 +184,30 @@ private struct RoutingModeSection: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        // 切换路由模式先确认——它改变所有走代理连接的上游选择方式,不该点一下就生效。
+        .confirmationDialog(
+            "切换路由模式？",
+            isPresented: Binding(get: { pendingKind != nil }, set: { if !$0 { pendingKind = nil } }),
+            presenting: pendingKind
+        ) { target in
+            Button("切到「\(Self.modeName(target))」") {
+                store.dispatch(.setProxyRoutingMode(target.mode(carrying: selectedIDs)))
+                pendingKind = nil
+            }
+            Button("取消", role: .cancel) { pendingKind = nil }
+        } message: { target in
+            Text("会改变所有「走代理」连接的上游选择方式。现有连接不受影响，新连接按「\(Self.modeName(target))」。")
+        }
+    }
+
+    /// 路由模式的纯文本名(供确认对话框插值)。
+    private static func modeName(_ kind: RoutingModeKind) -> String {
+        switch kind {
+        case .single: "单台"
+        case .chain: "代理链"
+        case .failover: "故障转移"
+        case .loadBalance: "负载均衡"
+        }
     }
 
     /// 折叠标题右侧的当前模式短名。
@@ -218,10 +244,11 @@ private struct RoutingModeSection: View {
         }
     }
 
+    /// 选新模式不立即下发,只记进 `pendingKind` 弹确认;get 仍返回当前模式,分段控件不抢先跳。
     private var kindBinding: Binding<RoutingModeKind> {
         Binding(
             get: { kind },
-            set: { store.dispatch(.setProxyRoutingMode($0.mode(carrying: selectedIDs))) }
+            set: { newKind in if newKind != kind { pendingKind = newKind } }
         )
     }
 

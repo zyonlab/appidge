@@ -10,6 +10,8 @@ struct ProxyServersPaneView: View {
 
     @State private var selection: ProxyServer.ID?
     @State private var checks: [ProxyServerID: ProxyCheckStatus] = [:]
+    /// 每台的出口 IP 检测结果(IP 文本 / 「检测中…」/「失败：…」);view-local 瞬时态。
+    @State private var exitIP: [ProxyServerID: String] = [:]
     @State private var showingAdd = false
 
     private var sortedServers: [ProxyServer] {
@@ -61,11 +63,16 @@ struct ProxyServersPaneView: View {
             }
             .width(min: 80, ideal: 120)
             TableColumn("探活") { s in checkCell(checks[s.id] ?? .idle) }.width(56)
+            TableColumn("出口 IP") { s in
+                Text(exitIP[s.id] ?? "—").foregroundStyle(.secondary)
+                    .monospaced().lineLimit(1).truncationMode(.middle)
+            }.width(min: 90, ideal: 140)
         }
         .contextMenu(forSelectionType: ProxyServer.ID.self) { ids in
             if let id = ids.first {
                 Button("设为使用中") { store.dispatch(.setActiveProxyServer(id)) }
                 Button("测试") { runCheck(id) }
+                Button("出口 IP 检测") { runExitIP(id) }
                 Divider()
                 Button("删除", role: .destructive) { store.dispatch(.removeProxyServer(id)) }
             }
@@ -92,6 +99,11 @@ struct ProxyServersPaneView: View {
             }
             .disabled(selection == nil)
             .help("测试可达性")
+            Button { if let id = selection { runExitIP(id) } } label: {
+                Image(systemName: "globe")
+            }
+            .disabled(selection == nil)
+            .help("出口 IP 检测（通过这台代理访问 ip-echo，看它从哪个地址出网；代理链的出口 = 最后一跳那台）")
             Spacer()
             // 一句话说清「使用中」是什么,消除「默认/使用中」的措辞困惑。
             Text("勾选圈 = 使用中的代理").font(.caption).foregroundStyle(.secondary)
@@ -125,6 +137,21 @@ struct ProxyServersPaneView: View {
         Task {
             let status = await ProxyChecker.check(host: host, port: port, using: NWConnectionProxyProbe())
             await MainActor.run { checks[id] = status }
+        }
+    }
+
+    /// 出口 IP 检测:通过这台代理访问 ip-echo,把回来的出口地址填进「出口 IP」列。
+    private func runExitIP(_ id: ProxyServerID) {
+        guard let server = store.state.proxyServers[id] else { return }
+        exitIP[id] = "检测中…"
+        Task {
+            let result = await ExitIPChecker.exitIP(via: server)
+            await MainActor.run {
+                switch result {
+                case .ip(let ip): exitIP[id] = ip
+                case .failed(let m): exitIP[id] = "失败：\(m)"
+                }
+            }
         }
     }
 

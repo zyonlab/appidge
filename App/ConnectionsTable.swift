@@ -15,18 +15,25 @@ struct ConnectionsTable: View {
         KeyPathComparator(\.openedAt, order: .reverse)
     ]
 
-    /// 过滤(进程名/主机 + 可选仅活动)后按当前列排序;默认按时间倒序(最新在前),点列头切换排序。
+    /// 过滤(应用列内容 / 主机 + 可选仅活动)后按当前列排序;默认按时间倒序(最新在前),点列头切换排序。
+    /// 匹配范围对齐「应用」列**实际展示的内容**:显示名(`云梯`)+ 括号里的标识(`com.example.yunti`)
+    /// ——之前只匹配显示名,搜 `yunti`/`com.example` 命不中。子串匹配(大小写不敏感)+ 目标主机。
     private var rows: [ConnectionLogEntry] {
         let key = filter.trimmingCharacters(in: .whitespaces).lowercased()
         var filtered = key.isEmpty
             ? store.state.connectionLog
-            : store.state.connectionLog.filter {
-                appName($0).lowercased().contains(key) || $0.host.lowercased().contains(key)
-            }
+            : store.state.connectionLog.filter { matches($0, key) }
         if showActiveOnly {
             filtered = filtered.filter { $0.phase == .opened }
         }
         return filtered.sorted(using: sortOrder)
+    }
+
+    /// 一条连接是否命中过滤词:应用显示名、进程标识(应用列括号内容)、或目标主机任一含 `key`。
+    private func matches(_ entry: ConnectionLogEntry, _ key: String) -> Bool {
+        appName(entry).lowercased().contains(key)
+            || entry.processID.value.lowercased().contains(key)
+            || entry.host.lowercased().contains(key)
     }
 
     var body: some View {
@@ -52,10 +59,12 @@ struct ConnectionsTable: View {
                     path: store.state.catalog[e.processID]?.executablePath,
                     identifier: e.processID.value
                 )
+                .foregroundStyle(rowTextColor(e))
             }.width(min: 150, ideal: 230)
 
             TableColumn("目标", value: \.host) { e in
                 Text("\(e.host):\(e.port)").monospaced().lineLimit(1)
+                    .foregroundStyle(rowTextColor(e))
             }.width(min: 150, ideal: 230)
 
             // 时长/状态(对齐 Proxifier 的 Time/Status):活动 → 存活时长每秒走动;
@@ -72,12 +81,12 @@ struct ConnectionsTable: View {
             TableColumn("发送", value: \.bytesUp) { e in
                 Text(e.rule == .observe ? "—" : TrafficFormat.bytes(e.bytesUp))
                     .monospacedDigit()
-                    .foregroundStyle(e.rule == .observe ? .secondary : .primary)
+                    .foregroundStyle(e.rule == .observe ? .secondary : rowTextColor(e))
             }.width(min: 64, ideal: 76)
             TableColumn("接收", value: \.bytesDown) { e in
                 Text(e.rule == .observe ? "—" : TrafficFormat.bytes(e.bytesDown))
                     .monospacedDigit()
-                    .foregroundStyle(e.rule == .observe ? .secondary : .primary)
+                    .foregroundStyle(e.rule == .observe ? .secondary : rowTextColor(e))
             }.width(min: 64, ideal: 76)
 
             // 速率:该连接所属**进程**的实时瞬时速率(↓+↑ 合计),而非单连接——扩展只按进程计量速率
@@ -92,11 +101,23 @@ struct ConnectionsTable: View {
                 Section("为 \(first.host):\(first.port) 建规则") {
                     Button("走代理") { makeRules(targets, .proxied) }
                     Button("直连") { makeRules(targets, .direct) }
-                    Button("观测") { makeRules(targets, .observe) }
                     Button("拦截", role: .destructive) { makeRules(targets, .block) }
                 }
             }
         }
+        // 表格内容字号对齐底部日志(caption ≈ 11pt),四个 tab 的表统一到这一档,视觉密度一致。
+        .font(.caption)
+    }
+
+    /// 该连接是否已关闭(观测行不算——它显示「已放行」而非「已关闭」)。已关闭行整行黑字转灰、淡出。
+    private func isClosed(_ e: ConnectionLogEntry) -> Bool {
+        e.rule != .observe && e.phase == .closed
+    }
+
+    /// 行内文本(应用名 / 目标 / 字节 / 速率)的颜色:已关闭 → 次要灰(整行淡出),否则主色(黑)保留。
+    /// 走法胶囊与状态标签有各自语义色,不受此影响(「非 closed 黑色保留、彩色不变」)。
+    private func rowTextColor(_ e: ConnectionLogEntry) -> Color {
+        isClosed(e) ? .secondary : .primary
     }
 
     /// 时长/状态列:SF Symbol + 语义色 + 文案一起呈现(不靠颜色单独区分,便于无障碍)。
@@ -144,10 +165,14 @@ struct ConnectionsTable: View {
     private func rateCell(_ entry: ConnectionLogEntry) -> some View {
         if let proc = store.state.processes[entry.processID] {
             let total = proc.rateDownPerSec + proc.rateUpPerSec
+            // 已关闭行整行转灰;否则活跃(>0)主色高亮、空闲次要色。
+            let style: AnyShapeStyle = isClosed(entry)
+                ? AnyShapeStyle(.secondary)
+                : (total > 0 ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
             Text(total > 0 ? TrafficFormat.rate(total) : "—")
                 .monospacedDigit()
                 .lineLimit(1)
-                .foregroundStyle(total > 0 ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .foregroundStyle(style)
         } else {
             Text("—").monospacedDigit().foregroundStyle(.secondary)
         }
@@ -209,7 +234,9 @@ enum RouteText {
         switch (rule, kind) {
         case (.direct, _): "直连"
         case (.block, _): "拦截"
-        case (.observe, _): "观测"
+        // .observe 只由本地代理来源(xray/云梯自身流量)内部产生——记录后放行、不接管数据通路。
+        // 文案用「放行」比「观测」更直白(用户不再能手动选它,见规则/右键菜单已去掉观测项)。
+        case (.observe, _): "放行"
         case (.proxied, .some(.socks5)): "代理 · SOCKS5"
         case (.proxied, .some(.httpConnect)): "代理 · HTTP"
         case (.proxied, .none): "代理（回落直连）"

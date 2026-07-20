@@ -10,6 +10,13 @@ import AppFeature
 struct TrafficPane: View {
     var store: Store
     @State private var expanded = true
+    /// 展开态日志区的高度(可拖顶部把手调整)。折叠时不用——整个抽屉只剩头部,不留空白。
+    @State private var height: CGFloat = 190
+    /// 拖拽起点的基准高度(DragGesture.translation 是相对起点的累计量,需基于起点算)。
+    @State private var dragBaseHeight: CGFloat?
+
+    private let minHeight: CGFloat = 110
+    private let maxHeight: CGFloat = 460
 
     /// 事件日志按时间倒序(最新在前),与连接表默认排序一致。
     private var events: [ConnectionLogEntry] {
@@ -18,17 +25,42 @@ struct TrafficPane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            if expanded { resizeHandle }
             header
             Divider()
             if expanded {
-                if events.isEmpty {
-                    emptyState
-                } else {
-                    logList
+                Group {
+                    if events.isEmpty {
+                        emptyState
+                    } else {
+                        logList
+                    }
                 }
+                .frame(height: height)
             }
         }
         .background(.background)
+    }
+
+    /// 顶部拖拽把手:仅展开时出现,上下拖调整日志区高度(夹在 min…max)。给底部抽屉一个可调高度,
+    /// 找回旧 VSplitView 的可调性,同时不带它折叠留白的毛病。
+    private var resizeHandle: some View {
+        Capsule()
+            .fill(.quaternary)
+            .frame(width: 36, height: 4)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 3)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        let base = dragBaseHeight ?? height
+                        if dragBaseHeight == nil { dragBaseHeight = base }
+                        height = min(maxHeight, max(minHeight, base - value.translation.height))
+                    }
+                    .onEnded { _ in dragBaseHeight = nil }
+            )
+            .help("拖动调整日志区高度")
     }
 
     /// 折叠头:三角 + 标题 + 计数徽标,右侧「在访达中显示」「清除」。整条(除按钮外)可点击折叠/展开。
@@ -87,16 +119,43 @@ struct TrafficPane: View {
             .padding()
     }
 
-    /// 日志列表:LazyVStack 只渲染可见行,500 条环形缓冲下也不会全量构建。
+    /// 日志列表:整块渲染成可选中复制的等宽富文本(`NSTextView` 支撑,对齐 Console.app 的手感)。
+    /// 每条一行「时间 · 进程 · → 目标 · 走法 · 状态[ · 原因]」,走法/状态按语义上色。用户在选区中
+    /// (可能要拷贝)时刷新会暂停,避免把文字从选区下抽走。
     private var logList: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(events) { entry in
-                    EventLogRow(entry: entry, name: appName(entry), reason: eventReason(entry))
-                    Divider().opacity(0.4)
-                }
-            }
+        SelectableLogTextView(text: attributedLog)
+    }
+
+    /// 把当前(时间倒序)事件拼成一整段带色富文本,一行一条,供 `SelectableLogTextView` 显示。
+    private var attributedLog: NSAttributedString {
+        let mono = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+        let out = NSMutableAttributedString()
+        for (index, entry) in events.enumerated() {
+            if index > 0 { out.append(NSAttributedString(string: "\n")) }
+            out.append(logLine(entry, font: mono))
         }
+        return out
+    }
+
+    /// 一条日志渲染成一行富文本:时间(次要色)· 进程 · → 主机:端口 · 走法(语义色)· 状态(语义色)
+    /// [ · 原因(更淡)]。字段间两个空格分隔,整行等宽,便于对齐与拷贝。
+    private func logLine(_ entry: ConnectionLogEntry, font: NSFont) -> NSAttributedString {
+        let line = NSMutableAttributedString()
+        func seg(_ text: String, _ color: NSColor) {
+            line.append(NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color]))
+        }
+        // 非彩色字段一律用同一门灰(= 原因「命中规则…」的 tertiary):时间 / 进程名 / 目标都收成灰,
+        // 只让走法与状态的语义色跳出来。原来进程名 / 目标是黑色(labelColor),按需求统一成灰。
+        seg(entry.openedAt.formatted(date: .omitted, time: .standard) + "  ", .tertiaryLabelColor)
+        seg(appName(entry) + "  ", .tertiaryLabelColor)
+        seg("→ \(entry.host):\(entry.port)  ", .tertiaryLabelColor)
+        seg(Self.routeLabelText(rule: entry.rule, kind: entry.proxyKind) + "  ", Self.routeColor(entry.rule))
+        let (statusText, statusColor) = Self.statusPresentation(entry)
+        seg(statusText, statusColor)
+        if let reason = eventReasonText(entry) {
+            seg("  · " + reason, .tertiaryLabelColor)
+        }
+        return line
     }
 
     /// 优先级同连接表:目录扫描名 > 扩展解出的可读进程名 > 原始 processID。
@@ -113,31 +172,31 @@ struct TrafficPane: View {
     /// 最后回落默认直连。用户规则的匹配逻辑镜像 `EngineKit.RuleMatcher.firstMatchRule`(App target
     /// 不链接 EngineKit、且 B2 不变量禁止跨包依赖其匹配层,故按 Core 模型**镜像不复用**——语义须与
     /// 之一致,与 `Core.EffectiveAppRule` 镜像 `RuleMatcher.firstAppLevelMatch` 同理)。
-    private func eventReason(_ entry: ConnectionLogEntry) -> LocalizedStringKey? {
+    private func eventReasonText(_ entry: ConnectionLogEntry) -> String? {
         let identifier = entry.processID.value
         let path = store.state.catalog[entry.processID]?.executablePath
 
         // 1) 环自愈完全旁路(最保守,扩展里最先判)。
         if isExcludedOrigin(identifier: identifier, path: path, by: store.state.loopAutoExclusions) {
-            return "自动 · 回环旁路"
+            return String(localized: "自动 · 回环旁路")
         }
         // 2) 本地代理来源强制直连。
         if isExcludedOrigin(identifier: identifier, path: path, by: store.state.dynamicOriginExclusion) {
-            return "自动 · 本地代理直连"
+            return String(localized: "自动 · 本地代理直连")
         }
         // 3) 用户规则表:进程 × 主机 × 端口首个命中的**启用**规则(停用的从不进 wire,故跳过)。
         // 静态部分(「命中规则」/「任意端口」)走 String Catalog;模式串是动态数据,以插值 %@ 传入。
         if let rule = firstEnabledRuleMatch(store.state.rules, app: identifier, host: entry.host, port: entry.port) {
             if let range = rule.portRange {
                 let portText = Self.portLabel(range)
-                return "命中规则 \(rule.appPattern) · \(rule.hostPattern) · \(portText)"
+                return String(localized: "命中规则 \(rule.appPattern) · \(rule.hostPattern) · \(portText)")
             } else {
-                return "命中规则 \(rule.appPattern) · \(rule.hostPattern) · 任意端口"
+                return String(localized: "命中规则 \(rule.appPattern) · \(rule.hostPattern) · 任意端口")
             }
         }
         // 4) 规则表不命中、实际又走了直连 → 默认直连。
         if entry.rule == .direct {
-            return "默认直连"
+            return String(localized: "默认直连")
         }
         // 其余(如经每进程赋值走代理/观测但规则表无命中)无法从规则表可靠反推,不臆测。
         return nil
@@ -168,6 +227,39 @@ struct TrafficPane: View {
         range.lowerBound == range.upperBound ? "\(range.lowerBound)" : "\(range.lowerBound)–\(range.upperBound)"
     }
 
+    /// 走法文案的 String 版(镜像 `RouteText.label`,那个返回 `LocalizedStringKey` 不能进富文本)。
+    private static func routeLabelText(rule: ProxyRule, kind: ProxyKind?) -> String {
+        switch (rule, kind) {
+        case (.direct, _): String(localized: "直连")
+        case (.block, _): String(localized: "拦截")
+        case (.observe, _): String(localized: "放行")   // 见 RouteText.label 的说明
+        case (.proxied, .some(.socks5)): String(localized: "代理 · SOCKS5")
+        case (.proxied, .some(.httpConnect)): String(localized: "代理 · HTTP")
+        case (.proxied, .none): String(localized: "代理（回落直连）")
+        }
+    }
+
+    /// 走法语义色的 `NSColor` 版(镜像 `RouteText.color` 的 SwiftUI `Color`,供 `NSAttributedString` 用)。
+    private static func routeColor(_ rule: ProxyRule) -> NSColor {
+        switch rule {
+        case .direct: .systemGreen
+        case .proxied: .controlAccentColor
+        case .block: .systemRed
+        case .observe: .systemOrange
+        }
+    }
+
+    /// 状态文案 + 语义色(与连接表 / Inspector 同口径):观测→已放行;opened→活跃;closed→已关闭;failed→失败。
+    private static func statusPresentation(_ entry: ConnectionLogEntry) -> (String, NSColor) {
+        if entry.rule == .observe { return (String(localized: "已放行"), .systemOrange) }
+        switch entry.phase {
+        case .opened: return (String(localized: "活跃"), .systemGreen)
+        // 「已关闭」不是语义色、归入统一灰(与时间/进程/目标/原因同一门 tertiary);活跃/失败仍上色。
+        case .closed: return (String(localized: "已关闭"), .tertiaryLabelColor)
+        case .failed: return (String(localized: "失败"), .systemRed)
+        }
+    }
+
     /// 在访达中定位磁盘日志文件。文件还没生成时(首次运行 / 已清除)回落到选中其所在目录。
     private func revealLogInFinder() {
         let fileURL = ConnectionLogFileStore.defaultFileURL
@@ -181,65 +273,47 @@ struct TrafficPane: View {
     }
 }
 
-/// 事件日志的一行:时间 · 进程名 · → 主机:端口 · 走法胶囊 · 状态文案。紧凑单行,对齐 Console.app 的日志密度。
-private struct EventLogRow: View {
-    let entry: ConnectionLogEntry
-    let name: String
-    /// 「为什么这么走」的原因(命中规则 / 自动旁路 / 默认直连),由 `TrafficPane.eventReason` 按
-    /// 当前规则近似推导;推不出时为 nil(不显示副行)。已本地化(`LocalizedStringKey`)。
-    let reason: LocalizedStringKey?
+/// 可选中复制的日志文本视图:只读 `NSTextView`,整段富文本一行一条,支持跨行选中、⌘C 拷出纯文本
+/// (对齐 Console.app)。走 AppKit 是因为 SwiftUI 的 `Text` 拷贝体验散、拿不到"整段可选"。
+/// 刷新策略:用户正在选区中(可能要拷贝)时**跳过更新**,不把文字从选区下抽走;内容没变也不动。
+private struct SelectableLogTextView: NSViewRepresentable {
+    let text: NSAttributedString
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            HStack(spacing: 8) {
-                Text(entry.openedAt.formatted(date: .omitted, time: .standard))
-                    .font(.caption).monospacedDigit()
-                    .foregroundStyle(.secondary)
-                    .frame(width: 72, alignment: .leading)
+    func makeCoordinator() -> Coordinator { Coordinator() }
 
-                Text(name)
-                    .font(.caption.weight(.medium))
-                    .lineLimit(1)
-                    .frame(width: 130, alignment: .leading)
-
-                Text("→ \(entry.host):\(entry.port)")
-                    .font(.caption).monospaced()
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                RouteChip(rule: entry.rule, kind: entry.proxyKind)
-
-                status
-                    .font(.caption)
-                    .frame(width: 68, alignment: .leading)
-            }
-
-            if let reason {
-                // 次要色小字副行,缩进对齐到进程名列(时间列宽 72 + 间距 8),做「这条为什么这么走」的注脚。
-                Text(reason)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .padding(.leading, 80)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
+    func makeNSView(context: Context) -> NSScrollView {
+        let scroll = NSTextView.scrollableTextView()
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        guard let textView = scroll.documentView as? NSTextView else { return scroll }
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.drawsBackground = false
+        textView.textContainerInset = NSSize(width: 8, height: 6)
+        textView.textContainer?.lineFragmentPadding = 0
+        textView.textContainer?.widthTracksTextView = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.textStorage?.setAttributedString(text)
+        context.coordinator.textView = textView
+        return scroll
     }
 
-    /// 状态文案(与连接表语义一致):观测 → 已放行;opened → 活动;closed → 已关闭;failed → 失败。
-    @ViewBuilder private var status: some View {
-        if entry.rule == .observe {
-            Label("已放行", systemImage: "eye").foregroundStyle(.orange)
-        } else {
-            switch entry.phase {
-            case .opened: Label("活跃", systemImage: "circle.fill").foregroundStyle(.green)
-            case .closed: Label("已关闭", systemImage: "checkmark.circle").foregroundStyle(.secondary)
-            case .failed: Label("失败", systemImage: "xmark.octagon").foregroundStyle(.red)
-            }
-        }
+    func updateNSView(_ scroll: NSScrollView, context: Context) {
+        guard let textView = context.coordinator.textView else { return }
+        // 别把文字从活动选区下抽走——用户可能正选着要拷贝,等选区收起下一帧再刷新。
+        if textView.selectedRange().length > 0 { return }
+        // 内容没变就不重排,避免每次 state 变更都抖动滚动条。
+        if textView.textStorage?.isEqual(to: text) == true { return }
+        let origin = scroll.contentView.bounds.origin
+        textView.textStorage?.setAttributedString(text)
+        // 尽量保住滚动位置(内容在顶部增删时不完美,但不至于每刷新都跳回顶)。
+        scroll.contentView.scroll(to: origin)
+        scroll.reflectScrolledClipView(scroll.contentView)
+    }
+
+    final class Coordinator {
+        weak var textView: NSTextView?
     }
 }
 

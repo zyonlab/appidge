@@ -15,8 +15,8 @@ enum SystemSettingsOpener {
 /// 内置规则说明。这些是「全局、少改」的项,从主窗口移到这里,让主窗口专注连接监视。
 struct SettingsView: View {
     var store: Store
-    /// 界面语言覆盖，与根 scene 的 `.environment(\.locale, ...)` 共用同一份 @AppStorage。
-    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
+    /// 界面语言。默认英文;改动写入 AppleLanguages 并重启 app 生效(见 `LanguageBootstrap`)。
+    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .english
 
     var body: some View {
         Form {
@@ -26,7 +26,19 @@ struct SettingsView: View {
                         Text(language.labelKey).tag(language)
                     }
                 }
-                Text("默认跟随系统语言，可在此覆盖。")
+                .onChange(of: appLanguage) { _, newValue in
+                    // 写 AppleLanguages 并重启:重启后 Bundle.main 加载对应 .lproj,全 UI 一致切换。
+                    LanguageBootstrap.switchTo(newValue)
+                }
+                Text("切换语言会重启 app 后生效。")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                LabeledContent("首次引导") {
+                    Button("查看引导流程") { store.dispatch(.reopenOnboarding) }
+                        .controlSize(.small)
+                }
+                Text("重新进入首次引导流程用于测试 / 评估;主窗口会切到引导页,走完即恢复。")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

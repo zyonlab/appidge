@@ -69,6 +69,21 @@ public final class XPCFlowTransport: NSObject, Transport, ExtensionXPCProtocol, 
         listener.resume()
     }
 
+    /// 停止监听并释放 mach service:`invalidate()` 掉 `NSXPCListener`,清掉当前连接。
+    /// **必须在 `stopProxy` 里调**——否则旧监听器泄漏、仍占着同一个 mach service;下次 `startProxy`
+    /// 新建的监听器与它抢同一服务,新 app 连上被路由到旧监听器/旧 transport,而 router 用新 transport
+    /// 投 flow,两边对不上 → flow 全丢(真机实锤的「退出重开会话通但收不到 flow」)。
+    public func invalidate() {
+        let existing = lock.withLock { () -> NSXPCListener? in
+            let l = listener
+            listener = nil
+            currentConnection = nil
+            appMessageHandler = nil
+            return l
+        }
+        existing?.invalidate()
+    }
+
     // MARK: - NSXPCListenerDelegate
 
     public func listener(_ listener: NSXPCListener, shouldAcceptNewConnection newConnection: NSXPCConnection) -> Bool {

@@ -20,7 +20,8 @@ enum TCPFlowDecision: Equatable {
     /// 完全不碰:返回 false 让系统原生处理,活动栏看不到(自身组件 / 回环 / 私网 / 上游)。
     case bypass
     /// 接管数据通路:`.proxied` 走上游、`.direct` 自己拨号直连、`.block` 拒绝——都在活动栏可见、可计量。
-    case handle(ProxyRuleDTO)
+    /// `proxyServerID`:命中规则指定走哪个上游 server(仅 `.proxied` 有意义);nil = 跟随全局活动/路由模式。
+    case handle(ProxyRuleDTO, proxyServerID: String?)
     /// 观测(B):不接管数据通路,但在活动栏记一条连接事件(进程+目的地),随即返回 false 放行。
     /// 看得见"连了哪里"、零转发开销,代价是没有逐连接速率/字节。
     case observe
@@ -170,6 +171,10 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
 
     override func startProxy(options: [String: Any]?, completionHandler: @escaping (Error?) -> Void) {
         ExtDiag.log("startProxy called")
+        // 防御:startProxy 若被再次调用(app 侧双 start 竞争等),先 invalidate 上一个监听器,
+        // 否则新旧两个 NSXPCListener 抢同一 mach service,app 连到旧的、flow 投到新 transport 全丢。
+        // stopProxy 的 invalidate 只挡 stop→start;这里补挡 start→start。
+        transport?.invalidate()
         let transport = XPCFlowTransport(upstreamHost: "127.0.0.1", upstreamPort: 1080)
         // 版本握手:app 每次连上就收到"是哪个版本的 provider 在服务",据此检测会话是否绑在旧扩展上。
         let version = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown"
@@ -193,6 +198,11 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     }
 
     override func stopProxy(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
+        ExtDiag.log("stopProxy called reason=\(reason.rawValue)")
+        // 先 invalidate 旧 XPC 监听器,释放 mach service——否则它泄漏、仍占着服务,下次 startProxy
+        // 新建的监听器与它抢同一服务,新 app 连上被路由到旧监听器,flow 投到新 transport 全丢
+        // (退出重开「会话通却收不到 flow」的真因)。
+        transport?.invalidate()
         router = nil
         transport = nil
         diagnosticsRunner = nil
@@ -306,14 +316,15 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
                 processID: processID, displayName: name, host: remoteHostname ?? hostPort?.0, port: hostPort?.1
             )
             return false
-        case .handle(let rule):
+        case .handle(let rule, let proxyServerID):
             flowLogger.log("""
             handleNewTCPFlow INTERCEPT src=\(sourceID, privacy: .public) \
             rule=\(String(describing: rule), privacy: .public) host=\(hostPort?.0 ?? "-", privacy: .public)
             """)
             beginHandledFlow(
                 tcpFlow: tcpFlow,
-                origin: FlowOrigin(processID: processID, displayName: name, executablePath: sourcePath, rule: rule),
+                origin: FlowOrigin(processID: processID, displayName: name, executablePath: sourcePath,
+                                   rule: rule, proxyServerID: proxyServerID),
                 to: remoteEndpoint, remoteHostname: remoteHostname, router: router
             )
             return true
@@ -384,7 +395,8 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         }
 
         do {
-            let remote = try await openRemote(to: remoteEndpoint, remoteHostname: remoteHostname, rule: rule)
+            let remote = try await openRemote(to: remoteEndpoint, remoteHostname: remoteHostname,
+                                              rule: rule, proxyServerID: origin.proxyServerID)
             emitConnectionEvent(context, phase: .opened)
             pumpClientToRemote(tcpFlow: tcpFlow, remote: remote, context: context, router: router)
             pumpRemoteToClient(tcpFlow: tcpFlow, remote: remote, context: context, router: router)

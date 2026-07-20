@@ -201,6 +201,17 @@ public struct FilePersistenceStore: PersistenceStore {
     }
 
     public func save(_ configuration: PersistedConfiguration) async {
+        Self.write(configuration, to: fileURL)
+    }
+
+    /// 同步落盘——退出路径(`applicationWillTerminate`)没法 await,但 JSON 编码 + 原子写本身
+    /// 不阻塞,直接同步写。用于「退出前强制存一次」,堵住『改动后 400ms 防抖没触发就退出 → 丢改动』
+    /// 的窗口(密码不在这份里、走 Keychain,退出不用管)。
+    public func saveSynchronously(_ configuration: PersistedConfiguration) {
+        Self.write(configuration, to: fileURL)
+    }
+
+    private static func write(_ configuration: PersistedConfiguration, to fileURL: URL) {
         let directory = fileURL.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         guard let data = try? JSONEncoder().encode(configuration) else { return }

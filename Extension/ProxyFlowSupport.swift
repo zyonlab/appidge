@@ -42,6 +42,8 @@ struct FlowOrigin {
     /// app 据此把来源进程双信号自动加入旁路排除(环自愈)。
     let executablePath: String?
     let rule: ProxyRuleDTO
+    /// `rule == .proxied` 时命中规则指定走哪个上游 server 的 id;nil = 跟随全局活动 server / 路由模式。
+    let proxyServerID: String?
 }
 
 /// 单条连接的上下文:身份 + 目标 + 决策(rule/proxyKind)+ 累计字节 + 结束只发一次的闸门。

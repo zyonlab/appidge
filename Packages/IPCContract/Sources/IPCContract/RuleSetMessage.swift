@@ -16,16 +16,20 @@ public struct MatchRuleDTO: Sendable, Equatable, Codable {
     public let hostPattern: String
     public let portRange: ClosedRange<UInt16>?
     public let rule: ProxyRuleDTO
+    /// `rule == .proxied` 时走哪个上游 server 的 id;nil = 跟随全局活动 server / 路由模式。
+    /// Optional → 合成 Decodable 用 decodeIfPresent,旧 wire 数据无此键解码为 nil。
+    public let proxyServerID: String?
 
     public init(
         id: String, appPattern: String, hostPattern: String,
-        portRange: ClosedRange<UInt16>?, rule: ProxyRuleDTO
+        portRange: ClosedRange<UInt16>?, rule: ProxyRuleDTO, proxyServerID: String? = nil
     ) {
         self.id = id
         self.appPattern = appPattern
         self.hostPattern = hostPattern
         self.portRange = portRange
         self.rule = rule
+        self.proxyServerID = proxyServerID
     }
 }
 

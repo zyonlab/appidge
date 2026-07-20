@@ -26,7 +26,8 @@ public enum RuleSetMapping {
             appPattern: rule.appPattern,
             hostPattern: rule.hostPattern,
             portRange: rule.portRange,
-            rule: dtoRule(from: rule.action)
+            rule: dtoRule(from: rule.action),
+            proxyServerID: rule.proxyServerID?.value
         )
     }
 

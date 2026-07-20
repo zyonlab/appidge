@@ -8,9 +8,44 @@ import AppFeature
 /// 用户只能重启电脑(见 TransparentProxyController.stopCachedSessionForTermination)。
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// 启动最早期(UI 尚未构建、本地化尚未读取):把界面语言对齐到用户所选,必要时重启一次生效。
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        LanguageBootstrap.applyAtLaunch()
+    }
+
+    /// 单实例强制:代理工具**不能多开**——两个实例会抢同一个扩展的 XPC 连接与透明代理会话
+    /// (重复 resync、并发 start/stop 会话、活动栏重复/错乱)。已有一个更早启动的实例在跑,就激活它、
+    /// 自己退出。**例外**:语言切换重启出的新实例带 `APPIDGE_LANG_RELAUNCHED`,是有意的接班者
+    /// (旧实例正随即退出),不能自杀。
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        guard ProcessInfo.processInfo.environment["APPIDGE_LANG_RELAUNCHED"] == nil else { return }
+        guard let bundleID = Bundle.main.bundleIdentifier else { return }
+        let current = NSRunningApplication.current
+        // 只在存在「更早启动」的实例时退让 → 存活者确定是最早那个,避免两个几乎同时启动互相退出。
+        let incumbent = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+            .first { other in
+                guard other != current else { return false }
+                guard let mine = current.launchDate, let theirs = other.launchDate else { return true }
+                return theirs < mine
+            }
+        guard let incumbent else { return }
+        incumbent.activate()
+        NSApp.terminate(nil)
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
+        // 先强制同步存盘(退出前把最新配置落地,防 400ms 防抖没触发就退出丢改动),再停会话。
+        AppTermination.persist?()
         TransparentProxyController.stopCachedSessionForTermination()
     }
+}
+
+/// 退出时的同步存盘钩子。`applicationWillTerminate` 在 AppDelegate 里、拿不到 `store`;由 App 的
+/// `.task` 在窗口出现时注入一个捕获了 store 的同步存盘闭包(规则/代理只能在主窗口里改,窗口没开过
+/// 就没有需要抢救的改动,所以在 `.task` 注入已足够)。只在主线程读写,满足 Swift 6 严格并发。
+@MainActor
+enum AppTermination {
+    static var persist: (() -> Void)?
 }
 
 /// 主窗口选中的顶层分段(活动/应用/规则/代理)提升为**跨窗口共享状态**:主窗口的分段 Picker 与
@@ -30,19 +65,12 @@ struct AppidgeApp: App {
     @State private var profilesModel: ProfilesModel
     /// 主窗口分段选中态,菜单栏「打开入口」与主窗口 Picker 共享同一份(见 MainTabSelection)。
     @State private var tabSelection = MainTabSelection()
-    // 类而非局部变量：`store.onAction` 闭包按引用捕获它,多次 dispatch 之间能共享同一个
-    // "有没有待落盘的 Task" 状态(struct 会在每次闭包创建时拿到不同的副本，防抖就失效了)。
-    @State private var persistenceDebouncer = PersistenceDebouncer()
     /// 版本握手自愈的去重:已针对哪个运行版本重启过会话(避免重启后版本仍旧时反复重启)。
     /// nil = 还没自愈过;`extensionNeedsRebind` 为真时 runningExtensionVersion 必非 nil。
     @State private var healedForRunningVersion: String?
-    /// 界面语言（跟随系统 / 简体中文 / English）。`.system` 时不覆盖 locale 环境。
-    /// 在根 scene 对内容套 `.environment(\.locale, ...)`，`Text(LocalizedStringKey)` 即时切换。
-    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .system
+    // 界面语言不在这里做 locale 环境覆盖了——改由 `LanguageBootstrap` 在启动早期对齐 AppleLanguages
+    // + 切换时重启生效(见 AppDelegate.applicationWillFinishLaunching / SettingsView 的语言 Picker)。
     @Environment(\.scenePhase) private var scenePhase
-
-    /// 当前应覆盖到 `\.locale` 环境的 Locale：非 system 用所选语言，system 回退系统当前。
-    private var localeOverride: Locale { appLanguage.resolvedLocale ?? .autoupdatingCurrent }
 
     // 代理密码存 Keychain，不落 JSON（见 PersistedProxyServer 结构上无 password 字段）。
     private let credentialStore: any CredentialStore = KeychainCredentialStore()
@@ -87,6 +115,10 @@ struct AppidgeApp: App {
                 }
             }
             .task {
+                // 退出强制存盘钩子:捕获 store,同步落地最新配置(见 AppTermination / applicationWillTerminate)。
+                AppTermination.persist = { [store] in
+                    FilePersistenceStore().saveSynchronously(PersistedConfiguration(from: store.state))
+                }
                 // 扩展激活状态经 activator 的 delegate 回调回灌 store（状态栏据此如实显示）。
                 SystemExtensionActivator.shared.onStateChange = { activation in
                     store.dispatch(.extensionActivationChanged(activation))
@@ -115,7 +147,9 @@ struct AppidgeApp: App {
                     // 升级的僵尸态)→ 自动重启会话重绑最新扩展,一次为限(见 maybeHealStaleBinding)。
                     if case .extensionVersionReported = action { maybeHealStaleBinding() }
                     guard Self.isPersistenceRelevant(action) else { return }
-                    persistenceDebouncer.schedule { persistCurrentConfiguration() }
+                    // 立即同步落盘(去掉 400ms 防抖):每次改动一发生就在磁盘上,crash / 强杀也不丢。
+                    // 规则调序是离散按钮点击(非连续拖拽流),JSON 又小,每次同步原子写代价可忽略。
+                    persistCurrentConfiguration()
                 }
                 store.dispatch(.appLaunched)
                 // 启动恢复完成后,把最终的完整配置全量重推给扩展一次。onConnect 那次可能发生在
@@ -147,16 +181,13 @@ struct AppidgeApp: App {
                 persistCurrentConfiguration()
             }
         }
-        .environment(\.locale, localeOverride)
 
         Settings {
             SettingsView(store: store)
-                .environment(\.locale, localeOverride)
         }
 
-        MenuBarExtra("appidge", systemImage: "network") {
+        MenuBarExtra("appidge", image: "MenuBarIcon") {
             MenuBarView(store: store, tabSelection: tabSelection)
-                .environment(\.locale, localeOverride)
         }
         // .window 而非默认 .menu：内容是「仪表盘」(状态行 + Top-5 列表 + 开关),
         // 需要完整 SwiftUI 排版(语义色 / caption / 对齐),菜单渲染器会把这些收着。
@@ -238,13 +269,12 @@ struct AppidgeApp: App {
 
     @MainActor
     private func persistCurrentConfiguration() {
-        let configuration = PersistedConfiguration(from: store.state)
+        // 配置 JSON **同步立即**落盘——改动一发生就在磁盘上,crash / 强杀不丢(退出钩子同一条路径)。
+        FilePersistenceStore().saveSynchronously(PersistedConfiguration(from: store.state))
+        // 密码进 Keychain:只有代理增改才变化,异步保存不拖住 JSON 的即时落地。
         let servers = Array(store.state.proxyServers.values)
         let credentialStore = credentialStore
-        Task {
-            await FilePersistenceStore().save(configuration)            // 无密码落盘
-            await PersistedConfiguration.saveCredentials(from: servers, to: credentialStore) // 密码进 Keychain
-        }
+        Task { await PersistedConfiguration.saveCredentials(from: servers, to: credentialStore) }
     }
 
     /// `Store` 的 effectHandler 本体——从 `init` 里的闭包拆出来只是压 `function_body_length`
@@ -305,22 +335,5 @@ struct AppidgeApp: App {
         )
         let discovery = await LocalProxyOriginDiscovery.discover(state: discoveryState, using: resolver)
         return .proxyProcessIdentitiesResolved(discovery)
-    }
-}
-
-/// 防抖动的存盘触发器：连续多次"值得持久化"的 action(比如拖拽重排规则表连续触发
-/// `reorderMatchRules`)只在停顿下来之后落盘一次，避免每条 dispatch 都读写一次磁盘。
-/// 类而非 struct——`AppidgeApp.store.onAction` 闭包要按引用捕获同一份"待落盘 Task"状态。
-@MainActor
-final class PersistenceDebouncer {
-    private var pendingTask: Task<Void, Never>?
-
-    func schedule(delay: Duration = .milliseconds(400), _ action: @escaping @MainActor () -> Void) {
-        pendingTask?.cancel()
-        pendingTask = Task {
-            try? await Task.sleep(for: delay)
-            guard !Task.isCancelled else { return }
-            action()
-        }
     }
 }

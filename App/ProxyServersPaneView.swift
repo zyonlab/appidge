@@ -10,6 +10,8 @@ struct ProxyServersPaneView: View {
 
     @State private var selection: ProxyServer.ID?
     @State private var checks: [ProxyServerID: ProxyCheckStatus] = [:]
+    /// 每台的出口 IP 检测结果(IP 文本 / 「检测中…」/「失败：…」);view-local 瞬时态。
+    @State private var exitIP: [ProxyServerID: String] = [:]
     @State private var showingAdd = false
 
     private var sortedServers: [ProxyServer] {
@@ -61,11 +63,16 @@ struct ProxyServersPaneView: View {
             }
             .width(min: 80, ideal: 120)
             TableColumn("探活") { s in checkCell(checks[s.id] ?? .idle) }.width(56)
+            TableColumn("出口 IP") { s in
+                Text(exitIP[s.id] ?? "—").foregroundStyle(.secondary)
+                    .monospaced().lineLimit(1).truncationMode(.middle)
+            }.width(min: 90, ideal: 140)
         }
         .contextMenu(forSelectionType: ProxyServer.ID.self) { ids in
             if let id = ids.first {
                 Button("设为使用中") { store.dispatch(.setActiveProxyServer(id)) }
                 Button("测试") { runCheck(id) }
+                Button("出口 IP 检测") { runExitIP(id) }
                 Divider()
                 Button("删除", role: .destructive) { store.dispatch(.removeProxyServer(id)) }
             }
@@ -92,6 +99,11 @@ struct ProxyServersPaneView: View {
             }
             .disabled(selection == nil)
             .help("测试可达性")
+            Button { if let id = selection { runExitIP(id) } } label: {
+                Image(systemName: "globe")
+            }
+            .disabled(selection == nil)
+            .help("出口 IP 检测（通过这台代理访问 ip-echo，看它从哪个地址出网；代理链的出口 = 最后一跳那台）")
             Spacer()
             // 一句话说清「使用中」是什么,消除「默认/使用中」的措辞困惑。
             Text("勾选圈 = 使用中的代理").font(.caption).foregroundStyle(.secondary)
@@ -128,6 +140,21 @@ struct ProxyServersPaneView: View {
         }
     }
 
+    /// 出口 IP 检测:通过这台代理访问 ip-echo,把回来的出口地址填进「出口 IP」列。
+    private func runExitIP(_ id: ProxyServerID) {
+        guard let server = store.state.proxyServers[id] else { return }
+        exitIP[id] = "检测中…"
+        Task {
+            let result = await ExitIPChecker.exitIP(via: server)
+            await MainActor.run {
+                switch result {
+                case .ip(let ip): exitIP[id] = ip
+                case .failed(let m): exitIP[id] = "失败：\(m)"
+                }
+            }
+        }
+    }
+
     private static func kindLabel(_ kind: ProxyKind) -> String {
         switch kind {
         case .socks5: "SOCKS5"
@@ -145,6 +172,8 @@ private struct RoutingModeSection: View {
     /// 默认折叠——展开的整段(分段选择 + 说明 + 成员勾选)在窄 / 矮窗口里会撑高底部区、把上面的
     /// 服务器表挤到裁切(首行 / 表头被工具栏盖住)。折叠后底部只剩一行标题,表格拿回垂直空间。
     @State private var expanded = false
+    /// 待确认切换到的路由模式;非 nil = 弹确认对话框(切换会改变所有走代理连接的上游选择方式,加一道确认)。
+    @State private var pendingKind: RoutingModeKind?
 
     private var mode: ProxyRoutingMode { store.state.proxyRoutingMode }
     private var kind: RoutingModeKind { RoutingModeKind(mode) }
@@ -182,6 +211,30 @@ private struct RoutingModeSection: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        // 切换路由模式先确认——它改变所有走代理连接的上游选择方式,不该点一下就生效。
+        .confirmationDialog(
+            "切换路由模式？",
+            isPresented: Binding(get: { pendingKind != nil }, set: { if !$0 { pendingKind = nil } }),
+            presenting: pendingKind
+        ) { target in
+            Button("切到「\(Self.modeName(target))」") {
+                store.dispatch(.setProxyRoutingMode(target.mode(carrying: selectedIDs)))
+                pendingKind = nil
+            }
+            Button("取消", role: .cancel) { pendingKind = nil }
+        } message: { target in
+            Text("会改变所有「走代理」连接的上游选择方式。现有连接不受影响，新连接按「\(Self.modeName(target))」。")
+        }
+    }
+
+    /// 路由模式的纯文本名(供确认对话框插值)。
+    private static func modeName(_ kind: RoutingModeKind) -> String {
+        switch kind {
+        case .single: "单台"
+        case .chain: "代理链"
+        case .failover: "故障转移"
+        case .loadBalance: "负载均衡"
+        }
     }
 
     /// 折叠标题右侧的当前模式短名。
@@ -218,10 +271,11 @@ private struct RoutingModeSection: View {
         }
     }
 
+    /// 选新模式不立即下发,只记进 `pendingKind` 弹确认;get 仍返回当前模式,分段控件不抢先跳。
     private var kindBinding: Binding<RoutingModeKind> {
         Binding(
             get: { kind },
-            set: { store.dispatch(.setProxyRoutingMode($0.mode(carrying: selectedIDs))) }
+            set: { newKind in if newKind != kind { pendingKind = newKind } }
         )
     }
 

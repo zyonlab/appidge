@@ -46,7 +46,8 @@ public enum ExtensionMessageHandling {
                 bytesUp: event.bytesUp,
                 bytesDown: event.bytesDown,
                 openedAt: event.openedAt,
-                processDisplayName: event.processDisplayName
+                processDisplayName: event.processDisplayName,
+                upstreamLabel: event.upstreamLabel
             ))]
 
         case .loopDetected(let signature, let processID, let executablePath):

@@ -12,25 +12,34 @@ import IPCContract
 enum ProxyDialer {
 
     /// 按路由种类建立到目标的连接。`.direct` 用 `directEndpoint` 直连;其余按各自策略拨上游。
+    /// 返回:已就绪连接 + **本次实际用的那台上游**(供活动栏如实显示走了哪台;负载均衡/单台会带出,
+    /// 故障转移的赢家是运行时的、链是多跳,这两种返回 nil,由调用方保留候选/模式标签)。
     static func open(
         route: ResolvedRoute,
         to target: ProxyTarget,
         directEndpoint: Network.NWEndpoint,
         roundRobin: RoundRobinSelector
-    ) async throws -> NWConnection {
+    ) async throws -> (connection: NWConnection, usedServer: ProxyServerDTO?) {
         switch route {
         case .direct:
-            return try await openDirect(to: directEndpoint)
+            return (try await openDirect(to: directEndpoint), nil)
         case .single(let server):
-            return try await openSingleTunnel(to: target, via: server)
+            return (try await openSingleTunnel(to: target, via: server), server)
         case .failover(let servers):
             // 按序尝试,首个握手成功的胜出;全失败抛最后一个错(调用方 fail-open 关流)。
-            return try await FailoverConnector.connect(proxies: servers) { server in
-                try await openSingleTunnel(to: target, via: server)
+            // 捕获赢家:只有 openSingleTunnel 成功那台才走到 `winner = server`(失败的先抛),活动栏据此
+            // 显示实际落到哪台。
+            var winner: ProxyServerDTO?
+            let conn = try await FailoverConnector.connect(proxies: servers) { server in
+                let c = try await openSingleTunnel(to: target, via: server)
+                winner = server
+                return c
             }
+            return (conn, winner)
         case .loadBalance(let servers):
             let index = await roundRobin.next(count: servers.count) ?? 0
-            return try await openSingleTunnel(to: target, via: servers[index])
+            let picked = servers[index]
+            return (try await openSingleTunnel(to: target, via: picked), picked)
         case .chain(let servers):
             let stream = try await ChainConnector.connect(
                 proxies: servers, destinationHost: target.host, destinationPort: target.port
@@ -41,7 +50,7 @@ enum ProxyDialer {
             guard let tunnel = (stream as? NWConnectionByteStream)?.tunnelConnection else {
                 throw ProxyDialerError.chainTunnelUnavailable
             }
-            return tunnel
+            return (tunnel, nil)   // 链是多跳,保留 beginFlow 预算的「链 · A→B」标签
         }
     }
 

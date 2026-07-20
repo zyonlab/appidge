@@ -17,6 +17,9 @@ public struct ConnectionEventDTO: Sendable, Equatable, Codable {
     public let rule: ProxyRuleDTO
     /// 实际所用上游代理协议;直连(或代理未配好而回落直连)时为 nil。
     public let proxyKind: ProxyKindDTO?
+    /// 实际走的上游可读标签:单台=`host:port`、代理链=`链 · A → B`、故障转移/负载均衡标出候选;
+    /// 直连时为 nil。让活动栏/日志能看出「走了哪台、哪种路由模式」。Optional → 旧 wire 数据解码为 nil。
+    public let upstreamLabel: String?
     public let phase: ConnectionPhaseDTO
     public let bytesUp: Int64
     public let bytesDown: Int64
@@ -39,7 +42,8 @@ public struct ConnectionEventDTO: Sendable, Equatable, Codable {
         bytesUp: Int64,
         bytesDown: Int64,
         openedAt: Date = Date(timeIntervalSince1970: 0),
-        processDisplayName: String? = nil
+        processDisplayName: String? = nil,
+        upstreamLabel: String? = nil
     ) {
         self.id = id
         self.processID = processID
@@ -52,5 +56,6 @@ public struct ConnectionEventDTO: Sendable, Equatable, Codable {
         self.bytesDown = bytesDown
         self.openedAt = openedAt
         self.processDisplayName = processDisplayName
+        self.upstreamLabel = upstreamLabel
     }
 }

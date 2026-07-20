@@ -65,9 +65,11 @@ struct AppidgeApp: App {
     @State private var profilesModel: ProfilesModel
     /// 主窗口分段选中态,菜单栏「打开入口」与主窗口 Picker 共享同一份(见 MainTabSelection)。
     @State private var tabSelection = MainTabSelection()
-    /// 版本握手自愈的去重:已针对哪个运行版本重启过会话(避免重启后版本仍旧时反复重启)。
-    /// nil = 还没自愈过;`extensionNeedsRebind` 为真时 runningExtensionVersion 必非 nil。
-    @State private var healedForRunningVersion: String?
+    /// 版本握手:本进程内是否见过「扩展运行版本 ≠ 包内版本」(= 刚发生过升级)。升级窗口里 active 的
+    /// 还是旧 provider,不能急着绑(会绑回旧的);见过不匹配后,等新 provider 接管(版本变匹配)再重绑。
+    @State private var sawExtensionMismatch = false
+    /// 升级后是否已重绑过一次会话到新 provider(一次为限,避免反复)。
+    @State private var reboundAfterUpgrade = false
     // 界面语言不在这里做 locale 环境覆盖了——改由 `LanguageBootstrap` 在启动早期对齐 AppleLanguages
     // + 切换时重启生效(见 AppDelegate.applicationWillFinishLaunching / SettingsView 的语言 Picker)。
     @Environment(\.scenePhase) private var scenePhase
@@ -123,6 +125,8 @@ struct AppidgeApp: App {
                 SystemExtensionActivator.shared.onStateChange = { activation in
                     store.dispatch(.extensionActivationChanged(activation))
                     // 扩展获批(.active)后,必须由 app 侧启动透明代理会话,系统才会把流量交给 provider。
+                    // 起会话绑到当前 active 的 provider;升级窗口里若绑到旧的,靠版本握手在新 provider
+                    // 确认接管后重绑一次(见 maybeHealStaleBinding)。
                     if case .active = activation {
                         Task { await TransparentProxyController.start() }
                     }
@@ -186,7 +190,9 @@ struct AppidgeApp: App {
             SettingsView(store: store)
         }
 
-        MenuBarExtra("appidge", image: "MenuBarIcon") {
+        // 菜单栏用 SF Symbol 鸟形字形:菜单栏图标必须是单色模板,完整彩色鸽子图标(app/程序坞用)
+        // 当模板会被填成实心方块。彩色鸽子仍是 AppIcon;这里用干净的 bird.fill 剪影,随明暗自适应。
+        MenuBarExtra("appidge", systemImage: "bird.fill") {
             MenuBarView(store: store, tabSelection: tabSelection)
         }
         // .window 而非默认 .menu：内容是「仪表盘」(状态行 + Top-5 列表 + 开关),
@@ -211,14 +217,27 @@ struct AppidgeApp: App {
         return (NSDictionary(contentsOf: info)?["CFBundleVersion"] as? String)
     }
 
-    /// 版本握手发现会话绑在旧扩展上(`extensionNeedsRebind`)→ 重启会话重绑最新 provider。
-    /// **一次为限**:记住已针对哪个运行版本自愈过——若重启后扩展仍回报同一个旧版本(说明系统
-    /// 那边还没真正换实例,可能要重启电脑),不再反复重启会话空耗,而是留给 UI 提示用户。
+    /// 版本握手 —— 修「升级后会话绑死旧 provider = 黑洞」。
+    ///
+    /// 扩展升级(手动装新版 / 自动升级)时会有个窗口:app 起会话时 active 的还是**旧 provider**,
+    /// 会话就绑到它;等新 provider 接管、旧的终止,会话还绑在死掉的旧 provider 上 → 拦流量却转发不了
+    /// = 全系统黑洞。扩展经 XPC 如实回报**当前 active provider 的版本**(谁拥有 mach 监听器谁回报)。
+    ///
+    /// 策略:
+    /// - 运行版本 ≠ 包内版本(升级中,active 还是旧的)→ **别重绑**(会绑回旧的、且升级完又不再纠正,
+    ///   正是之前持续黑洞的根因)。只记一笔「见过不匹配」。
+    /// - 运行版本 == 包内版本(新 provider 已确认接管)→ 若此前见过不匹配(= 刚升级过),会话可能还绑在
+    ///   旧 provider 上 → **重绑一次**到当前 provider,黑洞消除。正常启动从没不匹配 → 不折腾会话。
     @MainActor
     private func maybeHealStaleBinding() {
-        guard store.state.extensionNeedsRebind, let running = store.state.runningExtensionVersion else { return }
-        guard healedForRunningVersion != running else { return }
-        healedForRunningVersion = running
+        guard let running = store.state.runningExtensionVersion,
+              let bundled = store.state.bundledExtensionVersion else { return }
+        if running != bundled {
+            sawExtensionMismatch = true
+            return
+        }
+        guard sawExtensionMismatch, !reboundAfterUpgrade else { return }
+        reboundAfterUpgrade = true
         Task { await TransparentProxyController.restart() }
     }
 

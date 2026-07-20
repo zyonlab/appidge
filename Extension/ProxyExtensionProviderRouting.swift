@@ -210,31 +210,40 @@ extension ProxyExtensionProvider {
     /// pump 的连接;`.direct`(含 proxied 但没配上游的 fail-open、以及本地代理被降级的那一路)则
     /// 直连目的地。实际拨号交给无状态的 ``ProxyDialer``。目标地址经 ``ProxyTargetSelector`` 优先取
     /// 原始主机名(DNS-over-proxy,让代理去解析)。
+    /// 返回:已就绪连接 + 本次实际用的那台上游(负载均衡/单台带出;直连/故障转移/链为 nil)。
     func openRemote(
         to endpoint: Network.NWEndpoint, remoteHostname: String?, rule: ProxyRuleDTO,
         proxyServerID: String? = nil
-    ) async throws -> NWConnection {
+    ) async throws -> (connection: NWConnection, usedServer: ProxyServerDTO?) {
         guard rule == .proxied, let (endpointHost, port) = ProxyDialer.hostPort(from: endpoint) else {
-            return try await ProxyDialer.openDirect(to: endpoint)
+            return (try await ProxyDialer.openDirect(to: endpoint), nil)
         }
-        let config = proxyConfig
-        let servers = config?.servers ?? []
-        // 规则指定了具体上游 server 且存在 → 强制走它(single);否则按全局路由模式/活动 server 解析。
-        // 指定的 id 认不得(server 被删)→ 回落全局,不致命。
-        let route: ResolvedRoute
-        if let proxyServerID, let picked = servers.first(where: { $0.id == proxyServerID }) {
-            route = .single(picked)
-        } else {
-            route = ProxyRouteResolver.resolve(
-                mode: routingMode, servers: servers, activeServerID: config?.activeServerID
-            )
-        }
+        let route = resolvedRoute(rule: rule, proxyServerID: proxyServerID)
         let target = ProxyTargetSelector.selectTarget(
             remoteHostname: remoteHostname, endpointHost: endpointHost, port: port
         )
         return try await ProxyDialer.open(
             route: route, to: target, directEndpoint: endpoint, roundRobin: roundRobinSelector
         )
+    }
+
+    /// 拨号后把连接事件的上游/协议回填成**实际用的那台**——负载均衡时每条连接落到不同上游,活动栏
+    /// 因此如实显示轮询(而不是永远显示第一台的协议)。规则指定单台 / 单台模式只显示 host:port;
+    /// 负载均衡带「负载均衡 · 」前缀,让模式与实际那台都可见。故障转移/链的 usedServer 为 nil,保留原标签。
+    func applyActualUpstream(_ context: ConnectionContext, used: ProxyServerDTO?, ruleServer: String?) {
+        guard let used else { return }
+        context.proxyKind = used.kind
+        let hp = "\(used.host):\(used.port)"
+        // 规则指定了单台 → 只显示 host:port;否则按当前路由模式加前缀,让模式与实际那台都可见。
+        if ruleServer != nil {
+            context.upstreamLabel = hp
+        } else {
+            switch routingMode {
+            case .loadBalance: context.upstreamLabel = "负载均衡 · \(hp)"
+            case .failover: context.upstreamLabel = "故障转移 · \(hp)"
+            case .single, .chain: context.upstreamLabel = hp
+            }
+        }
     }
 
     /// 接管(A):`.proxied` 走上游、`.direct` 自己拨号直连、`.block` 拒绝——都进 pump、可计量。
@@ -259,13 +268,40 @@ extension ProxyExtensionProvider {
 
     /// 发一条连接生命周期事件给 app(取当前累计字节)。非 private:beginFlow(主文件)与
     /// emitClose(本文件/TCPFlowPump)共用——从主文件挪来压 file_length,同既有拆文件先例。
+    /// 解析这条 flow 实际要走的路由:规则指定了具体 server 且存在 → 强制 `.single`;否则按全局路由
+    /// 模式 + 活动 server 解析。认不得的 id(server 被删)→ 回落全局。`openRemote` 与上游标签共用同一处。
+    func resolvedRoute(rule: ProxyRuleDTO, proxyServerID: String?) -> ResolvedRoute {
+        guard rule == .proxied else { return .direct }
+        let config = proxyConfig
+        let servers = config?.servers ?? []
+        if let proxyServerID, let picked = servers.first(where: { $0.id == proxyServerID }) {
+            return .single(picked)
+        }
+        return ProxyRouteResolver.resolve(
+            mode: routingMode, servers: servers, activeServerID: config?.activeServerID
+        )
+    }
+
+    /// 路由 → 活动栏/日志用的可读上游标签。直连 nil;单台 host:port;链/故障转移/负载均衡标出模式 + 候选。
+    func routeLabel(_ route: ResolvedRoute) -> String? {
+        func hp(_ s: ProxyServerDTO) -> String { "\(s.host):\(s.port)" }
+        switch route {
+        case .direct: return nil
+        case .single(let s): return hp(s)
+        case .chain(let list): return "链 · " + list.map(hp).joined(separator: " → ")
+        case .failover(let list): return "故障转移 · " + list.map(hp).joined(separator: ", ")
+        case .loadBalance(let list): return "负载均衡 · " + list.map(hp).joined(separator: ", ")
+        }
+    }
+
     func emitConnectionEvent(_ context: ConnectionContext, phase: ConnectionPhaseDTO) {
         guard let transport else { return }
         let bytes = context.snapshotBytes()
         let event = ConnectionEventDTO(
             id: context.id, processID: context.processID, targetHost: context.host, targetPort: context.port,
             rule: context.rule, proxyKind: context.proxyKind, phase: phase, bytesUp: bytes.up, bytesDown: bytes.down,
-            openedAt: context.openedAt, processDisplayName: context.processDisplayName
+            openedAt: context.openedAt, processDisplayName: context.processDisplayName,
+            upstreamLabel: context.upstreamLabel
         )
         Task { await transport.deliver(.connectionEvent(event)) }
     }

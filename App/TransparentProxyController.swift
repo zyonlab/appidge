@@ -27,21 +27,19 @@ enum TransparentProxyController {
         manager = managers.first ?? manager
     }
 
-    /// 是否已有一次 start 在进行中(@MainActor 上 await 前同步占旗,防并发)。
-    private static var startInFlight = false
+    /// 会话操作(start / restart)是否已有一次在进行中(@MainActor 上 await 前同步占旗)。
+    /// **start 与 restart 共用同一把锁**:否则并发时 restart 在停、start 在起,互相打架、会话卡死或
+    /// 绑错 provider。同一时刻只允许一次会话操作,余者跳过——那一次已把会话带到正确状态。
+    private static var sessionOpInFlight = false
 
     /// 建/存配置并启动会话。幂等:已在跑就不重复启。
     static func start() async {
-        // 防并发:`loadOrCreate()` 有 await,两次并发 start()(checkStatus + onStateChange)都会在
-        // await 后读到 disconnected → 都 startVPNTunnel → 两次 startProxy → 两个 XPC 监听器抢同一
-        // mach service → flow 投错监听器全丢(真机「会话卡 connecting、收不到 flow」的真因)。
-        // 同一时刻只允许一次 start,余者跳过。
-        guard !startInFlight else {
-            emit("start(): 已有 start 在进行,跳过本次(防并发双 startVPNTunnel)")
+        guard !sessionOpInFlight else {
+            emit("start(): 已有会话操作在进行,跳过本次(防并发双 startVPNTunnel / 与 restart 打架)")
             return
         }
-        startInFlight = true
-        defer { startInFlight = false }
+        sessionOpInFlight = true
+        defer { sessionOpInFlight = false }
         do {
             let mgr = try await loadOrCreate()
             switch mgr.connection.status {
@@ -60,20 +58,14 @@ enum TransparentProxyController {
     /// **重启会话 = 重新绑定到当前(最新)扩展 provider**。反复热升级后系统可能把运行中的
     /// 会话继续绑在待卸载的旧 provider 实例上(流量被交给僵尸扩展 → 黑洞),等价于用户手动在
     /// 系统设置里关开一次网络扩展。这里程序化地做:停会话 → 等它真的断开 → 重新起。
-    /// 用于:版本握手发现会话绑了旧扩展、或用户点「重启接管」。
-    /// 是否已有一次 restart 在进行中(@MainActor 上同步先占,防并发)。
-    private static var restartInFlight = false
-
+    /// 用于:启动首次重绑(startOnLaunch)、版本握手发现会话绑了旧扩展、或用户点「重启接管」。
     static func restart() async {
-        // 版本升级时 startOnLaunch 的 restart 与版本握手 maybeHealStaleBinding 的 restart 可能同时触发;
-        // 并发的 stop→等→start 会互相打架(一个在停、一个在起)。同一时刻只允许一次,余者跳过——
-        // 那一次已经把会话干净重绑,跳过无损。
-        guard !restartInFlight else {
-            emit("restart(): 已有重启在进行,跳过本次(避免并发 stop/start 抖动)")
+        guard !sessionOpInFlight else {
+            emit("restart(): 已有会话操作在进行,跳过本次(与 start / 另一个 restart 打架)")
             return
         }
-        restartInFlight = true
-        defer { restartInFlight = false }
+        sessionOpInFlight = true
+        defer { sessionOpInFlight = false }
         emit("restart(): stopping session to rebind to the current provider")
         do {
             let mgr = try await loadOrCreate()

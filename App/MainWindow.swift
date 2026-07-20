@@ -281,6 +281,13 @@ private struct ConnectionDetail: View {
                 }
                 Section("路由") {
                     LabeledContent("决策") { RouteChip(rule: e.rule, kind: e.proxyKind) }
+                    // 实际走的上游(单台 host:port / 链 / 故障转移 / 负载均衡);直连时不显示。用于验证路由模式。
+                    if let up = e.upstreamLabel {
+                        LabeledContent("上游") {
+                            Text(up).monospaced().textSelection(.enabled)
+                                .lineLimit(1).truncationMode(.middle)
+                        }
+                    }
                     LabeledContent("状态") {
                         if e.rule == .observe {
                             // 同连接表:观测行不跟踪生命周期,显示「已放行」而非「已关闭」。

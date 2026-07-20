@@ -217,18 +217,7 @@ extension ProxyExtensionProvider {
         guard rule == .proxied, let (endpointHost, port) = ProxyDialer.hostPort(from: endpoint) else {
             return try await ProxyDialer.openDirect(to: endpoint)
         }
-        let config = proxyConfig
-        let servers = config?.servers ?? []
-        // 规则指定了具体上游 server 且存在 → 强制走它(single);否则按全局路由模式/活动 server 解析。
-        // 指定的 id 认不得(server 被删)→ 回落全局,不致命。
-        let route: ResolvedRoute
-        if let proxyServerID, let picked = servers.first(where: { $0.id == proxyServerID }) {
-            route = .single(picked)
-        } else {
-            route = ProxyRouteResolver.resolve(
-                mode: routingMode, servers: servers, activeServerID: config?.activeServerID
-            )
-        }
+        let route = resolvedRoute(rule: rule, proxyServerID: proxyServerID)
         let target = ProxyTargetSelector.selectTarget(
             remoteHostname: remoteHostname, endpointHost: endpointHost, port: port
         )
@@ -259,13 +248,40 @@ extension ProxyExtensionProvider {
 
     /// 发一条连接生命周期事件给 app(取当前累计字节)。非 private:beginFlow(主文件)与
     /// emitClose(本文件/TCPFlowPump)共用——从主文件挪来压 file_length,同既有拆文件先例。
+    /// 解析这条 flow 实际要走的路由:规则指定了具体 server 且存在 → 强制 `.single`;否则按全局路由
+    /// 模式 + 活动 server 解析。认不得的 id(server 被删)→ 回落全局。`openRemote` 与上游标签共用同一处。
+    func resolvedRoute(rule: ProxyRuleDTO, proxyServerID: String?) -> ResolvedRoute {
+        guard rule == .proxied else { return .direct }
+        let config = proxyConfig
+        let servers = config?.servers ?? []
+        if let proxyServerID, let picked = servers.first(where: { $0.id == proxyServerID }) {
+            return .single(picked)
+        }
+        return ProxyRouteResolver.resolve(
+            mode: routingMode, servers: servers, activeServerID: config?.activeServerID
+        )
+    }
+
+    /// 路由 → 活动栏/日志用的可读上游标签。直连 nil;单台 host:port;链/故障转移/负载均衡标出模式 + 候选。
+    func routeLabel(_ route: ResolvedRoute) -> String? {
+        func hp(_ s: ProxyServerDTO) -> String { "\(s.host):\(s.port)" }
+        switch route {
+        case .direct: return nil
+        case .single(let s): return hp(s)
+        case .chain(let list): return "链 · " + list.map(hp).joined(separator: " → ")
+        case .failover(let list): return "故障转移 · " + list.map(hp).joined(separator: ", ")
+        case .loadBalance(let list): return "负载均衡 · " + list.map(hp).joined(separator: ", ")
+        }
+    }
+
     func emitConnectionEvent(_ context: ConnectionContext, phase: ConnectionPhaseDTO) {
         guard let transport else { return }
         let bytes = context.snapshotBytes()
         let event = ConnectionEventDTO(
             id: context.id, processID: context.processID, targetHost: context.host, targetPort: context.port,
             rule: context.rule, proxyKind: context.proxyKind, phase: phase, bytesUp: bytes.up, bytesDown: bytes.down,
-            openedAt: context.openedAt, processDisplayName: context.processDisplayName
+            openedAt: context.openedAt, processDisplayName: context.processDisplayName,
+            upstreamLabel: context.upstreamLabel
         )
         Task { await transport.deliver(.connectionEvent(event)) }
     }

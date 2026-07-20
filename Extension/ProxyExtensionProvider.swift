@@ -97,7 +97,12 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     private var storedMatchRules: [MatchRuleDTO] = []
     // 主动环检测(兜底安全网):同一目标在极短窗口内被反复捕获即疑似转发环。阈值刻意调高——真实
     // 环会以每秒上千次的速度重捕,远超正常并发连接;精确阈值需真机微调(见 PROGRESS)。锁保护。
-    private var storedLoopDetector = LoopDetector(threshold: 50, windowSeconds: 1.0)
+    // 环检测阈值:signature=host:port,窗内累计到 threshold 次判成环、把来源进程加自动旁路。
+    // 之前 50/1s 仍误报——微信等聊天 app 一秒内对同一推送服务器开 50+ 条是正常的。真正的转发环
+    // 是**瞬时爆发**(一秒上千条),合法 app 是**散在一秒里**。故收紧成「0.25s 窗内 60 次」(≈240/s
+    // 的持续高速率):合法 app 达不到,真环一瞬即触发。real loop 本身也已被「本地代理来源→放行」
+    // 挡在 beginFlow 之前,这里只是二级兜底,可以放宽而不牺牲安全。
+    private var storedLoopDetector = LoopDetector(threshold: 60, windowSeconds: 0.25)
     // 逐连接抓包开关(默认关)。锁保护;开着时 beginFlow 给每条连接建一个 .dmp 写入器。
     private var storedPacketCaptureEnabled = false
     // proxied 进程的 UDP 策略(默认 .block 止漏)。锁保护。
@@ -371,6 +376,8 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         // 实际所用代理协议:按解析后的路由取第一跳的 kind——proxied 但降级成直连时记 nil,
         // 让连接日志里"到底走没走代理"如实。
         let proxyKind = ProxyDialer.representativeKind(rule: rule, config: proxyConfig, mode: routingMode)
+        // 实际走的上游可读标签(单台 host:port / 链 / 故障转移 / 负载均衡),与 openRemote 用同一处路由解析。
+        let upstreamLabel = routeLabel(resolvedRoute(rule: rule, proxyServerID: origin.proxyServerID))
         // 抓包开着时给这条连接建一个 .dmp 写入器;关着(或拿不到容器)就 nil,pump 里是 no-op。
         let capture = packetCaptureEnabled
             ? PacketCaptureWriter.forConnection(
@@ -380,7 +387,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             : nil
         let context = ConnectionContext(
             id: UUID().uuidString, processID: processID, host: host, port: port,
-            rule: rule, proxyKind: proxyKind, openedAt: Date(), capture: capture,
+            rule: rule, proxyKind: proxyKind, upstreamLabel: upstreamLabel, openedAt: Date(), capture: capture,
             processDisplayName: origin.displayName
         )
 

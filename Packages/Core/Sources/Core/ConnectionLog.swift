@@ -25,12 +25,15 @@ public struct ConnectionLogEntry: Sendable, Equatable, Codable, Identifiable {
     /// 未签名命令行程序的 `processID.value` 常是没有意义的 `a.out`,这个字段是更可读的兜底。
     /// 解不出时为 nil,调用方回落到 `processID.value`。
     public var processDisplayName: String?
+    /// 实际走的上游可读标签(单台 host:port / 链 / 故障转移 / 负载均衡);直连或未知为 nil。
+    /// 让日志/详情能看出「走了哪台、哪种路由模式」。旧持久化条目无此字段 → 解码为 nil。
+    public var upstreamLabel: String?
 
     public init(
         id: String, processID: ProcessID, host: String, port: UInt16,
         rule: ProxyRule, proxyKind: ProxyKind?, phase: ConnectionPhase,
         bytesUp: Int64, bytesDown: Int64, openedAt: Date = Date(timeIntervalSince1970: 0),
-        processDisplayName: String? = nil
+        processDisplayName: String? = nil, upstreamLabel: String? = nil
     ) {
         self.id = id
         self.processID = processID
@@ -43,6 +46,7 @@ public struct ConnectionLogEntry: Sendable, Equatable, Codable, Identifiable {
         self.bytesDown = bytesDown
         self.openedAt = openedAt
         self.processDisplayName = processDisplayName
+        self.upstreamLabel = upstreamLabel
     }
 
     /// 应用重启后从磁盘回灌历史连接日志时用:仍停在 `opened` 阶段的记录不可能真的还活着——

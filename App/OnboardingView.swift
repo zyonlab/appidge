@@ -2,156 +2,264 @@ import SwiftUI
 import Core
 import AppFeature
 
-/// 首次启动引导：说清 app 干什么、能管哪一层，一个按钮触发系统扩展激活并把引导标成已完成。
-/// 跟其它面板一样，UI 只读 store.state、只 dispatch(Action)。
-///
-/// 排版按 Apple HIG：一句承诺 → 能管/管不到两张平白卡 → 技术细节收进可展开的「详情」，
-/// 不再是一屏术语墙。只用系统默认控件，跟 App/ContentView.swift 的朴素风格保持一致。
+/// 首次启动引导——**分步向导**:欢迎 → 启用网络扩展(带实时批准状态 + 直达系统设置)→ 设代理 →
+/// 设规则 → 完成。重点是第 2 步:Developer ID 分发的系统扩展,macOS 强制用户首次去「系统设置」
+/// 点允许(无法绕过,除非 MDM),这一步把用户直接带过去并实时反馈状态。
+/// 跟其它面板一样,UI 只读 store.state、只 dispatch(Action)。
 struct OnboardingView: View {
     var store: Store
 
+    @State private var step: Step = .welcome
+
+    enum Step: Int, CaseIterable {
+        case welcome, extensionSetup, proxy, rules, done
+    }
+
     var body: some View {
-        VStack(spacing: 20) {
-            header
-            capabilityCards
-            details
-            startButton
+        VStack(spacing: 0) {
+            stepIndicator
+                .padding(.top, 20)
+            Divider().padding(.top, 16)
+
+            ScrollView {
+                content
+                    .padding(.horizontal, 40)
+                    .padding(.vertical, 24)
+                    .frame(maxWidth: .infinity)
+            }
+
+            Divider()
+            navBar
+                .padding(16)
         }
-        .padding(40)
-        .frame(minWidth: 480, minHeight: 320)
+        .frame(minWidth: 560, minHeight: 520)
     }
 
-    /// 图标 + 标题 + 一句平白说明。
-    private var header: some View {
-        VStack(spacing: 12) {
-            Image("PigeonLogo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 72, height: 72)
+    // MARK: - 步骤进度点
+
+    private var stepIndicator: some View {
+        HStack(spacing: 8) {
+            ForEach(Step.allCases, id: \.rawValue) { s in
+                Capsule()
+                    .fill(s.rawValue <= step.rawValue ? AnyShapeStyle(.tint) : AnyShapeStyle(.quaternary))
+                    .frame(width: s == step ? 22 : 7, height: 7)
+                    .animation(.snappy, value: step)
+            }
+        }
+    }
+
+    // MARK: - 各步内容
+
+    @ViewBuilder private var content: some View {
+        switch step {
+        case .welcome: welcomeStep
+        case .extensionSetup: extensionStep
+        case .proxy: ProxyStep(store: store)
+        case .rules: rulesStep
+        case .done: doneStep
+        }
+    }
+
+    private var welcomeStep: some View {
+        VStack(spacing: 16) {
+            Image("PigeonLogo").resizable().scaledToFit().frame(width: 96, height: 96)
                 .accessibilityLabel("appidge")
-
-            Text("appidge · 按进程代理")
-                .font(.title2)
-                .bold()
-
-            Text("为每个应用单独指定走代理或直连。代理异常时自动回退直连。")
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 360)
+            Text("appidge · 按进程代理").font(.title2).bold()
+            Text("为每个应用单独指定走代理或直连,还能让不同应用走不同代理。代理异常时自动回退直连。")
+                .font(.body).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center).frame(maxWidth: 400)
+            Text("下面几步带你启用扩展、配好代理与规则,大概一分钟。")
+                .font(.callout).foregroundStyle(.tertiary)
         }
     }
 
-    /// 两张平白能力卡：能接管 / 管不到。绿勾 = 能管，橙 info = 盲区。
-    private var capabilityCards: some View {
-        VStack(spacing: 8) {
-            capabilityCard(
-                symbol: "checkmark.circle.fill", tint: .green,
-                title: "能接管：直连出网的应用",
-                detail: "多数 App、命令行、开发工具，包括无视全局代理的那些。"
-            )
-            capabilityCard(
-                symbol: "info.circle.fill", tint: .orange,
-                title: "管不到：连本地代理端口的应用",
-                detail: "少数应用自己连 127.0.0.1，那部分已由别的代理处理。"
-            )
+    private var extensionStep: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            stepHeader("启用网络扩展", "appidge 靠一个系统网络扩展接管流量。macOS 要求你**首次批准一次**——这是苹果的安全机制,任何同类工具都免不了。批准后永久生效,不用每次开都点。")
+
+            let a = Self.activation(store.state.extensionActivation)
+            HStack(spacing: 8) {
+                Image(systemName: a.symbol).foregroundStyle(a.color)
+                Text(a.label).foregroundStyle(a.color).font(.callout.weight(.medium))
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.quinary, in: RoundedRectangle(cornerRadius: 10))
+
+            HStack(spacing: 8) {
+                Button("启用扩展") { SystemExtensionActivator.shared.activate() }
+                    .buttonStyle(.borderedProminent)
+                Button("打开系统设置") { SystemSettingsOpener.openExtensionsPane() }
+            }
+
+            Text("点「启用扩展」后,在弹出的系统提示或「系统设置 → 隐私与安全性 / 登录项与扩展 → 网络扩展」里允许 appidge。状态会在上面实时更新;显示「已启用」即可继续(没批准也能先往下走,回头再允许)。")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: 420)
     }
 
-    private func capabilityCard(symbol: String, tint: Color, title: LocalizedStringKey, detail: LocalizedStringKey) -> some View {
+    private var rulesStep: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            stepHeader("设置规则", "默认规则已经是「任意应用 → 走代理」,装好就能用。想更精细再调:")
+            bulletRow("让某些应用直连", "在「应用」或「规则」页把它设为「直连」(比如公司内网、下载工具)。")
+            bulletRow("不同应用走不同代理", "规则动作选「代理」时可指定走哪台上游——进程 X 走代理 A、进程 Y 走代理 B。")
+            bulletRow("按主机/端口细分", "「规则」页可加「进程 × 主机 × 端口 → 动作」的细粒度规则,从上到下首个命中生效。")
+            Text("这些都能在主界面随时改,现在跳过也没关系。")
+                .font(.caption).foregroundStyle(.tertiary)
+        }
+    }
+
+    private var doneStep: some View {
+        VStack(spacing: 16) {
+            Image("PigeonLogo").resizable().scaledToFit().frame(width: 88, height: 88)
+                .accessibilityLabel("appidge")
+            Text("准备就绪").font(.title2).bold()
+            Text("扩展批准并有流量后,「活动」页会实时列出每条连接。状态栏显示「引擎正常」即在接管。")
+                .font(.body).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center).frame(maxWidth: 420)
+        }
+    }
+
+    // MARK: - 导航
+
+    private var navBar: some View {
+        HStack {
+            if step != .welcome {
+                Button("上一步") { back() }
+            }
+            Spacer()
+            if step == .done {
+                Button("开始使用") { finish() }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+            } else {
+                Button(step == .rules ? "下一步" : "继续") { next() }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+    }
+
+    private func next() {
+        withAnimation(.snappy) {
+            if let n = Step(rawValue: step.rawValue + 1) { step = n }
+        }
+    }
+
+    private func back() {
+        withAnimation(.snappy) {
+            if let p = Step(rawValue: step.rawValue - 1) { step = p }
+        }
+    }
+
+    private func finish() {
+        SystemExtensionActivator.shared.activate()   // 幂等:引导里没点启用也兜底激活一次
+        store.dispatch(.onboardingCompleted)
+        Task { await FilePersistenceStore().save(PersistedConfiguration(from: store.state)) }
+    }
+
+    // MARK: - 小件
+
+    private func stepHeader(_ title: LocalizedStringKey, _ detail: LocalizedStringKey) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.title3).bold()
+            Text(detail).font(.callout).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func bulletRow(_ title: LocalizedStringKey, _ detail: LocalizedStringKey) -> some View {
         Label {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.callout.weight(.medium))
                 Text(detail).font(.callout).foregroundStyle(.secondary)
             }
         } icon: {
-            Image(systemName: symbol).foregroundStyle(tint)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(.quinary, in: RoundedRectangle(cornerRadius: 10))
-    }
-
-    /// 技术细节降一层：本机环境探测 + 诊断要点，各收进一个可折叠 DisclosureGroup。
-    private var details: some View {
-        let env = store.state.proxyEnvironment
-        return VStack(spacing: 8) {
-            DisclosureGroup(env.hasBypassLayer ? "环境检查：部分应用不经 appidge" : "环境检查通过") {
-                environmentDetail(env)
-                    .padding(.top, 6)
-            }
-            DisclosureGroup("有应用没走 appidge？") {
-                DiagnosticGuideView()
-                    .padding(.top, 6)
-            }
-        }
-        .font(.callout)
-        .frame(maxWidth: 420)
-    }
-
-    /// 本机探测：复用 ProxyEnvironmentSection 的 row 口径，精简为「系统代理 / 环境变量 / 额外接口」。
-    private func environmentDetail(_ env: ProxyEnvironment) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            detailRow("系统代理", ProxyCoverage.systemProxyText(env.systemProxy),
-                      warn: env.systemProxy != .none)
-            detailRow("环境变量", env.environmentVariables.isEmpty
-                      ? "未在 appidge 进程中发现（终端里可能仍有，见诊断）"
-                      : "\(env.environmentVariables.joined(separator: ", "))",
-                      warn: !env.environmentVariables.isEmpty)
-            if !env.extraTunnelInterfaces.isEmpty {
-                detailRow("额外网络接口",
-                          "\(env.extraTunnelInterfaces.joined(separator: ", "))（可能是其它 VPN/TUN 型代理在 IP 层抢流量）",
-                          warn: true)
-            }
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func detailRow(_ label: LocalizedStringKey, _ value: LocalizedStringKey, warn: Bool) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: warn ? "exclamationmark.triangle.fill" : "checkmark.circle")
-                .foregroundStyle(warn ? .orange : .green)
-                .font(.caption)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(label).foregroundStyle(.secondary).font(.caption)
-                Text(value).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-            }
+    /// 扩展激活状态 → 引导里的符号 + 语义色 + 文案。绿=已启用,橙=待批准/安装中,红=失败,灰=未接入。
+    private static func activation(_ state: ExtensionActivation) -> (symbol: String, label: LocalizedStringKey, color: Color) {
+        switch state {
+        case .active: ("checkmark.shield.fill", "已启用,可以继续", .green)
+        case .inactive: ("bolt.horizontal.circle", "未接入——点「启用扩展」", .secondary)
+        case .activating: ("arrow.triangle.2.circlepath", "安装中…", .orange)
+        case .needsApproval: ("exclamationmark.circle.fill", "待批准——去系统设置点「允许」", .orange)
+        case .disabled: ("bolt.slash.circle", "已停用——去系统设置重新开启", .orange)
+        case .failed(let reason): ("xmark.octagon.fill", "安装失败:\(reason)", .red)
         }
-    }
-
-    /// 「开始使用」——动作与现状完全一致：激活系统扩展 + 标记引导完成 + 持久化。
-    private var startButton: some View {
-        Button("开始使用") {
-            SystemExtensionActivator.shared.activate()
-            store.dispatch(.onboardingCompleted)
-            Task {
-                await FilePersistenceStore().save(PersistedConfiguration(from: store.state))
-            }
-        }
-        .buttonStyle(.borderedProminent)
     }
 }
 
-/// 诊断要点：「某个应用没走 appidge / 看不到」怎么自查。从 ProxyEnvironmentSection 的
-/// diagnosticGuide 抽出同口径的条目，供首次引导的可折叠区复用。
-private struct DiagnosticGuideView: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            bullet("它可能认了系统代理或读了环境变量，直接连本地端口（回环）——appidge 看不到这类流量。终端里测：`env | grep -i proxy` 查有没有 HTTP_PROXY；有就 `unset HTTP_PROXY HTTPS_PROXY ALL_PROXY` 后再跑，appidge 就能接管并显示它。")
-            bullet("它的流量可能已被 yunti 等聚合——活动栏里显示成 xray（本地代理出站），而不是原始应用名。关掉上游的系统规则模式即可让应用以自己的身份出现。")
-            bullet("它可能走 QUIC/UDP（HTTP/3）——appidge 默认拦截代理进程的 UDP 逼其回落 TCP；个别工具异常时可在「UDP / QUIC」里改「直连放行」。")
-            bullet("确认扩展在跑：状态栏是「引擎正常」、系统扩展「已接管」。")
-        }
-        .foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
+/// 「设代理」步骤:内嵌精简加代理表单(与 ProxyServersPaneView 的 AddProxyServerSheet 同口径),
+/// 多次可加,列出已添加的;可留空跳过(之后在「代理」页补)。拆成独立 View 以便持有自己的输入 @State。
+private struct ProxyStep: View {
+    var store: Store
+
+    @State private var host = ""
+    @State private var portText = ""
+    @State private var username = ""
+    @State private var password = ""
+    @State private var kind: ProxyKind = .socks5
+
+    private var parsedPort: UInt16? { UInt16(portText.trimmingCharacters(in: .whitespaces)) }
+    private var trimmedHost: String { host.trimmingCharacters(in: .whitespaces) }
+    private var canAdd: Bool { !trimmedHost.isEmpty && parsedPort != nil }
+    private var servers: [ProxyServer] {
+        store.state.proxyServers.values.sorted { $0.host.localizedCompare($1.host) == .orderedAscending }
     }
 
-    private func bullet(_ text: LocalizedStringKey) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text("•")
-            Text(text).fixedSize(horizontal: false, vertical: true)
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("添加代理服务器").font(.title3).bold()
+                Text("填一台你的上游代理(SOCKS5 / HTTP)。可以加多台,之后规则里能指定谁走哪台。没有也能跳过,以后在「代理」页补。")
+                    .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if !servers.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(servers) { s in
+                        Label("\(s.host):\(s.port) · \(s.kind == .socks5 ? "SOCKS5" : "HTTP")",
+                              systemImage: "checkmark.circle.fill")
+                            .font(.callout).foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            Form {
+                Picker("协议", selection: $kind) {
+                    Text("SOCKS5").tag(ProxyKind.socks5)
+                    Text("HTTP CONNECT").tag(ProxyKind.httpConnect)
+                }
+                .pickerStyle(.segmented)
+                TextField("地址", text: $host, prompt: Text("127.0.0.1"))
+                TextField("端口", text: $portText, prompt: Text("1080"))
+                TextField("用户名（可选）", text: $username)
+                SecureField("密码（可选）", text: $password)
+            }
+            .formStyle(.grouped)
+            .frame(height: 210)
+
+            HStack {
+                Spacer()
+                Button("添加这台", action: add).disabled(!canAdd)
+            }
         }
-        .font(.callout)
+    }
+
+    private func add() {
+        guard let port = parsedPort else { return }
+        store.dispatch(.addProxyServer(ProxyServer(
+            id: ProxyServerID(UUID().uuidString),
+            host: trimmedHost, port: port, kind: kind,
+            username: username.isEmpty ? nil : username,
+            password: password.isEmpty ? nil : password
+        )))
+        // 加完清空输入,方便连着加下一台;已添加的会出现在上方列表。
+        host = ""; portText = ""; username = ""; password = ""
     }
 }

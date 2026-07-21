@@ -1,0 +1,19 @@
+{
+  // Node 上下文文件（契约测试 + sandbox smoke 脚本）单独 typecheck，
+  // 用 @types/node，避免与 @cloudflare/workers-types 的全局声明冲突。
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true
+  },
+  "include": ["scripts/**/*.ts", "test/contract.test.ts", "vitest.config.ts", "vitest.node.config.ts"],
+  "exclude": ["node_modules", "dist", ".wrangler"]
+}

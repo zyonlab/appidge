@@ -1,0 +1,43 @@
+# apps/api/wrangler.toml — Appidge license facade Worker
+# secrets (CREEM_API_KEY / CREEM_WEBHOOK_SECRET / LICENSE_HMAC_PEPPER) 走 `wrangler secret put`，
+# 绝不写进本文件或 git。本地 dev 用 .dev.vars（git-ignored）。
+name = "appidge-api"
+main = "src/index.ts"
+compatibility_date = "2025-07-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+
+# 非秘密的构建期配置。MOCK_MODE 默认开：本地/CI 用协议 mock，不触真实 Creem。
+# 生产用 `wrangler deploy --var MOCK_MODE:false` 或 environment 覆盖，并注入真实 secret。
+[vars]
+MOCK_MODE = "true"
+CREEM_API_BASE = "https://test-api.creem.io"
+CREEM_PRODUCT_ID = "prod_PLACEHOLDER_xxxxxxxx"
+# 限速（滥用保护）：每 IP+路由 每窗口最大请求数 / 窗口毫秒。
+RATE_LIMIT_MAX = "60"
+RATE_LIMIT_WINDOW_MS = "60000"
+# 请求体大小上限（字节）。
+MAX_BODY_BYTES = "16384"
+
+# D1：webhook 幂等 + entitlement/refund 状态。真实 database_id 由部署者填入并记录在
+# infra/cloudflare。本地/测试用 miniflare 内置 D1，不需要真实 id。
+[[d1_databases]]
+binding = "DB"
+database_name = "appidge-licensing"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+# 生产环境：MOCK_MODE 关，base 指向生产 Creem。secret 仍走 `wrangler secret put --env production`。
+[env.production.vars]
+MOCK_MODE = "false"
+CREEM_API_BASE = "https://api.creem.io"
+CREEM_PRODUCT_ID = "prod_PLACEHOLDER_xxxxxxxx"
+RATE_LIMIT_MAX = "60"
+RATE_LIMIT_WINDOW_MS = "60000"
+MAX_BODY_BYTES = "16384"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "appidge-licensing"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"

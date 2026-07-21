@@ -20,3 +20,23 @@ pigeon_icon_assets/*
 
 # 描述文件含 team-identifier 与开发者证书，绝不进 git（同 .env 纪律）——本地保留供构建
 Signing/*.provisionprofile
+
+# ── Node / pnpm / Turborepo monorepo ──────────────────────────────
+node_modules/
+.turbo/
+.pnpm-store/
+# 构建产物
+apps/*/dist/
+apps/*/.astro/
+apps/*/.wrangler/
+apps/**/coverage/
+# Worker/前端本地秘密（含 mock 值）绝不进 git；只提交 *.example
+apps/api/.dev.vars
+apps/web/.env
+apps/web/.env.*
+!apps/web/.env.example
+.wrangler/
+# Cloudflare 本地状态 / D1 本地库
+apps/api/.mf/
+**/.cloudflare/
+

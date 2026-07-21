@@ -1,0 +1,239 @@
+openapi: 3.1.0
+info:
+  title: Appidge Licensing Facade API
+  version: 1.0.0
+  description: >-
+    App ↔ Worker 之间的唯一契约。macOS 客户端只调用本 facade（api.appidge.app），
+    绝不直连带 x-api-key 的 Creem API。Worker 在服务端持有 Creem secret 并转译，
+    对客户端稳定化状态与错误，不透传 Creem 内部响应。
+    本文件是语言边界真相：Swift DTO 与 TypeScript DTO 都以此为准，配合 contracts/fixtures 做契约测试。
+servers:
+  - url: https://api.appidge.app
+    description: 生产
+  - url: http://127.0.0.1:8787
+    description: 本地 wrangler dev（MOCK_MODE 默认开）
+
+tags:
+  - name: health
+  - name: licenses
+  - name: webhooks
+
+paths:
+  /healthz:
+    get:
+      tags: [health]
+      summary: 存活探针
+      operationId: healthz
+      responses:
+        "200":
+          description: 服务存活
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [ok] }
+                  mockMode: { type: boolean, description: 是否运行在协议 mock 模式 }
+
+  /v1/licenses/activate:
+    post:
+      tags: [licenses]
+      summary: 首次在本机激活 license，占用一个激活名额
+      operationId: activateLicense
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ActivateRequest" }
+      responses:
+        "200":
+          description: 激活成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LicenseState" }
+        "400": { $ref: "#/components/responses/Error" }
+        "402": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+        "502": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+
+  /v1/licenses/validate:
+    post:
+      tags: [licenses]
+      summary: 校验 license+实例仍有效（先查本地 revoked，再问上游）
+      operationId: validateLicense
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ValidateRequest" }
+      responses:
+        "200":
+          description: 校验完成（状态见 body.status，可能为 revoked/expired）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LicenseState" }
+        "400": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+        "502": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+
+  /v1/licenses/deactivate:
+    post:
+      tags: [licenses]
+      summary: 在本机停用，释放激活名额
+      operationId: deactivateLicense
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DeactivateRequest" }
+      responses:
+        "200":
+          description: 停用成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeactivateResponse" }
+        "400": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+        "502": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+
+  /v1/webhooks/creem:
+    post:
+      tags: [webhooks]
+      summary: Creem webhook 接收端（HMAC over raw body 验签后处理）
+      operationId: creemWebhook
+      description: >-
+        用收到的原始请求字节计算 HMAC-SHA256，对 creem-signature 做恒定时间比较；
+        验签成功才解析 JSON。以事件 ID 幂等，重复投递返回 200 但不重复副作用。
+      parameters:
+        - in: header
+          name: creem-signature
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Creem 事件 payload（确切字段以 test mode 捕获的脱敏 fixture 为准）
+      responses:
+        "200":
+          description: 已接收（含重复投递的幂等成功）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [received]
+                properties:
+                  received: { type: boolean, enum: [true] }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+
+components:
+  schemas:
+    LicenseStatus:
+      type: string
+      description: 稳定化后的授权状态（不透传 Creem 原始枚举）
+      enum: [active, expired, revoked]
+
+    ActivateRequest:
+      type: object
+      required: [licenseKey, instanceName, appVersion]
+      additionalProperties: false
+      properties:
+        licenseKey:
+          type: string
+          minLength: 8
+          maxLength: 200
+          description: 用户从 Creem 邮件/门户复制的 license key
+        instanceName:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: 隐私友好且稳定的安装标识，非邮箱/主机名/硬件序列号
+        appVersion:
+          type: string
+          maxLength: 40
+
+    ValidateRequest:
+      type: object
+      required: [licenseKey, instanceId, appVersion]
+      additionalProperties: false
+      properties:
+        licenseKey: { type: string, minLength: 8, maxLength: 200 }
+        instanceId: { type: string, minLength: 1, maxLength: 120 }
+        appVersion: { type: string, maxLength: 40 }
+
+    DeactivateRequest:
+      type: object
+      required: [licenseKey, instanceId]
+      additionalProperties: false
+      properties:
+        licenseKey: { type: string, minLength: 8, maxLength: 200 }
+        instanceId: { type: string, minLength: 1, maxLength: 120 }
+
+    LicenseState:
+      type: object
+      required: [status, instanceId, activations, activationLimit, validatedAt]
+      additionalProperties: false
+      properties:
+        status: { $ref: "#/components/schemas/LicenseStatus" }
+        instanceId:
+          type: string
+          description: Creem instance.id，客户端必须本地存以供后续 validate/deactivate
+        expiresAt:
+          type: [string, "null"]
+          format: date-time
+          description: 订阅到期时间；买断为 null
+        activations:
+          type: integer
+          minimum: 0
+          description: 当前已用激活数
+        activationLimit:
+          type: [integer, "null"]
+          minimum: 0
+          description: 激活上限；null=无限
+        validatedAt:
+          type: string
+          format: date-time
+          description: 本次服务端校验时间（客户端据此计算离线宽限）
+
+    DeactivateResponse:
+      type: object
+      required: [status]
+      additionalProperties: false
+      properties:
+        status: { type: string, enum: [deactivated] }
+
+    Error:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: string
+          description: 稳定错误码，不透传 Creem 内部响应
+          enum:
+            - invalid_request
+            - invalid_license
+            - activation_limit
+            - expired
+            - revoked
+            - rate_limited
+            - upstream_unavailable
+            - internal_error
+        message:
+          type: string
+          description: 人类可读、脱敏的补充说明（绝不含完整 license/API key）
+
+  responses:
+    Error:
+      description: 稳定错误体
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }

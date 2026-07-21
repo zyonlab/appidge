@@ -1,12 +1,23 @@
-name: CI
+name: CI · Swift
 
 on:
+  # main push 始终跑全（集成闸门）
   push:
     branches: [main]
+  # PR 只在 Swift 相关改动时跑；web-only 改动不触发 macOS CI
   pull_request:
+    paths:
+      - "App/**"
+      - "Extension/**"
+      - "Packages/**"
+      - "appidge.xcodeproj/**"
+      - "project.yml"
+      - ".swiftlint.yml"
+      - "scripts/**"
+      - ".github/workflows/ci-swift.yml"
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-swift-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

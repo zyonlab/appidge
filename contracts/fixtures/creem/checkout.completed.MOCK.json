@@ -1,0 +1,13 @@
+{
+  "_mock": true,
+  "_warning": "占位样本，字段名未经 Creem test mode 实测确认。拿到 test secret 后用真实脱敏 payload 替换并去掉 _mock。",
+  "id": "evt_MOCK_checkout_0000",
+  "eventType": "checkout.completed",
+  "object": {
+    "checkout": "chk_MOCK_0000",
+    "order": "ord_MOCK_0000",
+    "customer": "cust_MOCK_0000",
+    "product": "prod_MOCK_appidge",
+    "license": "MOCK-LICENSE-0000-0000-0000"
+  }
+}

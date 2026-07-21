@@ -1,0 +1,43 @@
+name: CI · Web/API
+
+on:
+  # main push 始终跑全（集成闸门）
+  push:
+    branches: [main]
+  # PR 只在 web/api 相关改动时跑；Swift-only 改动不触发
+  pull_request:
+    paths:
+      - "apps/**"
+      - "contracts/**"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "turbo.json"
+      - ".npmrc"
+      - ".github/workflows/ci-web.yml"
+
+concurrency:
+  group: ci-web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: pnpm check (lint / typecheck / test / build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Check
+        run: pnpm check

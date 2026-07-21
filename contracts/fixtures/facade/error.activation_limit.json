@@ -1,0 +1,11 @@
+{
+  "request": {
+    "licenseKey": "MOCK-LICENSE-0000-0000-0000",
+    "instanceName": "appidge-install-mock04",
+    "appVersion": "1.0.0"
+  },
+  "response": {
+    "error": "activation_limit",
+    "message": "This license has reached its activation limit."
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "request": {
+    "licenseKey": "MOCK-LICENSE-0000-0000-0000",
+    "instanceId": "inst_MOCK_0000000000",
+    "appVersion": "1.0.0"
+  },
+  "response": {
+    "status": "revoked",
+    "instanceId": "inst_MOCK_0000000000",
+    "expiresAt": null,
+    "activations": 1,
+    "activationLimit": 3,
+    "validatedAt": "2026-01-02T00:00:00Z"
+  }
+}

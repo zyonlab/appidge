@@ -1,0 +1,24 @@
+{
+  "name": "appidge-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Appidge 商业化 monorepo —— Swift 根目录保持不动，apps/web + apps/api 渐进扩展",
+  "packageManager": "pnpm@10.13.1",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "scripts": {
+    "dev:web": "turbo run dev --filter=web",
+    "dev:api": "turbo run dev --filter=api",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "build": "turbo run build",
+    "check": "turbo run lint typecheck test build",
+    "check:swift": "bash scripts/check-swift.sh"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3"
+  }
+}

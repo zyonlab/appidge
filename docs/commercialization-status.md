@@ -23,7 +23,7 @@
 - [ ] macOS App 用 Keychain 保存授权，activate/validate/deactivate 与 7 天 grace —— Wave 2（Agent E）未开始
 - [~] Sparkle feed/包/R2 —— App target 接入且 Debug build 成功；`SUPublicEDKey` 仍为 TODO（未伪造）= 人工闸门
 - [ ] 旧版 → 新版 Sparkle + 系统扩展升级 smoke test —— 发布期人工闸门
-- [~] `swift test` 五包全绿、App Debug build 成功；SwiftLint strict 见下「已知问题」（App/ExitIPChecker.swift 预存违规）
+- [x] `swift test` 五包全绿、App Debug build 成功、**SwiftLint strict 0 违规**（预存 11 处已清零，见下「已解决」）
 - [x] `pnpm check` 全绿（web+api：lint/typecheck/test/build），Worker `wrangler deploy --dry-run` 成功；提交物无 secret（.dev.vars/.env git-ignored）
 - [~] 部署/回滚/密钥轮换文档：`infra/cloudflare/README.md` runbook 就位；退款操作/剩余闸门见下表
 
@@ -49,10 +49,11 @@
 - [ ] Agent E · macOS License Client（依赖已集成的 Sparkle 分支 + 契约）
 - [ ] Agent F · Integration/QA（跨端契约、sandbox、升级 smoke）
 
-## 已知问题（预存，非本次引入）
-- **SwiftLint strict 当前红**：`App/ExitIPChecker.swift` 11 处违规（cyclomatic_complexity / non_optional_string_data_conversion / unused_closure_parameter）。
-  已核实这些违规在 `198d7a6`（本轮工作之前）即存在，属 SwiftLint 版本漂移（新规则），**非商业化改动引入**，且在路由/退出 IP 检测的稳定敏感代码里。
-  未在本轮擅自修改（§7「不做无关重构」+ 稳定性零容忍）。需用户决定：单独修 lint 或放宽 `.swiftlint.yml` 对应规则。
+## 已解决：SwiftLint strict 预存违规（commit `02f7955`）
+11 处预存违规（`198d7a6` 即存在的 SwiftLint 版本漂移，非商业化改动引入）已清零：
+- **行为保持真实修复（9）**：Core/Reducer 拆 `reduceConnectionLog`；Core/Action 换行；ExitIPChecker（`Data(str.utf8)` / 拆 `readSocks5ConnectReply` / 未用闭包参数 `_`）；SettingsView 两条长文案拼接换行；OnboardingView 与 …Routing 各把三元组换成结构体。
+- **作用域豁免（2）**：`ProxyExtensionProvider` 的 `file_length` / `function_body_length` region-disable + 理由——转发热路径仅超阈值 2/21 行，稳定性零容忍下不为纯长度阈值重构热路径。
+- 验证：`swiftlint --strict` 0 违规、`swift test` 五包全绿、`xcodebuild App Debug` BUILD SUCCEEDED。
 
 ---
 

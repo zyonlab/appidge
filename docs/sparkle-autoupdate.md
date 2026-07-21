@@ -12,7 +12,7 @@
   一构造即启动后台自动检查。菜单栏下拉「**检查更新…**」(`App/ContentView.swift` 的 `MenuBarView`)
   调用 `updater.checkForUpdates()` 手动触发一次检查。
 - **Info.plist**(`App/Info.plist`):
-  - `SUFeedURL` = `https://appidge.app/appcast.xml`(**占位**,发布前替换,见下)。
+  - `SUFeedURL` = `https://updates.appidge.app/appcast.xml`(CLAUDE.md §5.6 固定域名,R2 自定义域直达,不经 Worker)。
   - `SUPublicEDKey` = `TODO-REPLACE-WITH-ED-PUBLIC-KEY`(**占位**,发布前替换成真实 base64 公钥)。
   - `SUEnableAutomaticChecks` = `true`。
 - app 非沙盒(Developer ID 分发),用 Sparkle 标准配置,无需 XPC 服务分离 / 额外 sandbox 桥接。
@@ -52,8 +52,8 @@ Sparkle 的 `generate_keys` 工具在解析后的包产物里(SPM 缓存 / Xcode
 
 ### 3. 托管 appcast.xml
 
-- 在 `SUFeedURL` 指向的地址(现占位 `https://appidge.app/appcast.xml`)托管一个 `appcast.xml`(RSS)。
-  发布前把这个 URL 换成你真实的托管地址(HTTPS)。
+- 在 `SUFeedURL` 指向的地址(`https://updates.appidge.app/appcast.xml`,Cloudflare R2 自定义域)托管一个 `appcast.xml`(RSS)。
+  该域名已由 CLAUDE.md §5.6 固定,发布前只需把 R2 桶挂到该自定义域并上传 appcast/更新包,无需再改客户端。
 - 每次发版追加一个 `<item>`:`<sparkle:version>`(= `CFBundleVersion`)、
   `<sparkle:shortVersionString>`、`<enclosure url=... sparkle:edSignature=... length=...>`。
 - 更新包(zip/dmg)本身也托管在可 HTTPS 下载的地址,URL 写进 `<enclosure url>`。

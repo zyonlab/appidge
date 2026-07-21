@@ -1,0 +1,14 @@
+---
+// 法律页草稿标记 —— 明确文本需用户最终法务审核，不冒充法律意见。见 CLAUDE.md §5.2。
+interface Props {
+  updated?: string;
+}
+const { updated } = Astro.props;
+---
+
+<aside class="draft-notice" role="note">
+  <strong>草稿 · 待法务审核：</strong>
+  本页文本为占位草稿，需由你（运营方）委托合格法律顾问最终审核后再对外生效，
+  不构成法律意见。
+  {updated && <span> 最后更新：{updated}。</span>}
+</aside>

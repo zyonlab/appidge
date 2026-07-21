@@ -1,0 +1,23 @@
+{
+  "name": "web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Appidge 官网 —— Astro 静态站（无 SSR / 无 React / 无追踪）",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "typecheck": "astro check",
+    "lint": "node scripts/lint.mjs",
+    "test": "node scripts/check-site.mjs"
+  },
+  "dependencies": {
+    "astro": "5.12.0",
+    "@astrojs/sitemap": "3.4.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.4",
+    "typescript": "5.8.3"
+  }
+}

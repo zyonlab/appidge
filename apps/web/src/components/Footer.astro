@@ -1,0 +1,46 @@
+---
+import { SITE_NAME, SUPPORT_EMAIL } from '../config/site';
+
+const year = new Date().getFullYear();
+
+const productLinks = [
+  { href: '/download', label: '下载' },
+  { href: '/pricing', label: '定价' },
+  { href: '/faq', label: '常见问题' },
+];
+const legalLinks = [
+  { href: '/refund', label: '退款政策' },
+  { href: '/privacy', label: '隐私政策' },
+  { href: '/terms', label: '服务条款' },
+];
+---
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <p class="brand" style="color:var(--fg)">{SITE_NAME}</p>
+        <p style="max-width:22rem">按进程控制网络去向的 macOS 透明代理工具。</p>
+      </div>
+      <nav aria-label="产品">
+        <ul>
+          <li><strong style="color:var(--fg)">产品</strong></li>
+          {productLinks.map((l) => <li><a href={l.href}>{l.label}</a></li>)}
+        </ul>
+      </nav>
+      <nav aria-label="法律">
+        <ul>
+          <li><strong style="color:var(--fg)">法律</strong></li>
+          {legalLinks.map((l) => <li><a href={l.href}>{l.label}</a></li>)}
+        </ul>
+      </nav>
+      <nav aria-label="联系">
+        <ul>
+          <li><strong style="color:var(--fg)">联系</strong></li>
+          <li><a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a></li>
+        </ul>
+      </nav>
+    </div>
+    <p class="footer-meta">© {year} {SITE_NAME}. 保留所有权利。</p>
+  </div>
+</footer>

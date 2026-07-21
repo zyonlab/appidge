@@ -27,6 +27,32 @@ database_name = "appidge-licensing"
 database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "migrations"
 
+# ── staging（测试预览）──────────────────────────────────────────────
+# 自定义域：api-staging.appidge.com（custom_domain=true，wrangler 自动建 DNS+证书）。
+# 先跑 MOCK_MODE=true：验证 Pages→Worker→D1 全链路，无需真实 Creem secret。
+# 唯一需要的 staging secret 是 LICENSE_HMAC_PEPPER（走 `wrangler secret put --env staging`）。
+[env.staging]
+workers_dev = false
+
+[[env.staging.routes]]
+pattern = "api-staging.appidge.com"
+custom_domain = true
+
+[env.staging.vars]
+MOCK_MODE = "true"
+CREEM_API_BASE = "https://test-api.creem.io"
+CREEM_PRODUCT_ID = "prod_PLACEHOLDER_xxxxxxxx"
+RATE_LIMIT_MAX = "60"
+RATE_LIMIT_WINDOW_MS = "60000"
+MAX_BODY_BYTES = "16384"
+
+# staging 专用 D1（与生产库隔离，区域 APAC）。
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "appidge-licensing-staging"
+database_id = "2777a4a3-8e0f-4f39-af39-12aed0ceb63e"
+migrations_dir = "migrations"
+
 # 生产环境：MOCK_MODE 关，base 指向生产 Creem。secret 仍走 `wrangler secret put --env production`。
 [env.production.vars]
 MOCK_MODE = "false"

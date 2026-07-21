@@ -21,7 +21,10 @@ public enum Action: Sendable, Equatable {
     /// 就地编辑一条已有规则(按 id 定位):替换 进程/主机/端口/动作,**保留原位置与启用态**。
     /// 用于「双击某行改规则」——区别于 `addMatchRule`(那是新增或按三元组去重后置顶)。id 不存在
     /// 时 no-op。
-    case updateMatchRule(id: RuleID, appPattern: String, hostPattern: String, portRange: ClosedRange<UInt16>?, action: ProxyRule, proxyServerID: ProxyServerID? = nil)
+    case updateMatchRule(
+        id: RuleID, appPattern: String, hostPattern: String,
+        portRange: ClosedRange<UInt16>?, action: ProxyRule, proxyServerID: ProxyServerID? = nil
+    )
     case removeMatchRule(RuleID)
     case reorderMatchRules([RuleID])
     /// 启用/停用一条规则(保留在表里,不删除)。禁用的规则下发前被过滤,永不参与匹配。

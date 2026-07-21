@@ -110,13 +110,15 @@ extension ProxyExtensionProvider {
         }
         // ⑤ 解出动作:细粒度规则表(首个命中)优先于每进程规则;都没有 → 默认 .direct(策略 A:
         //    默认就接管并直连计量,活动栏能看到每条连接)。
-        let (action, serverID, ruleSource) = resolveAction(sourceID: sourceID, hosts: candidates, port: port)
+        let resolved = resolveAction(sourceID: sourceID, hosts: candidates, port: port)
+        let action = resolved.rule
+        let ruleSource = resolved.source
         switch action {
         case .observe:
             return (.observe, "observe:\(ruleSource)")
         case .direct, .proxied, .block:
             // 规则指定的上游 server 只对 .proxied 有意义;其余动作忽略。
-            return (.handle(action, proxyServerID: action == .proxied ? serverID : nil),
+            return (.handle(action, proxyServerID: action == .proxied ? resolved.serverID : nil),
                     "handle:\(ruleSource)(\(action))")
         }
     }
@@ -147,18 +149,27 @@ extension ProxyExtensionProvider {
         return nil
     }
 
+    /// 解出的路由动作(规则 + 指定上游 + 命中来源标签)。取代三元组，满足 large_tuple。
+    private struct ResolvedAction {
+        let rule: ProxyRuleDTO
+        let serverID: String?
+        let source: String
+    }
+
     /// 规则表(首个命中,hostname/endpoint host 两候选各试一次)→ 每进程规则 → 默认 `.direct`(策略 A)。
-    private func resolveAction(sourceID: String, hosts: [String], port: UInt16?) -> (ProxyRuleDTO, String?, String) {
+    private func resolveAction(sourceID: String, hosts: [String], port: UInt16?) -> ResolvedAction {
         if let port {
             for host in hosts {
                 // firstMatchRule(非 firstMatch)拿到整条规则,才能读出它指定的 proxyServerID。
                 if let matched = RuleMatcher.firstMatchRule(matchRules, app: sourceID, host: host, port: port) {
-                    return (matched.rule, matched.proxyServerID, "matchRule(\(host))")
+                    return ResolvedAction(rule: matched.rule, serverID: matched.proxyServerID, source: "matchRule(\(host))")
                 }
             }
         }
-        if let perProcess = perProcessRules[sourceID] { return (perProcess, nil, "perProcess") }
-        return (.direct, nil, "default")
+        if let perProcess = perProcessRules[sourceID] {
+            return ResolvedAction(rule: perProcess, serverID: nil, source: "perProcess")
+        }
+        return ResolvedAction(rule: .direct, serverID: nil, source: "default")
     }
 
     /// 来源是不是 app 动态查到的本地代理进程(签名标识或可执行文件路径任一命中,直连档)。

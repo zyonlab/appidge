@@ -1,3 +1,7 @@
+// swiftlint:disable file_length
+// 稳定性零容忍:本文件是 NE provider 的转发热路径(beginFlow/openRemote/pump…)。仅超阈值 21 行,
+// 已按既有先例把路由拆到 ProxyExtensionProviderRouting.swift;不为凑 file_length 再切分热路径,
+// 避免为一个纯长度阈值给转发链引入回归风险。新增大块逻辑时应优先拆到同类型 extension 文件。
 import Foundation
 import Network
 @preconcurrency import NetworkExtension
@@ -336,6 +340,9 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         }
     }
 
+    // 转发热路径:仅超阈值 2 行。稳定性零容忍下不为凑 function_body_length 抽取热路径中间步骤,
+    // 那会打断"解路由→建远端→双向 pump"的线性可读性并引入回归面。故就地 region-disable。
+    // swiftlint:disable function_body_length
     /// 非 private:`beginHandledFlow` 在同类型的跨文件 extension(`ProxyExtensionProviderRouting`)里
     /// 调用它——同 `matchRules`/`effectiveRuleSync` 的既有先例(拆文件压 lint 阈值)。
     func beginFlow(
@@ -417,5 +424,6 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             emitClose(context, failed: true)
         }
     }
+    // swiftlint:enable function_body_length
 
 }

@@ -181,15 +181,27 @@ struct OnboardingView: View {
     }
 
     /// 扩展激活状态 → 引导里的符号 + 语义色 + 文案。绿=已启用,橙=待批准/安装中,红=失败,灰=未接入。
-    private static func activation(_ state: ExtensionActivation) -> (symbol: String, label: LocalizedStringKey, color: Color) {
+    private static func activation(_ state: ExtensionActivation) -> ActivationStyle {
         switch state {
-        case .active: ("checkmark.shield.fill", "已启用,可以继续", .green)
-        case .inactive: ("bolt.horizontal.circle", "未接入——点「启用扩展」", .secondary)
-        case .activating: ("arrow.triangle.2.circlepath", "安装中…", .orange)
-        case .needsApproval: ("exclamationmark.circle.fill", "待批准——去系统设置点「允许」", .orange)
-        case .disabled: ("bolt.slash.circle", "已停用——去系统设置重新开启", .orange)
-        case .failed(let reason): ("xmark.octagon.fill", "安装失败:\(reason)", .red)
+        case .active: ActivationStyle("checkmark.shield.fill", "已启用,可以继续", .green)
+        case .inactive: ActivationStyle("bolt.horizontal.circle", "未接入——点「启用扩展」", .secondary)
+        case .activating: ActivationStyle("arrow.triangle.2.circlepath", "安装中…", .orange)
+        case .needsApproval: ActivationStyle("exclamationmark.circle.fill", "待批准——去系统设置点「允许」", .orange)
+        case .disabled: ActivationStyle("bolt.slash.circle", "已停用——去系统设置重新开启", .orange)
+        case .failed(let reason): ActivationStyle("xmark.octagon.fill", "安装失败:\(reason)", .red)
         }
+    }
+}
+
+/// 引导里一行激活状态的展示样式（符号 + 文案 + 语义色）。取代三元组，满足 large_tuple。
+private struct ActivationStyle {
+    let symbol: String
+    let label: LocalizedStringKey
+    let color: Color
+    init(_ symbol: String, _ label: LocalizedStringKey, _ color: Color) {
+        self.symbol = symbol
+        self.label = label
+        self.color = color
     }
 }
 

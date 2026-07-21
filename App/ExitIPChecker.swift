@@ -51,8 +51,8 @@ enum ExitIPChecker {
 
     private static func absoluteGET(username: String?, password: String?) -> String {
         var req = "GET http://\(echoHost)/ HTTP/1.1\r\nHost: \(echoHost)\r\nUser-Agent: appidge\r\nConnection: close\r\n"
-        if let username, let password,
-           let cred = "\(username):\(password)".data(using: .utf8) {
+        if let username, let password {
+            let cred = Data("\(username):\(password)".utf8)
             req += "Proxy-Authorization: Basic \(cred.base64EncodedString())\r\n"
         }
         req += "\r\n"
@@ -83,7 +83,12 @@ enum ExitIPChecker {
         var req: [UInt8] = [0x05, 0x01, 0x00, 0x03, UInt8(host.count)] + host
         req += [UInt8(echoPort >> 8), UInt8(echoPort & 0xff)]
         try await send(conn, Data(req))
-        // 回复:VER REP RSV ATYP BND.ADDR BND.PORT。先读前 4 字节判 ATYP，再读余量。
+        try await readSocks5ConnectReply(conn)
+    }
+
+    /// 读并丢弃 SOCKS5 CONNECT 回复:VER REP RSV ATYP BND.ADDR BND.PORT。
+    /// 先读前 4 字节判 ATYP，再按类型读余量。拆出来压 `socks5Connect` 的 cyclomatic_complexity。
+    private static func readSocks5ConnectReply(_ conn: NWConnection) async throws {
         let head = try await readExactly(conn, 4)
         guard head.count == 4, head[0] == 0x05, head[1] == 0x00 else {
             throw CheckError("SOCKS5 CONNECT 被拒（REP=\(head.count > 1 ? head[1] : 255)）")
@@ -151,7 +156,7 @@ enum ExitIPChecker {
 
     private static func receiveOnce(_ conn: NWConnection, max: Int) async throws -> [UInt8] {
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<[UInt8], Error>) in
-            conn.receive(minimumIncompleteLength: 1, maximumLength: max) { data, _, isComplete, err in
+            conn.receive(minimumIncompleteLength: 1, maximumLength: max) { data, _, _, err in
                 if let err { cont.resume(throwing: err); return }
                 cont.resume(returning: data.map(Array.init) ?? [])
             }

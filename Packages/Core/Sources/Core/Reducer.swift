@@ -8,6 +8,7 @@ public enum Reducer {
             ?? reduceProcessAndFlow(state, action)
             ?? reduceRuntimeSignals(state, action)
             ?? reduceSettings(state, action)
+            ?? reduceConnectionLog(state, action)
             ?? reduceLifecycle(state, action)
     }
 
@@ -82,17 +83,25 @@ public enum Reducer {
             return reopenOnboarding(state)
         case .appLaunched:
             return appLaunched(state)
+        case .resyncExtension:
+            return resyncExtension(state)
+        default:
+            // 只可能是前面几组已处理的 case，reduce 不会走到这里。
+            return (state, [])
+        }
+    }
+
+    /// 连接日志这一组 action（从 `reduceLifecycle` 拆出，压 cyclomatic_complexity 阈值）。
+    private static func reduceConnectionLog(_ state: AppState, _ action: Action) -> (AppState, [Effect])? {
+        switch action {
         case .connectionEventReceived(let entry):
             return connectionEventReceived(entry, state)
         case .connectionEventsReceived(let entries):
             return connectionEventsReceived(entries, state)
         case .clearConnectionLog:
             return clearConnectionLog(state)
-        case .resyncExtension:
-            return resyncExtension(state)
         default:
-            // 只可能是前面几组已处理的 case，reduce 不会走到这里。
-            return (state, [])
+            return nil
         }
     }
 

@@ -3,7 +3,7 @@
 > 只由主 Agent 更新勾选状态和证据。勾选前必须有可复现命令/输出证据，不凭主观标 pass。
 > 缺真实凭证时，代码与自动测试完成 ≠ 上线完成——对应项保持未勾选，并给一条最短解锁步骤。
 
-最后更新：2026-07-21（Phase 1 monorepo 地基）
+最后更新：2026-07-21（Phase 1 地基 + Wave 1 三 Agent 并行集成完成）
 
 ## 图例
 - [x] 已自动验证（有命令+输出）
@@ -14,38 +14,45 @@
 
 ## Definition of Done（对齐 CLAUDE.md §8）
 
-- [~] 现有 Swift/Xcode 路径未移动；根 pnpm/Turbo workspace 可重复安装并全绿
-- [ ] CI 能按改动范围运行，main 集成闸门覆盖 Swift、Web、Worker
-- [ ] Astro 官网含下载/购买/退款/隐私/条款并在 Cloudflare preview 验证
-- [ ] Hosted Checkout test flow 能完成购买并获得 license key
-- [ ] Worker license facade 不泄露 Creem API key，契约测试与错误映射全绿
-- [ ] Webhook HMAC、D1 幂等、refund/dispute revoke 有自动测试与 sandbox 证据
-- [ ] macOS App 用 Keychain 保存授权，activate/validate/deactivate 与 7 天 grace 全绿
-- [ ] Sparkle 公钥、feed、签名更新包与 R2 路径真实可验证，不含 TODO 私钥
-- [ ] 旧版 → 新版 Sparkle + 系统扩展升级 smoke test 有结果
-- [ ] `swift test` 五包全绿，SwiftLint strict 全绿，App Debug build 成功
-- [ ] `pnpm check` 全绿，Worker dry-run/preview 成功，仓库 secret 扫描无泄漏
-- [ ] 部署/回滚/密钥轮换/退款操作/剩余人工闸门文档齐备
+- [x] 现有 Swift/Xcode 路径未移动；根 pnpm/Turbo workspace 可重复安装（`pnpm install` frozen-able）并 `pnpm check` 全绿
+- [~] CI 能按改动范围运行（`ci-swift` / `ci-web` 路径过滤，main push 跑全）—— 结构就位，尚未在 GitHub 实跑一次绿
+- [~] Astro 官网含下载/购买/退款/隐私/条款 —— 本地 build/test 全绿；Cloudflare preview = 人工闸门
+- [ ] Hosted Checkout test flow 能完成购买并获得 license key —— 需真实 Creem 产品/checkout link
+- [x] Worker license facade 不泄露 Creem API key，契约测试与错误映射全绿（MOCK_MODE，44 测试）
+- [~] Webhook HMAC、D1 幂等、refund/dispute revoke 有自动测试 —— sandbox 证据 = 人工闸门（真实 test secret + 脱敏 fixture）
+- [ ] macOS App 用 Keychain 保存授权，activate/validate/deactivate 与 7 天 grace —— Wave 2（Agent E）未开始
+- [~] Sparkle feed/包/R2 —— App target 接入且 Debug build 成功；`SUPublicEDKey` 仍为 TODO（未伪造）= 人工闸门
+- [ ] 旧版 → 新版 Sparkle + 系统扩展升级 smoke test —— 发布期人工闸门
+- [~] `swift test` 五包全绿、App Debug build 成功；SwiftLint strict 见下「已知问题」（App/ExitIPChecker.swift 预存违规）
+- [x] `pnpm check` 全绿（web+api：lint/typecheck/test/build），Worker `wrangler deploy --dry-run` 成功；提交物无 secret（.dev.vars/.env git-ignored）
+- [~] 部署/回滚/密钥轮换文档：`infra/cloudflare/README.md` runbook 就位；退款操作/剩余闸门见下表
 
 ---
 
-## 当前进度（Phase 1）
+## 当前进度
 
-### 地基（主 Agent，serial）
-- [~] pnpm workspace + Turborepo（root `package.json` / `pnpm-workspace.yaml` / `turbo.json`）
-- [~] mock 秘密结构：`apps/api/.dev.vars`（MOCK）、`apps/web/.env`（公开配置），`.example` 已提交，真值 git-ignored
-- [~] `contracts/licensing.openapi.yaml` v1 + facade fixtures + creem MOCK fixtures 占位
-- [~] `infra/cloudflare/` 说明、本状态文档
-- [ ] CI 路径感知（macOS ∥ web/api）—— 见 Agent A
+集成后 `main` 线性历史（Phase 1 地基 → Sparkle → Website → Commerce → 集成）：
+`d9e547a`(地基) → `1710844..b9e13f0`(Sparkle×4) → `d7eb9d6..dbfb350`(Website×3) → `ebf659c..12ffc35`(Commerce×5) → `72bb7e5`(集成 lockfile+turbo)。
 
-### 并行 Wave（worktree 隔离）
-- [ ] Agent B · apps/web（Astro 静态站）
-- [ ] Agent C · apps/api（Worker facade + Creem mock + D1 + fixtures）
-- [ ] Agent D · Sparkle 移植（从 `feat/sparkle-autoupdate`）
+### 地基（主 Agent，serial）— 完成
+- [x] pnpm workspace + Turborepo（root `package.json` / `pnpm-workspace.yaml` / `turbo.json`）
+- [x] mock 秘密结构：`apps/api/.dev.vars`（MOCK）、`apps/web/.env`（公开配置），`.example` 已提交，真值 git-ignored
+- [x] `contracts/licensing.openapi.yaml` v1 + facade fixtures；creem `*.MOCK.json` 为占位（字段名待实测）
+- [x] `infra/cloudflare/` runbook、本状态文档、CI 路径感知拆分（`ci-swift` / `ci-web`）
 
-### Wave 2
-- [ ] Agent E · macOS License Client
-- [ ] Agent F · Integration/QA
+### Wave 1（三 Agent 并行，集成完成）
+- [x] Agent B · apps/web（Astro 静态站）—— 7 路由+404、两路 CTA、SEO/OG/JSON-LD、无 JS 可用、脱敏与法律草稿标记；`typecheck`/`build`/`test` 全绿
+- [x] Agent C · apps/api（Worker facade + Creem mock/http + webhook + D1）—— 44 测试全绿（38 workers-pool + 6 契约），`wrangler deploy --dry-run` 绿，redaction 断言无 key 泄漏
+- [x] Agent D · Sparkle 移植 —— cherry-pick 3 提交零冲突 + feed 修正；`check-swift` 五包绿，`xcodebuild App Debug` BUILD SUCCEEDED，Extension 不链接 Sparkle 已核
+
+### Wave 2（未开始）
+- [ ] Agent E · macOS License Client（依赖已集成的 Sparkle 分支 + 契约）
+- [ ] Agent F · Integration/QA（跨端契约、sandbox、升级 smoke）
+
+## 已知问题（预存，非本次引入）
+- **SwiftLint strict 当前红**：`App/ExitIPChecker.swift` 11 处违规（cyclomatic_complexity / non_optional_string_data_conversion / unused_closure_parameter）。
+  已核实这些违规在 `198d7a6`（本轮工作之前）即存在，属 SwiftLint 版本漂移（新规则），**非商业化改动引入**，且在路由/退出 IP 检测的稳定敏感代码里。
+  未在本轮擅自修改（§7「不做无关重构」+ 稳定性零容忍）。需用户决定：单独修 lint 或放宽 `.swiftlint.yml` 对应规则。
 
 ---
 

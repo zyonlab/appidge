@@ -58,7 +58,40 @@
 `apps/api/src/creem/mapping.ts` 顶部注释：在 test mode 抓真实 payload → 脱敏替换 fixture →
 按需微调 `mapping.ts` 的候选键 → 跑 webhook 契约测试。映射逻辑集中在该单一模块，可无痛替换。
 
+## Staging 部署实况（真实域名 appidge.com，Cloudflare 免费层）
+
+Account ID `020878119352f1d4380269a2a334e17f`；zone `appidge.com`(active) `77d3b7f9…`。
+分支 `staging` = 测试预览；`main` 以后 = 线上（见下「生产映射」）。
+
+| 组件 | 资源 | URL |
+|---|---|---|
+| Worker（API） | `appidge-api-staging`（`[env.staging]`，MOCK_MODE=true） | **https://api-staging.appidge.com**（custom_domain，wrangler 自动建 DNS+证书） |
+| D1 | `appidge-licensing-staging` `2777a4a3-8e0f-4f39-af39-12aed0ceb63e`（APAC） | 迁移 `0001_init.sql` 已 apply --remote |
+| Worker secrets | `LICENSE_HMAC_PEPPER` / `CREEM_WEBHOOK_SECRET` | 走 `wrangler secret put --env staging`，不入 git |
+| Pages（官网） | 项目 `appidge-web-staging`（production branch=staging） | **https://appidge-web-staging.pages.dev** + 自定义域 **staging.appidge.com**（证书 provisioning） |
+
+已在 live worker 验证（MOCK_MODE，真实远端 D1）：healthz、activate/validate/deactivate、
+签名 refund webhook→validate=revoked、篡改/缺签→401。官网首页 200、无 secret 泄漏。
+
+### 重新部署 staging
+```bash
+export CLOUDFLARE_ACCOUNT_ID=… CLOUDFLARE_API_TOKEN=…   # 不入 git
+# API
+cd apps/api && npx wrangler deploy --env staging
+# 官网（构建期公开配置 PUBLIC_API_BASE_URL=https://api-staging.appidge.com 等经 apps/web/.env 注入）
+cd apps/web && pnpm build
+cd /repo/root && ./apps/api/node_modules/.bin/wrangler pages deploy apps/web/dist \
+  --project-name appidge-web-staging --branch staging
+```
+注意：`wrangler secret put` 后 secret 传播到运行实例有 ~10-15s 延迟，刚设完立刻打 webhook 可能 500，稍等即恢复。
+
+### 生产映射（待 main 上线时做）
+- Worker `[env.production]` route → `api.appidge.com`（custom_domain），MOCK_MODE=false + 真实 Creem secret。
+- Pages 项目 `appidge-web`（production branch=main）→ 自定义域 `appidge.com` + `www.appidge.com`。
+- R2 `updates.appidge.com`（Sparkle 包/appcast，需 EdDSA 公钥就绪后接）。
+- ⚠️ 客户端/Sparkle/官网里所有 `appidge.app` 占位需统一改 `appidge.com`（含 App 内 `SUFeedURL` 与 license API base）。
+
 ## 状态
 
 MVP 目标是 Cloudflare 免费层，但不作为可靠性假设——客户端有离线宽限兜底。
-部署、回滚、密钥轮换步骤见本文件与 `docs/commercialization-status.md`。真实部署需用户授权，当前只做 dry-run / preview。
+部署、回滚、密钥轮换步骤见本文件与 `docs/commercialization-status.md`。

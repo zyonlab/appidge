@@ -1,0 +1,18 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const description = '页面未找到 —— 返回 Appidge 首页。';
+---
+
+<BaseLayout title="页面未找到" description={description} path="/404">
+  <section class="section">
+    <div class="container prose text-center">
+      <h1>404 · 页面未找到</h1>
+      <p style="margin-inline:auto">你要找的页面不存在，或已被移动。</p>
+      <div class="cta-row" style="justify-content:center">
+        <a class="btn btn-primary" href="/">返回首页</a>
+        <a class="btn btn-secondary" href="/download">下载 App</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

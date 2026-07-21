@@ -1,0 +1,49 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import DraftNotice from '../components/DraftNotice.astro';
+import { SUPPORT_EMAIL } from '../config/site';
+
+const description = 'Appidge 隐私政策（草稿）。本站无 cookie、无追踪；说明许可证激活涉及的最小数据处理。';
+---
+
+<BaseLayout title="隐私政策" description={description} path="/privacy">
+  <section class="section">
+    <div class="container prose">
+      <h1>隐私政策</h1>
+      <DraftNotice updated="2026-07-21" />
+
+      <h2>本网站</h2>
+      <p>
+        本网站为纯静态页面，不使用 cookie、不加载第三方追踪脚本、不做用户画像分析。
+      </p>
+
+      <h2>购买</h2>
+      <p>
+        购买通过第三方支付服务 Creem 的 Hosted Checkout 完成。你的支付信息由 Creem 处理，
+        请参阅其隐私条款。我们不接触也不存储你的完整支付卡信息。
+      </p>
+
+      <h2>许可证激活</h2>
+      <p>
+        激活与校验许可证时，Appidge 会向授权服务发送完成校验所必需的最小信息（如许可证密钥与
+        一个隐私友好的安装标识）。我们不以此为目的收集你的邮箱、真实主机名或硬件序列号。
+      </p>
+
+      <h2>应用内数据</h2>
+      <p>
+        Appidge 的规则与网络接管在你的 Mac 本地运行。你的规则配置与被接管进程信息保留在本地，
+        不因使用本产品而上传给我们。
+      </p>
+
+      <h2>联系</h2>
+      <p>
+        隐私相关问题请联系
+        <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>。
+      </p>
+
+      <p>
+        本政策涵盖的数据类别、法律依据与保留期限，需由运营方结合适用法律最终确定。
+      </p>
+    </div>
+  </section>
+</BaseLayout>

@@ -1,0 +1,48 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import DraftNotice from '../components/DraftNotice.astro';
+import { SITE_NAME, SUPPORT_EMAIL } from '../config/site';
+
+const description = `${SITE_NAME} 服务条款（草稿）：许可范围、可接受使用、免责声明与联系方式。`;
+---
+
+<BaseLayout title="服务条款" description={description} path="/terms">
+  <section class="section">
+    <div class="container prose">
+      <h1>服务条款</h1>
+      <DraftNotice updated="2026-07-21" />
+
+      <h2>许可范围</h2>
+      <p>
+        购买 Appidge 许可证后，你获得在许可条款允许范围内使用本软件的非独占、不可转让的权利。
+        许可证不得转售或共享；具体激活设备数量以结账页与产品说明为准。
+      </p>
+
+      <h2>可接受使用</h2>
+      <p>
+        你需在遵守适用法律的前提下使用 Appidge，并对自己设定的网络规则与由此产生的流量行为负责。
+        不得将本软件用于任何违法用途。
+      </p>
+
+      <h2>更新与变更</h2>
+      <p>
+        我们可能不时发布软件更新与功能调整。重大条款变更会在本页更新。
+      </p>
+
+      <h2>免责声明</h2>
+      <p>
+        本软件按「现状」提供，在适用法律允许的最大范围内不附带任何明示或默示担保。
+      </p>
+
+      <h2>联系</h2>
+      <p>
+        条款相关问题请联系
+        <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>。
+      </p>
+
+      <p>
+        本条款的完整法律措辞、责任限制与管辖条款，需由运营方委托法律顾问最终确定。
+      </p>
+    </div>
+  </section>
+</BaseLayout>

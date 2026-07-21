@@ -1,0 +1,68 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { SITE_NAME, SITE_URL } from '../config/site';
+
+const description = `关于 ${SITE_NAME} 的常见问题：它做什么、如何决定连接去向、如何处理代理回环、如何激活许可证等。`;
+
+const faqs = [
+  {
+    q: 'Appidge 是做什么的？',
+    a: '它是一款 macOS 透明代理工具，全接管进程网络，并按你设定的规则决定每个连接是直连还是走代理。',
+  },
+  {
+    q: '它如何决定某个连接走哪里？',
+    a: '按目标地规则判断。你为目的地写规则，Appidge 据此决定去向；当你已配置代理时，默认走代理。',
+  },
+  {
+    q: '会不会和我的代理软件互相绕环？',
+    a: 'Appidge 会自动识别并排除代理软件自身产生的回环流量，避免把代理的出站再次绕回它自己。',
+  },
+  {
+    q: '我能看到当前哪些进程被接管吗？',
+    a: '可以。活动页显示当前正被接管的进程；点击某个进程即可立即修改它的访问规则。',
+  },
+  {
+    q: '修改规则后要重启吗？',
+    a: '不需要。改动即时生效。规则按时间倒序排列，对同一目标，较新的规则覆盖较旧的。',
+  },
+  {
+    q: '下载和购买是同一步吗？',
+    a: '不是。下载与购买互相独立：可先下载试用，再购买许可证解锁。购买通过 Creem Hosted Checkout 完成。',
+  },
+  {
+    q: '购买后如何激活？',
+    a: '付款成功后你会收到含许可证密钥的邮件，在 Appidge 内粘贴密钥即可激活。',
+  },
+  {
+    q: '离线还能用吗？',
+    a: '许可证激活后，App 会缓存最近一次有效授权并提供离线宽限期，短时无网络不会立即锁定。',
+  },
+];
+
+const jsonld = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  url: new URL('/faq', SITE_URL).href,
+  mainEntity: faqs.map((f) => ({
+    '@type': 'Question',
+    name: f.q,
+    acceptedAnswer: { '@type': 'Answer', text: f.a },
+  })),
+};
+---
+
+<BaseLayout title="常见问题" description={description} path="/faq" jsonld={jsonld}>
+  <section class="section">
+    <div class="container prose">
+      <h1>常见问题</h1>
+      {
+        faqs.map((f) => (
+          <div class="faq-item">
+            <h3>{f.q}</h3>
+            <p>{f.a}</p>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+</BaseLayout>

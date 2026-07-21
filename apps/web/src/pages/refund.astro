@@ -1,0 +1,44 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import DraftNotice from '../components/DraftNotice.astro';
+import { SUPPORT_EMAIL } from '../config/site';
+
+const description = 'Appidge 退款政策（草稿）。退款由用户通过官方渠道联系发起，本页说明流程与联系入口。';
+---
+
+<BaseLayout title="退款政策" description={description} path="/refund">
+  <section class="section">
+    <div class="container prose">
+      <h1>退款政策</h1>
+      <DraftNotice updated="2026-07-21" />
+
+      <p>
+        我们希望你对 Appidge 满意。若购买后遇到问题，请先阅读本政策并与我们联系。
+      </p>
+
+      <h2>如何申请退款</h2>
+      <p>
+        请通过邮件联系
+        <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>，
+        并附上你的购买邮箱与订单信息。我们会核对订单并按本政策处理。
+      </p>
+
+      <h2>处理方式</h2>
+      <ul>
+        <li>退款经核对后通过原支付渠道（Creem）退回。</li>
+        <li>退款完成后，对应许可证将被停用，相关设备的付费能力随之失效。</li>
+        <li>退款到账时间取决于支付渠道与发卡方。</li>
+      </ul>
+
+      <h2>建议先试用</h2>
+      <p>
+        下载与购买是两个独立步骤。建议先下载试用，确认 Appidge 适配你的工作流后再购买，
+        以减少退款需求。
+      </p>
+
+      <p>
+        具体退款条件、时限与例外，需由运营方结合适用法律与支付渠道条款最终确定。
+      </p>
+    </div>
+  </section>
+</BaseLayout>

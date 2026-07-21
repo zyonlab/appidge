@@ -1,0 +1,56 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { CREEM_CHECKOUT_URL, DOWNLOAD_URL, SITE_NAME } from '../config/site';
+
+const description =
+  'Appidge 许可证定价。通过安全的 Creem Hosted Checkout 完成购买，购买后在邮件中获取许可证密钥并在 App 内激活。';
+---
+
+<BaseLayout title="定价" description={description} path="/pricing">
+  <section class="section">
+    <div class="container">
+      <h1 class="text-center">定价</h1>
+      <p class="lede text-center" style="margin-inline:auto">
+        先下载试用，确认合适再购买。购买通过安全的 Creem Hosted Checkout 完成。
+      </p>
+
+      <div class="card price-card">
+        <h2 class="mt-0">{SITE_NAME} 许可证</h2>
+        <p class="price">
+          查看当前价格<br /><small>以结账页显示为准</small>
+        </p>
+        <ul class="feature-list">
+          <li>全接管进程网络，按规则判断去向</li>
+          <li>活动进程即时改规则，最新规则覆盖旧规则</li>
+          <li>代理软件回环自动排除</li>
+          <li>应用内自动更新</li>
+        </ul>
+        <div class="cta-row" style="justify-content:center">
+          <a class="btn btn-primary" href={CREEM_CHECKOUT_URL} rel="noopener">购买许可证</a>
+          <a class="btn btn-secondary" href={DOWNLOAD_URL} rel="noopener">先下载试用</a>
+        </div>
+        <p style="font-size:0.9rem;margin-bottom:0">
+          实际价格、币种与税费以 Creem 结账页为准。
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-subtle">
+    <div class="container prose">
+      <h2>购买后如何激活</h2>
+      <ol>
+        <li>点击「购买许可证」，在 Creem Hosted Checkout 完成付款。</li>
+        <li>付款成功后，你会收到含许可证密钥的邮件。</li>
+        <li>打开 Appidge，粘贴许可证密钥完成激活。</li>
+      </ol>
+      <p>
+        购买与下载是两个独立步骤：结账不会自动安装 App，也不会自动回填密钥；
+        请从邮件复制密钥到 App 内激活。
+      </p>
+      <p>
+        关于退款，请查看 <a href="/refund">退款政策</a>。
+      </p>
+    </div>
+  </section>
+</BaseLayout>

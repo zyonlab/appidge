@@ -1,0 +1,92 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { CREEM_CHECKOUT_URL, SITE_NAME, SITE_TAGLINE, SITE_URL } from '../config/site';
+
+const description =
+  'Appidge 是一款 macOS 透明代理工具：按进程接管网络，按你的规则决定每个连接去向，自动排除代理软件自身回环，活动进程可即时改规则。';
+
+const jsonld = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: SITE_NAME,
+  applicationCategory: 'UtilitiesApplication',
+  operatingSystem: 'macOS',
+  url: SITE_URL,
+  description: SITE_TAGLINE,
+};
+
+const features = [
+  {
+    title: '全接管进程网络',
+    body: '接管系统内进程的网络连接，统一在一处按规则判断去向，而不是靠各应用自己的代理设置。',
+  },
+  {
+    title: '按目标地规则判断',
+    body: '你为目的地写规则，Appidge 据此决定某个连接直连还是走代理。规则由你掌控，不做黑箱决策。',
+  },
+  {
+    title: 'loop 自动排除',
+    body: '识别并自动处理代理软件自身产生的回环流量，避免把代理的出站再次绕回自己造成环路。',
+  },
+  {
+    title: '配置过代理时默认走代理',
+    body: '当你已经配置了代理，默认让流量走代理；无需为每个进程重复设置即可获得一致行为。',
+  },
+  {
+    title: '活动进程即时改规则',
+    body: '活动页显示当前正被接管的进程；点击某个进程即可立即修改它的访问规则，改动即时生效。',
+  },
+  {
+    title: '最新规则覆盖旧规则',
+    body: '规则按时间倒序排列；对同一目标，较新的规则覆盖较旧的，便于快速迭代而不必先清理旧规则。',
+  },
+];
+---
+
+<BaseLayout title="首页" description={description} path="/" jsonld={jsonld}>
+  <section class="section">
+    <div class="container">
+      <h1>{SITE_TAGLINE}</h1>
+      <p class="lede">
+        Appidge 是一款 macOS 透明代理工具：全接管进程网络，按你的规则判断每个连接的去向，
+        自动排除代理软件回环，活动进程可即时改规则，最新规则覆盖旧规则。
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="/download">下载 App</a>
+        <a class="btn btn-secondary" href={CREEM_CHECKOUT_URL} rel="noopener">购买许可证</a>
+      </div>
+      <p style="font-size:0.9rem">
+        「下载 App」与「购买许可证」是两个独立步骤：可先下载试用，再购买许可证解锁。
+      </p>
+    </div>
+  </section>
+
+  <section class="section section-subtle">
+    <div class="container">
+      <h2>它如何工作</h2>
+      <div class="grid">
+        {
+          features.map((f) => (
+            <article class="card">
+              <h3>{f.title}</h3>
+              <p>{f.body}</p>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container text-center">
+      <h2>准备好接管你的 macOS 网络了吗？</h2>
+      <p class="lede" style="margin-inline:auto">
+        先下载试用，确认它符合你的工作流，再购买许可证。
+      </p>
+      <div class="cta-row" style="justify-content:center">
+        <a class="btn btn-primary" href="/download">下载 App</a>
+        <a class="btn btn-secondary" href="/pricing">查看定价</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

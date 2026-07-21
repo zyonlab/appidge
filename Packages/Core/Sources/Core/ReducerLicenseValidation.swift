@@ -12,6 +12,8 @@ extension Reducer {
             return licenseValidateSucceeded(response: response, now: now, state)
         case .licenseValidateFailed(let failure, let now):
             return licenseValidateFailed(failure, now: now, state)
+        case .licenseLoadRequested:
+            return (state, [.loadPersistedLicense])
         case .licenseRestored(let info, let now):
             return licenseRestored(info, now: now, state)
         case .licenseClockTick(let now):

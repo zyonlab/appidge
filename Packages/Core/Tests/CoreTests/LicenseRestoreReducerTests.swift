@@ -14,6 +14,13 @@ struct LicenseRestoreReducerTests {
         )
     }
 
+    @Test("licenseLoadRequested emits the loadPersistedLicense effect, no state change")
+    func loadRequested() {
+        let (next, effects) = Reducer.reduce(AppState(), .licenseLoadRequested)
+        #expect(next == AppState())
+        #expect(effects == [.loadPersistedLicense])
+    }
+
     @Test("restore nil → unlicensed")
     func restoreNil() {
         let (next, effects) = Reducer.reduce(AppState(), .licenseRestored(nil, now: t0))
@@ -97,6 +104,19 @@ struct LicenseRestoreReducerTests {
                 break
             }
         }
+    }
+
+    @Test("isValidateDue: due only when active, with a record, and past the daily interval")
+    func validateDue() {
+        #expect(!AppState().isValidateDue(now: t0)) // no license
+        var licensed = AppState()
+        licensed.license = info(.active, lastValidatedAt: t0)
+        licensed.licensePhase = .licensed
+        #expect(!licensed.isValidateDue(now: t0.addingTimeInterval(3600)))           // < 1 day
+        #expect(licensed.isValidateDue(now: t0.addingTimeInterval(24 * 3600 + 1)))    // ≥ 1 day
+        var revoked = licensed
+        revoked.licensePhase = .revoked
+        #expect(!revoked.isValidateDue(now: t0.addingTimeInterval(48 * 3600)))        // locked → never due
     }
 
     @Test("purchase requested opens the configured checkout link, no state change")

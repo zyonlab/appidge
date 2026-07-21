@@ -86,6 +86,13 @@ public struct AppState: Sendable, Equatable {
     /// 例行校验间隔，默认每日一次。是否到期由 App 层调度器据此判断。
     public static let licenseValidateInterval: TimeInterval = 24 * 60 * 60
 
+    /// 是否到了该做一次例行校验（有记录、当前放行、距上次成功校验 ≥ 每日间隔）。用参照时刻算，
+    /// 防时钟回拨绕过。App 层调度器据此决定是否 dispatch `.licenseValidateRequested`。
+    public func isValidateDue(now: Date) -> Bool {
+        guard let info = license, isLicenseActive else { return false }
+        return info.referenceNow(now).timeIntervalSince(info.lastValidatedAt) >= Self.licenseValidateInterval
+    }
+
     public init(
         isEngineHealthy: Bool = true,
         processes: [ProcessID: MonitoredProcess] = [:],

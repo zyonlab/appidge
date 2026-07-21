@@ -90,6 +90,8 @@ public enum Action: Sendable, Equatable {
     case licenseDeactivateSucceeded
     /// 停用失败（transient=是否暂时性）。→ 保留授权、回落 `.licensed`，允许重试（不误锁）。
     case licenseDeactivateFailed(transient: Bool)
+    /// 启动请求从 Keychain 恢复授权记录。→ 产出 `.loadPersistedLicense` effect（结果经 `.licenseRestored` 回灌）。
+    case licenseLoadRequested
     /// 启动从 Keychain 读回记录（可能为 nil，携带本地 now）。→ 依记录 + 宽限窗口计算初始相位。
     case licenseRestored(LicenseInfo?, now: Date)
     /// 周期性时钟推进（携带本地 now）。纯本地判定：抬高水位、宽限耗尽/订阅到期 → 落 expired；不发网络。

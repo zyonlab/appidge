@@ -93,10 +93,17 @@ struct AppidgeApp: App {
         // 本地代理进程(如 xray/yunti)签名标识查询：libproc 查监听端口 + SecCode 取签名标识，
         // 用于转发环硬化的「来源进程自动排除」第二正交维度（见 LocalProxyOriginDiscovery）。
         let processIdentityResolver: any LocalProcessIdentityResolving = LibprocSecCodeProcessIdentityResolver()
+        // 授权 effect 处理器：注入真实 API 客户端 / Keychain / 时钟（协议边界，测试用 mock）。
+        // 与转发/路由完全独立——授权 effect 只经这里，绝不触碰网络接管路径。openCheckout 打开
+        // Creem Hosted Checkout 链接（v1 无浏览器回跳，用户从邮件复制 key 回来激活）。
+        let licenseHandler = LicenseEffectHandler.makeProduction(openCheckout: { url in
+            guard let checkoutURL = URL(string: url) else { return }
+            Task { @MainActor in NSWorkspace.shared.open(checkoutURL) }
+        })
         let store = Store(effectHandler: { effect in
             await Self.handleEffect(
                 effect, transport: transport, connectionLogFileStore: connectionLogFileStore,
-                processIdentityResolver: processIdentityResolver
+                processIdentityResolver: processIdentityResolver, licenseHandler: licenseHandler
             )
         })
         // XPC(重)连上扩展时全量重推当前配置。扩展升级/重启/掉线重连后是空规则起步的,不补推
@@ -157,6 +164,14 @@ struct AppidgeApp: App {
                     // 扩展 XPC 连上回报版本时,若与包内版本不一致 = 会话绑在旧 provider 上(反复热
                     // 升级的僵尸态)→ 自动重启会话重绑最新扩展,一次为限(见 maybeHealStaleBinding)。
                     if case .extensionVersionReported = action { maybeHealStaleBinding() }
+                    // 授权记录从 Keychain 恢复落地后：若已到每日校验间隔，联网做一次新鲜度校验
+                    // （离线只会进宽限，不锁）。授权与持久化无关，故放在下面的 guard 之前。
+                    if case .licenseRestored = action {
+                        let now = Date()
+                        if store.state.isValidateDue(now: now) {
+                            store.dispatch(.licenseValidateRequested(now: now))
+                        }
+                    }
                     guard Self.isPersistenceRelevant(action) else { return }
                     // 立即同步落盘(去掉 400ms 防抖):每次改动一发生就在磁盘上,crash / 强杀也不丢。
                     // 规则调序是离散按钮点击(非连续拖拽流),JSON 又小,每次同步原子写代价可忽略。
@@ -167,6 +182,20 @@ struct AppidgeApp: App {
                 // 恢复之前(状态还空);这次确保扩展拿到的是恢复后的最新全量(规则+代理+路由+UDP+
                 // 排除名单)。effect 已串行化,这次 resync 的推送排在恢复推送之后、最终胜出。
                 store.dispatch(.resyncExtension)
+                // 授权：从 Keychain 恢复上次的授权记录（onAction 里据此决定是否需要联网校验）。
+                // 授权服务不可用绝不影响上面的网络接管——两条路径完全独立。
+                store.dispatch(.licenseLoadRequested)
+                // 周期性时钟推进：本地判定宽限耗尽/订阅到期（防时钟回拨），到期则每日联网校验一次。
+                Task { @MainActor in
+                    while !Task.isCancelled {
+                        try? await Task.sleep(nanoseconds: 3_600_000_000_000) // 1 小时
+                        let now = Date()
+                        store.dispatch(.licenseClockTick(now: now))
+                        if store.state.isValidateDue(now: now) {
+                            store.dispatch(.licenseValidateRequested(now: now))
+                        }
+                    }
+                }
                 // **先查真实状态,再决定要不要激活/起会话**(propertiesRequest 只查询、零 UI):
                 // 扩展被用户在系统设置里**停用**时,activate() 只会打扰、startVPNTunnel 必然失败,
                 // XPC 也无人监听——这种状态下什么都不做,状态栏如实显示「已停用」,把人指向系统
@@ -303,55 +332,61 @@ struct AppidgeApp: App {
         Task { await PersistedConfiguration.saveCredentials(from: servers, to: credentialStore) }
     }
 
-    /// `Store` 的 effectHandler 本体——从 `init` 里的闭包拆出来只是压 `function_body_length`
-    /// (init 本身塞了 store/ipcReceiver/profilesModel 三个 `_xxx = State(...)` 赋值,
-    /// 闭包体一长就超预算),逻辑跟原来内联时完全一样,分支对 `Core.Effect` 一一映射。
+    /// `Store` 的 effectHandler 本体。授权 effect 委托给注入了协议的 ``LicenseEffectHandler``
+    /// （网络/Keychain/打开链接，与转发路径完全独立）；四类「纯下发信号」合并成一个分支经
+    /// `signalMessage` 映射后下发（压 cyclomatic_complexity）。逻辑与拆分前逐一映射一致。
     private static func handleEffect(
         _ effect: Core.Effect, transport: XPCAppSideTransport, connectionLogFileStore: ConnectionLogFileStore,
-        processIdentityResolver: any LocalProcessIdentityResolving
+        processIdentityResolver: any LocalProcessIdentityResolving, licenseHandler: LicenseEffectHandler
     ) async -> Core.Action? {
         switch effect {
+        case .activateLicense, .validateLicense, .deactivateLicense,
+             .persistLicense, .loadPersistedLicense, .openCheckout:
+            return await licenseHandler.handle(effect)
         case .log:
             return nil
         case .scanDirectory:
             let entries = await FileSystemDirectoryScanner().scan()
             return .directoryScanned(entries)
         case .runDiagnostic(let processID, let kinds):
-            let message = ExtensionMessageHandling.diagnosticRequestMessage(processID: processID, kinds: kinds)
-            await transport.send(message)
+            await transport.send(ExtensionMessageHandling.diagnosticRequestMessage(processID: processID, kinds: kinds))
             return nil // 结果异步经 IPCReceiver -> diagnosticResultReceived 回灌
         case .applyProxyConfig(let servers, let activeID):
-            let message = ProxyConfigMapping.proxyConfigMessage(servers: servers, activeID: activeID)
-            await transport.send(message)
+            await transport.send(ProxyConfigMapping.proxyConfigMessage(servers: servers, activeID: activeID))
             return await Self.resolveProcessOriginExclusions(
                 servers: servers, activeID: activeID, using: processIdentityResolver
             )
         case .applyRuleSet(let assignments, let matchRules):
-            let message = RuleSetMapping.ruleSetMessage(assignments: assignments, matchRules: matchRules)
-            await transport.send(message)
+            await transport.send(RuleSetMapping.ruleSetMessage(assignments: assignments, matchRules: matchRules))
             return nil // 纯下发，扩展据此更新每进程规则 + 细粒度规则表
-        case .applyRoutingMode(let mode):
-            await transport.send(ProxyConfigMapping.routingModeMessage(mode))
-            return nil // 纯下发，扩展据此在单台/链/故障转移/负载均衡之间切换
-        case .applyPacketCapture(let enabled):
-            await transport.send(ProxyConfigMapping.packetCaptureMessage(enabled))
-            return nil // 纯下发，扩展据此开/关逐连接 .dmp 抓包
-        case .applyUDPPolicy(let policy):
-            await transport.send(ProxyConfigMapping.udpPolicyMessage(policy))
-            return nil // 纯下发，扩展据此在拦截/直连/SOCKS5 代理之间切换 UDP 处理
-        case .applyProcessOriginExclusions(let direct, let hardBypass):
-            await transport.send(ProxyConfigMapping.processOriginExclusionsMessage(direct: direct, hardBypass: hardBypass))
-            return nil // 纯下发，扩展据此更新两档来源排除(直连档 / 完全旁路档)
+        case .applyRoutingMode, .applyPacketCapture, .applyUDPPolicy, .applyProcessOriginExclusions:
+            if let message = Self.signalMessage(for: effect) { await transport.send(message) }
+            return nil // 纯下发信号：路由模式 / 抓包 / UDP / 来源排除
         case .clearConnectionLogFile:
             await connectionLogFileStore.clear()
             return nil // 内存里的 connectionLog 已经在 reducer 里清空了,这里只清磁盘那份
         }
     }
 
-    /// applyProxyConfig 下发之后顺带查一次:active 上游若指向本机(如用户配的是本地
-    /// xray/yunti),查出它的签名标识 + 可执行文件路径、包成 `.proxyProcessIdentitiesResolved`
-    /// 供 store 回灌——转发环硬化的「来源进程自动排除」（见 LocalProxyOriginDiscovery）。拆成
-    /// 静态方法只是为了不撑爆 init 里 effectHandler 闭包的长度，逻辑本身不复杂。
+    /// 把「纯下发信号」类 effect 映射成扩展消息（合并分支后复用，非本组 effect 返回 nil）。
+    private static func signalMessage(for effect: Core.Effect) -> IPCContract.AppToExtensionMessage? {
+        switch effect {
+        case .applyRoutingMode(let mode):
+            return ProxyConfigMapping.routingModeMessage(mode)
+        case .applyPacketCapture(let enabled):
+            return ProxyConfigMapping.packetCaptureMessage(enabled)
+        case .applyUDPPolicy(let policy):
+            return ProxyConfigMapping.udpPolicyMessage(policy)
+        case .applyProcessOriginExclusions(let direct, let hardBypass):
+            return ProxyConfigMapping.processOriginExclusionsMessage(direct: direct, hardBypass: hardBypass)
+        default:
+            return nil
+        }
+    }
+
+    /// applyProxyConfig 下发之后顺带查一次:active 上游若指向本机(如用户配的是本地 xray/yunti),
+    /// 查出它的签名标识 + 可执行文件路径、包成 `.proxyProcessIdentitiesResolved` 供 store 回灌——
+    /// 转发环硬化的「来源进程自动排除」（见 LocalProxyOriginDiscovery）。
     private static func resolveProcessOriginExclusions(
         servers: [Core.ProxyServer], activeID: Core.ProxyServerID?, using resolver: any LocalProcessIdentityResolving
     ) async -> Core.Action {

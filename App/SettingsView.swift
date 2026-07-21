@@ -43,6 +43,8 @@ struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            LicenseSettingsView(store: store)
+
             Section("代理") {
                 LabeledContent("系统扩展") {
                     HStack(spacing: 8) {
@@ -185,6 +187,124 @@ struct SettingsView: View {
         case .block: "默认：代理进程的 UDP/QUIC 一律拦截，逼 QUIC 回落 TCP 走代理，不泄漏。"
         case .direct: "放行直连：UDP 可用，但绕过代理、可能暴露访问目标（游戏 / VoIP 需要 UDP 时用）。"
         case .proxySOCKS5: "上游是 SOCKS5 时经 UDP ASSOCIATE 真正代理；上游非 SOCKS5 则退回拦截。"
+        }
+    }
+}
+
+/// 「许可证」设置面板。**只读 State、只 dispatch Action**——网络与 Keychain 都在 Store 的
+/// effect handler（注入协议）里，View 不碰。购买只打开 Hosted Checkout；v1 用户从 Creem 邮件
+/// 复制 key 回来粘贴激活，无浏览器回跳自动灌 key。授权服务故障绝不阻塞其它设置或接管路径。
+struct LicenseSettingsView: View {
+    var store: Store
+    @State private var keyInput: String = ""
+
+    var body: some View {
+        Section("许可证") {
+            statusRow
+            switch store.state.licensePhase {
+            case .licensed, .validating, .gracePeriod, .deactivating:
+                activeDetails
+            case .unlicensed, .activating, .revoked, .expired, .recoverableError:
+                activationControls
+            }
+        }
+    }
+
+    private var statusRow: some View {
+        LabeledContent("状态") {
+            HStack(spacing: 8) {
+                let display = Self.display(store.state.licensePhase)
+                Text(display.label).foregroundStyle(display.color)
+                if store.state.licensePhase == .activating
+                    || store.state.licensePhase == .validating
+                    || store.state.licensePhase == .deactivating {
+                    ProgressView().controlSize(.small)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var activeDetails: some View {
+        if let info = store.state.license {
+            LabeledContent("激活数") {
+                Text(Self.activationsText(used: info.activations, limit: info.activationLimit))
+            }
+            if let expiresAt = info.expiresAt {
+                LabeledContent("到期") { Text(expiresAt, style: .date) }
+            } else {
+                LabeledContent("类型") { Text("买断（永久）") }
+            }
+        }
+        HStack(spacing: 8) {
+            Button("刷新校验") { store.dispatch(.licenseValidateRequested(now: Date())) }
+            Button("本机停用", role: .destructive) { store.dispatch(.licenseDeactivateRequested) }
+        }
+        .controlSize(.small)
+        .disabled(store.state.licensePhase == .validating || store.state.licensePhase == .deactivating)
+        Text("「本机停用」释放一个激活名额，便于换机后在新机激活。授权信息保存在系统钥匙串。")
+            .font(.caption).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder
+    private var activationControls: some View {
+        errorHintView
+        TextField("粘贴 license key", text: $keyInput)
+            .textFieldStyle(.roundedBorder)
+            .disabled(store.state.licensePhase == .activating)
+        HStack(spacing: 8) {
+            let trimmed = keyInput.trimmingCharacters(in: .whitespacesAndNewlines)
+            Button("激活") { store.dispatch(.licenseActivateRequested(licenseKey: trimmed)) }
+                .disabled(trimmed.count < 8 || store.state.licensePhase == .activating)
+            if !LicenseBuildConfig.checkoutURL.isEmpty {
+                Button("购买许可证") { store.dispatch(.licensePurchaseRequested(checkoutURL: LicenseBuildConfig.checkoutURL)) }
+            }
+        }
+        .controlSize(.small)
+        Text("购买后从 Creem 的确认邮件里复制 license key，粘贴到上方激活。")
+            .font(.caption).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder
+    private var errorHintView: some View {
+        if case .recoverableError(let code) = store.state.licensePhase {
+            Text(Self.errorHint(code)).font(.caption).foregroundStyle(.red)
+                .fixedSize(horizontal: false, vertical: true)
+        } else if store.state.licensePhase == .revoked {
+            Text("此许可证已被吊销（退款/拒付）。如有疑问请通过退款政策页的联系入口联系我们。")
+                .font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+        } else if store.state.licensePhase == .expired {
+            Text("此许可证已过期。续订后可重新激活。")
+                .font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private static func display(_ phase: LicensePhase) -> (label: LocalizedStringKey, color: Color) {
+        switch phase {
+        case .licensed: ("已授权", .green)
+        case .validating: ("校验中…", .secondary)
+        case .gracePeriod: ("离线宽限中（暂时联系不上授权服务，仍可使用）", .orange)
+        case .deactivating: ("停用中…", .secondary)
+        case .activating: ("激活中…", .secondary)
+        case .unlicensed: ("未激活", .secondary)
+        case .revoked: ("已吊销", .red)
+        case .expired: ("已过期", .red)
+        case .recoverableError: ("激活未完成", .orange)
+        }
+    }
+
+    private static func activationsText(used: Int, limit: Int?) -> String {
+        guard let limit else { return "\(used) / 无限" }
+        return "\(used) / \(limit)"
+    }
+
+    private static func errorHint(_ code: String) -> LocalizedStringKey {
+        switch code {
+        case "activationLimit": "激活名额已用尽：请在其它设备「本机停用」后再试，或联系支持。"
+        case "invalidLicense": "license key 无效：请核对是否从 Creem 邮件完整复制。"
+        default: "暂时无法连接授权服务，请检查网络后重试。"
         }
     }
 }

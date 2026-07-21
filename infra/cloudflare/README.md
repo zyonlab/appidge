@@ -68,10 +68,14 @@ Account ID `020878119352f1d4380269a2a334e17f`；zone `appidge.com`(active) `77d3
 | Worker（API） | `appidge-api-staging`（`[env.staging]`，MOCK_MODE=true） | **https://api-staging.appidge.com**（custom_domain，wrangler 自动建 DNS+证书） |
 | D1 | `appidge-licensing-staging` `2777a4a3-8e0f-4f39-af39-12aed0ceb63e`（APAC） | 迁移 `0001_init.sql` 已 apply --remote |
 | Worker secrets | `LICENSE_HMAC_PEPPER` / `CREEM_WEBHOOK_SECRET` | 走 `wrangler secret put --env staging`，不入 git |
-| Pages（官网） | 项目 `appidge-web-staging`（production branch=staging） | **https://appidge-web-staging.pages.dev** + 自定义域 **staging.appidge.com**（证书 provisioning） |
+| 官网（Workers 静态资源） | Worker `appidge-web`（`[env.staging]`，`assets=./dist`，无 main） | 自定义域 **https://staging.appidge.com**（custom_domain，同 API 机制） |
 
-已在 live worker 验证（MOCK_MODE，真实远端 D1）：healthz、activate/validate/deactivate、
-签名 refund webhook→validate=revoked、篡改/缺签→401。官网首页 200、无 secret 泄漏。
+**为什么官网也用 Worker（而非 Pages）**：Worker custom_domain 由 Workers API 自动建 DNS+证书，
+token 的 Workers 权限即可；Pages custom_domain 依赖 zone 里的 CNAME，需 `Zone:DNS:Edit`
+（当前 token 无此权限）。用 Workers 静态资源托管官网 → 与 API 同一套零手动 DNS 流程，静态资源请求免费层不计费。
+
+已在 live 验证：API（healthz、activate/validate/deactivate、签名 refund webhook→validate=revoked、
+篡改/缺签→401，MOCK_MODE + 真实远端 D1）；官网 staging.appidge.com 首页/子页 200、无 secret 泄漏。
 
 ### 重新部署 staging
 ```bash
@@ -79,15 +83,13 @@ export CLOUDFLARE_ACCOUNT_ID=… CLOUDFLARE_API_TOKEN=…   # 不入 git
 # API
 cd apps/api && npx wrangler deploy --env staging
 # 官网（构建期公开配置 PUBLIC_API_BASE_URL=https://api-staging.appidge.com 等经 apps/web/.env 注入）
-cd apps/web && pnpm build
-cd /repo/root && ./apps/api/node_modules/.bin/wrangler pages deploy apps/web/dist \
-  --project-name appidge-web-staging --branch staging
+cd apps/web && pnpm build && ../api/node_modules/.bin/wrangler deploy --env staging
 ```
 注意：`wrangler secret put` 后 secret 传播到运行实例有 ~10-15s 延迟，刚设完立刻打 webhook 可能 500，稍等即恢复。
 
 ### 生产映射（待 main 上线时做）
 - Worker `[env.production]` route → `api.appidge.com`（custom_domain），MOCK_MODE=false + 真实 Creem secret。
-- Pages 项目 `appidge-web`（production branch=main）→ 自定义域 `appidge.com` + `www.appidge.com`。
+- Worker `appidge-web` `[env.production]` route → `appidge.com` + `www.appidge.com`（custom_domain；配置已在 `apps/web/wrangler.jsonc`）。
 - R2 `updates.appidge.com`（Sparkle 包/appcast，需 EdDSA 公钥就绪后接）。
 - ⚠️ 客户端/Sparkle/官网里所有 `appidge.app` 占位需统一改 `appidge.com`（含 App 内 `SUFeedURL` 与 license API base）。
 

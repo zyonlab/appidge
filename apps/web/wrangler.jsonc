@@ -1,0 +1,22 @@
+{
+  // 官网以「Workers 静态资源」托管（与 API 同一套 custom_domain 机制：wrangler 自动建 DNS+证书，
+  // 无需 Zone:DNS:Edit）。纯静态、无 main 脚本；静态资源请求在 Workers 免费层不计费。
+  // 构建：apps/web 先 `pnpm build` 生成 dist/，再从本目录 `wrangler deploy --env staging`。
+  "name": "appidge-web",
+  "compatibility_date": "2025-07-01",
+  "workers_dev": false,
+  "assets": { "directory": "./dist" },
+  "env": {
+    "staging": {
+      "routes": [
+        { "pattern": "staging.appidge.com", "custom_domain": true }
+      ]
+    },
+    "production": {
+      "routes": [
+        { "pattern": "appidge.com", "custom_domain": true },
+        { "pattern": "www.appidge.com", "custom_domain": true }
+      ]
+    }
+  }
+}

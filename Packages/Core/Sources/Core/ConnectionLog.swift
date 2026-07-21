@@ -8,6 +8,11 @@ public enum ConnectionPhase: Sendable, Equatable, Codable {
 
 /// 连接日志里的一行:一条 TCP 连接的身份 + 目标 + 决策 + 当前状态/字节。按连接 id 去重更新
 /// (opened → closed/failed 更新同一行,不新增)。是扩展 `ConnectionEventDTO` 在 Core 侧的孪生。
+/// 上游路由模式(领域层),供 UI 本地化上游标签前缀。`.single` 无前缀。
+public enum UpstreamKind: String, Sendable, Equatable, Codable {
+    case single, chain, failover, loadBalance
+}
+
 public struct ConnectionLogEntry: Sendable, Equatable, Codable, Identifiable {
     public let id: String
     public let processID: ProcessID
@@ -25,15 +30,17 @@ public struct ConnectionLogEntry: Sendable, Equatable, Codable, Identifiable {
     /// 未签名命令行程序的 `processID.value` 常是没有意义的 `a.out`,这个字段是更可读的兜底。
     /// 解不出时为 nil,调用方回落到 `processID.value`。
     public var processDisplayName: String?
-    /// 实际走的上游可读标签(单台 host:port / 链 / 故障转移 / 负载均衡);直连或未知为 nil。
-    /// 让日志/详情能看出「走了哪台、哪种路由模式」。旧持久化条目无此字段 → 解码为 nil。
+    /// 实际走的上游**内容**(host:port 或 `A → B`,语言中立);模式前缀由 UI 本地化。直连/未知为 nil。
+    /// 旧持久化条目无此字段 → 解码为 nil。
     public var upstreamLabel: String?
+    /// 上游路由模式(供 UI 本地化「代理链/故障转移/负载均衡」前缀);单台无前缀,直连/未知为 nil。
+    public var upstreamKind: UpstreamKind?
 
     public init(
         id: String, processID: ProcessID, host: String, port: UInt16,
         rule: ProxyRule, proxyKind: ProxyKind?, phase: ConnectionPhase,
         bytesUp: Int64, bytesDown: Int64, openedAt: Date = Date(timeIntervalSince1970: 0),
-        processDisplayName: String? = nil, upstreamLabel: String? = nil
+        processDisplayName: String? = nil, upstreamLabel: String? = nil, upstreamKind: UpstreamKind? = nil
     ) {
         self.id = id
         self.processID = processID
@@ -47,6 +54,7 @@ public struct ConnectionLogEntry: Sendable, Equatable, Codable, Identifiable {
         self.openedAt = openedAt
         self.processDisplayName = processDisplayName
         self.upstreamLabel = upstreamLabel
+        self.upstreamKind = upstreamKind
     }
 
     /// 应用重启后从磁盘回灌历史连接日志时用:仍停在 `opened` 阶段的记录不可能真的还活着——

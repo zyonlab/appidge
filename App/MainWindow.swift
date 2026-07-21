@@ -281,8 +281,8 @@ private struct ConnectionDetail: View {
                 }
                 Section("路由") {
                     LabeledContent("决策") { RouteChip(rule: e.rule, kind: e.proxyKind) }
-                    // 实际走的上游(单台 host:port / 链 / 故障转移 / 负载均衡);直连时不显示。用于验证路由模式。
-                    if let up = e.upstreamLabel {
+                    // 实际走的上游(本地化前缀 + host:port);直连时不显示。用于验证路由模式。
+                    if let up = UpstreamLabelFormat.display(label: e.upstreamLabel, kind: e.upstreamKind) {
                         LabeledContent("上游") {
                             Text(up).monospaced().textSelection(.enabled)
                                 .lineLimit(1).truncationMode(.middle)

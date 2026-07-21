@@ -376,8 +376,8 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         // 实际所用代理协议:按解析后的路由取第一跳的 kind——proxied 但降级成直连时记 nil,
         // 让连接日志里"到底走没走代理"如实。
         let proxyKind = ProxyDialer.representativeKind(rule: rule, config: proxyConfig, mode: routingMode)
-        // 实际走的上游可读标签(单台 host:port / 链 / 故障转移 / 负载均衡),与 openRemote 用同一处路由解析。
-        let upstreamLabel = routeLabel(resolvedRoute(rule: rule, proxyServerID: origin.proxyServerID))
+        // 上游标签(内容 + 模式),与 openRemote 用同一处路由解析;模式前缀由 app 本地化。
+        let upstream = routeLabel(resolvedRoute(rule: rule, proxyServerID: origin.proxyServerID))
         // 抓包开着时给这条连接建一个 .dmp 写入器;关着(或拿不到容器)就 nil,pump 里是 no-op。
         let capture = packetCaptureEnabled
             ? PacketCaptureWriter.forConnection(
@@ -387,7 +387,8 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             : nil
         let context = ConnectionContext(
             id: UUID().uuidString, processID: processID, host: host, port: port,
-            rule: rule, proxyKind: proxyKind, upstreamLabel: upstreamLabel, openedAt: Date(), capture: capture,
+            rule: rule, proxyKind: proxyKind, upstreamLabel: upstream?.content, upstreamKind: upstream?.kind,
+            openedAt: Date(), capture: capture,
             processDisplayName: origin.displayName
         )
 

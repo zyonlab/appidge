@@ -228,6 +228,20 @@ struct RouteChip: View {
     }
 }
 
+/// 上游标签的本地化拼接:内容(host:port / `A → B`,语言中立)由扩展给,模式前缀在此按当前语言拼。
+/// 单台 / 直连无前缀;链 / 故障转移 / 负载均衡带本地化前缀。日志行与详情面板共用一处。
+enum UpstreamLabelFormat {
+    static func display(label: String?, kind: UpstreamKind?) -> String? {
+        guard let label else { return nil }
+        switch kind {
+        case .chain: return String(localized: "链 · \(label)")
+        case .failover: return String(localized: "故障转移 · \(label)")
+        case .loadBalance: return String(localized: "负载均衡 · \(label)")
+        case .single, .none: return label
+        }
+    }
+}
+
 /// 「规则·代理」列的文案与颜色,单处共用(直连/拦截/代理·协议)。
 enum RouteText {
     static func label(rule: ProxyRule, kind: ProxyKind?) -> LocalizedStringKey {

@@ -150,8 +150,10 @@ struct TrafficPane: View {
         seg(appName(entry) + "  ", .tertiaryLabelColor)
         seg("→ \(entry.host):\(entry.port)  ", .tertiaryLabelColor)
         seg(Self.routeLabelText(rule: entry.rule, kind: entry.proxyKind) + "  ", Self.routeColor(entry.rule))
-        // 实际走的上游(单台 host:port / 链 / 故障转移 / 负载均衡),让路由模式与具体代理可见。
-        if let up = entry.upstreamLabel { seg("· " + up + "  ", .secondaryLabelColor) }
+        // 实际走的上游(本地化前缀 + host:port / A→B),让路由模式与具体代理可见。
+        if let up = UpstreamLabelFormat.display(label: entry.upstreamLabel, kind: entry.upstreamKind) {
+            seg("· " + up + "  ", .secondaryLabelColor)
+        }
         let (statusText, statusColor) = Self.statusPresentation(entry)
         seg(statusText, statusColor)
         if let reason = eventReasonText(entry) {

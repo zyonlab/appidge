@@ -47,7 +47,8 @@ public enum ExtensionMessageHandling {
                 bytesDown: event.bytesDown,
                 openedAt: event.openedAt,
                 processDisplayName: event.processDisplayName,
-                upstreamLabel: event.upstreamLabel
+                upstreamLabel: event.upstreamLabel,
+                upstreamKind: event.upstreamKind.map(coreUpstreamKind(from:))
             ))]
 
         case .loopDetected(let signature, let processID, let executablePath):
@@ -84,6 +85,15 @@ public enum ExtensionMessageHandling {
         case .opened: .opened
         case .closed: .closed
         case .failed: .failed
+        }
+    }
+
+    private static func coreUpstreamKind(from dto: IPCContract.UpstreamKindDTO) -> Core.UpstreamKind {
+        switch dto {
+        case .single: .single
+        case .chain: .chain
+        case .failover: .failover
+        case .loadBalance: .loadBalance
         }
     }
 

@@ -56,8 +56,10 @@ final class ConnectionContext: @unchecked Sendable {
     let rule: ProxyRuleDTO
     /// 拨号前按路由模式估计;拨号后(负载均衡/单台)回填成**实际用的那台**的协议,故为 var。
     var proxyKind: ProxyKindDTO?
-    /// 实际走的上游可读标签(单台 host:port / 代理链 / 故障转移 / 负载均衡);直连为 nil。拨号后回填实际那台,故 var。
+    /// 上游标签的**内容部分**(host:port 或 `A → B`,语言中立);模式前缀由 app 本地化。直连为 nil。拨号后回填,故 var。
     var upstreamLabel: String?
+    /// 上游路由模式(供 app 本地化前缀);单台 = .single,直连 = nil。拨号后回填实际模式,故 var。
+    var upstreamKind: UpstreamKindDTO?
     /// 连接建立时间戳,进每条 ConnectionEventDTO(app 侧据此排序 + 显示时间列)。
     let openedAt: Date
     /// 逐连接抓包写入器(抓包开关关时为 nil)。pump 往它写上下行字节,teardown 时 close。
@@ -72,10 +74,12 @@ final class ConnectionContext: @unchecked Sendable {
 
     init(
         id: String, processID: ProcessIdentifierDTO, host: String, port: UInt16,
-        rule: ProxyRuleDTO, proxyKind: ProxyKindDTO?, upstreamLabel: String? = nil,
+        rule: ProxyRuleDTO, proxyKind: ProxyKindDTO?,
+        upstreamLabel: String? = nil, upstreamKind: UpstreamKindDTO? = nil,
         openedAt: Date, capture: PacketCaptureWriter? = nil,
         processDisplayName: String? = nil
     ) {
+        self.upstreamKind = upstreamKind
         self.id = id
         self.processID = processID
         self.host = host

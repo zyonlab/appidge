@@ -2781,6 +2781,36 @@
           }
         }
       }
+    },
+    "链 · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chain · %@"
+          }
+        }
+      }
+    },
+    "故障转移 · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failover · %@"
+          }
+        }
+      }
+    },
+    "负载均衡 · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Load balancing · %@"
+          }
+        }
+      }
     }
   }
 }

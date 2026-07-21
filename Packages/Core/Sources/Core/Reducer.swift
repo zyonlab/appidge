@@ -9,6 +9,8 @@ public enum Reducer {
             ?? reduceRuntimeSignals(state, action)
             ?? reduceSettings(state, action)
             ?? reduceConnectionLog(state, action)
+            ?? reduceLicenseFlow(state, action)
+            ?? reduceLicenseValidation(state, action)
             ?? reduceLifecycle(state, action)
     }
 

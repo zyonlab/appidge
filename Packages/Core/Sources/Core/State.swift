@@ -1,3 +1,5 @@
+import Foundation
+
 public struct AppState: Sendable, Equatable {
     public var isEngineHealthy: Bool
     public var processes: [ProcessID: MonitoredProcess]
@@ -45,6 +47,12 @@ public struct AppState: Sendable, Equatable {
     /// 运行时状态,不持久化。
     public var bundledExtensionVersion: String?
 
+    /// 授权状态机相位（见 ``LicensePhase`` / CLAUDE.md §5.5）。默认未激活。
+    /// **和网络接管完全解耦**：授权服务故障绝不影响转发/路由，付费能力只在 `isLicenseActive` 时开放。
+    public var licensePhase: LicensePhase
+    /// 本地授权记录（存 Keychain）。相位为 licensed/validating/gracePeriod/deactivating 时非 nil。
+    public var license: LicenseInfo?
+
     /// 会话绑定的扩展是不是旧的:两者都已知且不相等 = 会话绑在旧 provider 上,需重启会话重绑。
     /// 任一未知(还没握手 / 读不到包内版本)时返回 false——不确定就不误报。
     public var extensionNeedsRebind: Bool {
@@ -57,8 +65,26 @@ public struct AppState: Sendable, Equatable {
         .applyProcessOriginExclusions(direct: dynamicOriginExclusion, hardBypass: loopAutoExclusions)
     }
 
+    /// 授权能力是否开放。**只有** licensed/validating/gracePeriod/deactivating 放行——
+    /// 校验/停用在途保留既有访问（乐观），上游不可用进 gracePeriod 仍放行；
+    /// 只有明确的 revoked/expired（及未激活/激活中/可恢复错误）才关闭付费能力。
+    public var isLicenseActive: Bool {
+        switch licensePhase {
+        case .licensed, .validating, .gracePeriod, .deactivating:
+            return true
+        case .unlicensed, .activating, .revoked, .expired, .recoverableError:
+            return false
+        }
+    }
+
     /// 连接日志保留的最大条数;超出丢最旧。
     public static let connectionLogCap = 500
+
+    /// 离线宽限窗口，集中配置，默认 **7 天**（见 CLAUDE.md §5.5）。上游暂时不可用期间，
+    /// 距上次成功校验在此窗口内一律放行；超出才落 `expired`。
+    public static let licenseGracePeriod: TimeInterval = 7 * 24 * 60 * 60
+    /// 例行校验间隔，默认每日一次。是否到期由 App 层调度器据此判断。
+    public static let licenseValidateInterval: TimeInterval = 24 * 60 * 60
 
     public init(
         isEngineHealthy: Bool = true,
@@ -80,7 +106,9 @@ public struct AppState: Sendable, Equatable {
         loopAutoExclusions: OriginExclusionDiscovery = OriginExclusionDiscovery(),
         proxyEnvironment: ProxyEnvironment = ProxyEnvironment(),
         runningExtensionVersion: String? = nil,
-        bundledExtensionVersion: String? = nil
+        bundledExtensionVersion: String? = nil,
+        licensePhase: LicensePhase = .unlicensed,
+        license: LicenseInfo? = nil
     ) {
         self.isEngineHealthy = isEngineHealthy
         self.processes = processes
@@ -102,5 +130,7 @@ public struct AppState: Sendable, Equatable {
         self.proxyEnvironment = proxyEnvironment
         self.runningExtensionVersion = runningExtensionVersion
         self.bundledExtensionVersion = bundledExtensionVersion
+        self.licensePhase = licensePhase
+        self.license = license
     }
 }

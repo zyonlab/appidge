@@ -1,3 +1,5 @@
+import Foundation
+
 public enum Action: Sendable, Equatable {
     case processDiscovered(id: ProcessID, displayName: String, executablePath: String)
     case assignRule(processID: ProcessID, rule: ProxyRule, proxyServerID: ProxyServerID? = nil)
@@ -66,4 +68,34 @@ public enum Action: Sendable, Equatable {
     /// 保证扩展手里的配置永远是最新的——不然扩展升级/重启/XPC 掉线重连后,它会一直空转
     /// (每条 flow 回落默认直连、什么都不接管)。纯粹的"重发",不改任何 state。
     case resyncExtension
+
+    // MARK: - 授权（License）状态机
+
+    /// 用户粘贴 key 后请求激活。instanceName/appVersion 由 App 层配置注入到 effect handler，
+    /// 这里只带 key（View 只提供 key）。→ 相位 `.activating`，产出 `.activateLicense` effect。
+    case licenseActivateRequested(licenseKey: String)
+    /// 激活成功（携带回显的 key + 服务端响应 + 本地 now）。→ 依 status 落 licensed/expired/revoked。
+    case licenseActivateSucceeded(licenseKey: String, response: LicenseResponse, now: Date)
+    /// 激活失败（已归类）。→ 依类型落 recoverableError/expired/revoked。
+    case licenseActivateFailed(LicenseActivationFailure)
+    /// 请求例行校验（携带本地 now）。→ 相位 `.validating`，产出 `.validateLicense` effect。
+    case licenseValidateRequested(now: Date)
+    /// 校验成功。→ 更新记录并依 status 落 licensed/expired/revoked。
+    case licenseValidateSucceeded(response: LicenseResponse, now: Date)
+    /// 校验失败（已归类，携带本地 now）。→ revoked/expired 锁定；transient 进 grace 或耗尽落 expired。
+    case licenseValidateFailed(LicenseValidationFailure, now: Date)
+    /// 请求本机停用。→ 相位 `.deactivating`，产出 `.deactivateLicense` effect。
+    case licenseDeactivateRequested
+    /// 停用成功。→ 清空记录，落 `.unlicensed`，清 Keychain。
+    case licenseDeactivateSucceeded
+    /// 停用失败（transient=是否暂时性）。→ 保留授权、回落 `.licensed`，允许重试（不误锁）。
+    case licenseDeactivateFailed(transient: Bool)
+    /// 启动从 Keychain 读回记录（可能为 nil，携带本地 now）。→ 依记录 + 宽限窗口计算初始相位。
+    case licenseRestored(LicenseInfo?, now: Date)
+    /// 周期性时钟推进（携带本地 now）。纯本地判定：抬高水位、宽限耗尽/订阅到期 → 落 expired；不发网络。
+    case licenseClockTick(now: Date)
+    /// 请求购买（打开 Hosted Checkout）。checkoutURL 由 App 层构建期配置提供。→ 产出 `.openCheckout`。
+    case licensePurchaseRequested(checkoutURL: String)
+    /// Keychain 持久化失败（非致命）。→ 保持当前相位，不锁用户，仅记日志。
+    case licensePersistenceFailed
 }

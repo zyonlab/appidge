@@ -10,7 +10,12 @@ extension Reducer {
         case .dismissLoopWarning:
             return dismissLoopWarning(state)
         case .resetState:
-            return (AppState(), [])
+            // 切档案清运行时/会话状态，但**授权与网络接管解耦**：license 是账号级、非档案级，
+            // profile 切换不该把付费状态清掉（Keychain 里那份也还在）。故 license 相位/记录原样带过。
+            var fresh = AppState()
+            fresh.licensePhase = state.licensePhase
+            fresh.license = state.license
+            return (fresh, [])
         case .setPacketCaptureEnabled(let enabled):
             var state = state
             state.isPacketCaptureEnabled = enabled

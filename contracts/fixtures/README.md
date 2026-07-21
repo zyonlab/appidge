@@ -5,10 +5,13 @@
 1. **facade/** —— 本仓库 Worker facade 的对外契约（`licensing.openapi.yaml` 的实例）。
    由我们定义，稳定，Swift/TS 双端契约测试都读它。**当前可用。**
 
-2. **creem/** —— Creem **上游**真实 payload 的脱敏样本（webhook / license API）。
-   ⚠️ 字段名（`event_id` / order / license key 字段）**必须用 Creem test mode 实测捕获后脱敏**，
-   不得凭猜测填。当前只有 `*.MOCK.json` 占位，标注 `"_mock": true`；
-   拿到 test secret 后用真实脱敏样本替换，去掉 `_mock` 标记，再让 webhook 处理逻辑依赖确切字段名。
+2. **creem/** —— Creem **上游**真实 webhook payload 的脱敏样本。
+   ✅ 已用 Creem test mode 实测捕获并脱敏（2026-07-21）：`checkout.completed.json` /
+   `refund.created.json` / `dispute.created.json`。结构：顶层 `id`+`eventType`+`object`，
+   业务字段在 `object.order.{id,customer,product}` 等。
+   ⚠️ 关键：**这些 webhook 都不含 license key**；且 license API 只回 product_id、不回 order_id，
+   两侧无公共 join key → 吊销走 validate 主路（Creem status），webhook 只做验签+幂等登记。见
+   `apps/api/src/creem/mapping.ts` 顶部注释与 `docs/creem-integration.md`。
 
 ## 纪律
 

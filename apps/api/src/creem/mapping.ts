@@ -1,18 +1,18 @@
 // ────────────────────────────────────────────────────────────────────────────
-// ⚠️ 人工闸门（HUMAN GATE）：Creem webhook 字段映射
+// Creem webhook 字段映射（已用 test mode 真实 payload 实测确认，2026-07-21）。
+// fixtures：contracts/fixtures/creem/{checkout.completed,refund.created,dispute.created}.json
 //
-// 本模块是 Creem 上游 webhook payload → 我们内部规范事件的**唯一**翻译点。
-// 目前字段名（event_id / eventType / order / license 等）来自 contracts/fixtures/creem/*.MOCK.json
-// 占位样本，**未经 Creem test mode 实测确认**。
+// 实测确认的结构：
+//   顶层 `id`(事件ID) + `eventType` + `object`；业务字段在 object 下：
+//   object.order.{id,customer,product} · object.product.id(仅 checkout) · object.customer.{id,email}
 //
-// 解锁步骤（人工）：
-//   1. 在 Creem test mode 触发真实 checkout.completed / refund.created / dispute.created；
-//   2. 抓取 raw webhook body，脱敏后替换 contracts/fixtures/creem/*.json 并去掉 _mock 标记；
-//   3. 核对下方 CANDIDATE_* 候选键，删掉不存在的、补上真实键名；
-//   4. 跑 webhook 契约测试。
-//
-// 设计为「多候选键 + 首个命中」，因此即便真实键名与占位略有出入也不硬失败，只需在此微调，
-// 不触碰 handler 逻辑。绝不凭邮箱/模糊字段吊销（见 mapEvent 的 unmappable 处理）。
+// ⚠️ 关键事实：**Creem webhook 不携带 license key**（checkout/refund/dispute 都没有），
+// 且 license API(validate/activate) 只回 product_id、**不回 order_id**。webhook 与 license API
+// 没有公共 join key → **无法用 webhook 精确吊销某个 license**。因此吊销走 validate 主路：
+// app 定期 validate → 我们的 facade 调 Creem validate → status=disabled/inactive → 映射为 revoked
+// （见 handlers/licenses.ts statusFromCreem 与 creem/http.ts normalizeStatus）。webhook 的职责
+// 收敛为「验签 + 幂等登记（审计）」，不再期望它驱动 per-license 吊销。
+// 多候选键设计保留，便于将来 Creem 若在 payload 里补 license 字段时无痛接入。
 // ────────────────────────────────────────────────────────────────────────────
 
 export type CanonicalEventType = "checkout.completed" | "refund.created" | "dispute.created" | "unknown";

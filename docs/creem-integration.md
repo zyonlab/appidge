@@ -5,6 +5,25 @@
 ## 0. 一句话结论
 creem 满足场景:**MoR 收款 + 自动发 license key + activate / validate / deactivate 三个设备级端点**。Mac app 只需本地「输入 key → activate → 存激活态 → 定期 validate」小状态机。等价于 Lemon Squeezy 的 license API。
 
+## 0.5 实测结论（2026-07-21，test mode 真实 webhook + 官方 API 文档）——**吊销走 validate，不走 webhook**
+
+test mode 抓到真实 `checkout.completed` / `refund.created` / `dispute.created`（脱敏样本见 `contracts/fixtures/creem/*.json`），并核对官方 validate/activate 文档，得到关键事实：
+
+- **webhook 不含 license key**（三种事件都没有），payload 是**订单中心**：`object.order.{id,customer,product}`。
+- **validate/activate 响应含 `product_id` 但不含 `order_id`/`customer_id`**；status ∈ `active/inactive/expired/disabled`。
+- ⇒ **webhook（有 order 无 license）与 license API（有 license 无 order）没有公共 join key**，无 `license.*` 事件。
+  **无法用 webhook 精确吊销某个 license。**
+
+**因此确定的架构（也是官方文档推荐）：**
+1. **吊销主路 = validate**：app 定期 validate → facade 调 Creem validate → `status=disabled/inactive` → 映射 `revoked`、`expired`→`expired`。代码已就位（`creem/http.ts normalizeStatus` + `handlers/licenses.ts statusFromCreem`）。
+2. **webhook 职责收敛**：验签 + 幂等登记（审计）。不再期望它驱动 per-license 吊销；现有 `revoke_unmapped` 安全路径即正确行为（不凭模糊字段乱吊销）。
+3. **Agent C 早期基于「webhook 带 license」写的 refund→revoke-by-fingerprint 测试是虚构场景**，需改写为 validate 驱动（见待办）。
+
+**唯一未决、必须实测的一点**：**退款后 Creem 是否把 license status 置为 `disabled`？** 文档未明说。
+解锁测试（需 license-enabled 产品 + `creem_test_` API key）：**买 → activate → 退款 → validate 看 status**。
+- 若变 `disabled/inactive` → validate 主路成立，全链路闭环。
+- 若仍 `active` → 需 Creem 是否提供「按 order 查 license」的服务端 API 作桥（待查）。
+
 ## 1. 要不要先做官网?—— 不需要为集成/测试先做
 - **注册 + test 模式 + 写全部代码:不需要网站**。免信用卡,test key 前缀 `creem_test_`,无限用。（[introduction](https://docs.creem.io/getting-started/introduction)）
 - **上线收真钱**:要过 onboarding/KYC——法律主体、所有权、税务居民地、VAT/税号、business/个人身份。**官方没把「产品官网 URL」列为强制项**。（[Terms](https://www.creem.io/terms)）

@@ -20,7 +20,7 @@
 - [ ] Hosted Checkout test flow 能完成购买并获得 license key —— 需真实 Creem 产品/checkout link
 - [x] Worker license facade 不泄露 Creem API key，契约测试与错误映射全绿（MOCK_MODE，44 测试）
 - [~] Webhook HMAC、D1 幂等、refund/dispute revoke 有自动测试 —— sandbox 证据 = 人工闸门（真实 test secret + 脱敏 fixture）
-- [ ] macOS App 用 Keychain 保存授权，activate/validate/deactivate 与 7 天 grace —— Wave 2（Agent E）未开始
+- [x] macOS App 用 Keychain 保存授权，activate/validate/deactivate 与 7 天 grace 全绿（Core+AppFeature 授权测试；`xcodebuild App Debug` BUILD SUCCEEDED，真实签名）
 - [~] Sparkle feed/包/R2 —— App target 接入且 Debug build 成功；`SUPublicEDKey` 仍为 TODO（未伪造）= 人工闸门
 - [ ] 旧版 → 新版 Sparkle + 系统扩展升级 smoke test —— 发布期人工闸门
 - [x] `swift test` 五包全绿、App Debug build 成功、**SwiftLint strict 0 违规**（预存 11 处已清零，见下「已解决」）
@@ -45,9 +45,15 @@
 - [x] Agent C · apps/api（Worker facade + Creem mock/http + webhook + D1）—— 44 测试全绿（38 workers-pool + 6 契约），`wrangler deploy --dry-run` 绿，redaction 断言无 key 泄漏
 - [x] Agent D · Sparkle 移植 —— cherry-pick 3 提交零冲突 + feed 修正；`check-swift` 五包绿，`xcodebuild App Debug` BUILD SUCCEEDED，Extension 不链接 Sparkle 已核
 
-### Wave 2（未开始）
-- [ ] Agent E · macOS License Client（依赖已集成的 Sparkle 分支 + 契约）
-- [ ] Agent F · Integration/QA（跨端契约、sandbox、升级 smoke）
+### Wave 2（集成完成，分支 `feat/wave2-macos-licensing`）
+- [x] Agent E · macOS License Client —— Core 纯授权状态机(相位机/DTO/协议注入) + AppFeature effect handler + App 侧 Keychain/URLSession/Clock 具体实现 + `LicenseSettingsView`；7 天宽限 + 时钟回拨高水位防护；**授权动作不产出任何路由 effect**（有测试断言，防授权故障黑洞网络）。`check-swift` 五包绿、`swiftlint` 0、`xcodebuild App Debug` SUCCEEDED。
+- [x] Agent F · Integration/QA —— `scripts/smoke-license-mock.sh` 真实 wrangler dev 端到端 **17/17**（activate→validate→deactivate + 签名 refund webhook → validate 返回 revoked；篡改/缺签 → 401），契约一致性、官网、dry-run 全绿。证据与人工闸门 runbook 见 `docs/qa-evidence.md`。
+
+集成全量闸门（主 Agent 复跑）：5 Swift 包绿 · SwiftLint strict 0(185 文件) · `xcodebuild App Debug` SUCCEEDED(真实签名) · `pnpm check` 8/8。
+
+### 待接线（config，非阻塞）
+- 生产需把 `LicenseAPIBaseURL=https://api.appidge.app`（可选 `LicenseCheckoutURL`）注入 App 构建配置/Info.plist；缺失时客户端安全回落 `http://127.0.0.1:8787`（本地 dev，绝不误连生产）。Agent E 未改 Info.plist/project 文件（避 xcodegen 漂移丢 Sparkle），留给集成方/Agent A 接线。
+- ⚠️ **构建配置漂移警告**：`project.yml` 未含 Sparkle 包（Sparkle 只在 `project.pbxproj` 手工加入）。**不要跑 `xcodegen generate`**，否则会重生成 pbxproj 丢掉 Sparkle。修复方向：把 Sparkle 远程 SPM 包补进 `project.yml` 的 `packages:` 与 App target `dependencies:`，再 `xcodegen generate` 对齐——需人工核对生成结果与现有 pbxproj 一致后再提交。
 
 ## 已解决：SwiftLint strict 预存违规（commit `02f7955`）
 11 处预存违规（`198d7a6` 即存在的 SwiftLint 版本漂移，非商业化改动引入）已清零：

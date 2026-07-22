@@ -23,12 +23,11 @@ test mode 抓到真实 `checkout.completed` / `refund.created` / `dispute.create
 只有 activate/validate/deactivate 三个端点。license key 只出现在订单确认/邮件/客户门户，**任何 API 都不返回**。
 ⇒ order↔license 的程序化桥**不存在**，validate 是**唯一**可能的吊销杠杆。
 
-**唯一未决、必须实测的一点**：**退款后 Creem 是否把 license status 置为 `disabled`？** 文档未明说。
-解锁测试（需 license-enabled 产品 + `creem_test_` API key）：**买 → activate → 退款 → validate 看 status**。
-- 若变 `disabled/inactive` → validate 主路自动闭环，收工。
-- 若仍 `active` → 没有自动/程序化吊销途径。v1 落地方案：**退款时你在 Creem Dashboard 手动 disable 该 license**
-  （反正退款本就在 Dashboard 操作），validate 随即返回 disabled → app 锁定。webhook 负责审计/提醒。
-  （注意 `deactivate` 只释放实例名额，不等于 disable license key；disable 目前只能在 Dashboard 做。）
+**已实测结论（2026-07-22，真实 Creem test 全链路）**：走通 买 → activate → validate(active) → 退款 → validate → 手动 disable → validate：
+- **退款不自动 disable license**：真实退款后（refund.created webhook 已入库），直连 Creem validate 仍返回 `active` → **Creem 不因退款自动禁用授权**。
+- **手动 disable 有效且我们映射正确**：在 Dashboard→Licenses 手动 disable 后，直连 Creem validate = `disabled`，我们 facade validate = **`revoked`**（`normalizeStatus` + `statusFromCreem` 把 disabled→revoked）。
+- ⇒ **v1 运营模型确定**：退款/拒付时在 **Creem Dashboard 手动 disable 该 license**（退款本就在 Dashboard 操作），validate 随即返回 revoked → app 锁定。webhook 只做审计/提醒。
+  （注意 `deactivate` 只释放实例名额，不等于 disable license key；disable 目前只能在 Dashboard 做，无程序化 API。）
 
 ## 1. 要不要先做官网?—— 不需要为集成/测试先做
 - **注册 + test 模式 + 写全部代码:不需要网站**。免信用卡,test key 前缀 `creem_test_`,无限用。（[introduction](https://docs.creem.io/getting-started/introduction)）

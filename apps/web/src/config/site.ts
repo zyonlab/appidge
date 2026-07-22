@@ -62,10 +62,10 @@ export const API_BASE_URL = values.PUBLIC_API_BASE_URL;
 export const DOWNLOAD_URL = values.PUBLIC_DOWNLOAD_URL;
 
 /** 生产站点域名（canonical / OG / sitemap）。 */
-export const SITE_URL = 'https://appidge.app';
+export const SITE_URL = 'https://appidge.com';
 
 /** 支持 / 退款联系邮箱（对外公开）。 */
-export const SUPPORT_EMAIL = 'support@appidge.app';
+export const SUPPORT_EMAIL = 'support@appidge.com';
 
 /** 站点常量。 */
 export const SITE_NAME = 'Appidge';

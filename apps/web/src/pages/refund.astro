@@ -3,41 +3,54 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import DraftNotice from '../components/DraftNotice.astro';
 import { SUPPORT_EMAIL } from '../config/site';
 
-const description = 'Appidge 退款政策（草稿）。退款由用户通过官方渠道联系发起，本页说明流程与联系入口。';
+const description = 'Appidge 退款政策（草稿）。14 天内无理由全额退款，邮件联系即可，我们会尽快处理。';
 ---
 
 <BaseLayout title="退款政策" description={description} path="/refund">
   <section class="section">
     <div class="container prose">
       <h1>退款政策</h1>
-      <DraftNotice updated="2026-07-21" />
+      <DraftNotice updated="2026-07-22" />
 
-      <p>
-        我们希望你对 Appidge 满意。若购买后遇到问题，请先阅读本政策并与我们联系。
+      <p class="lede">
+        我们希望你用得满意。<strong>购买后 14 天内不满意，可无理由申请全额退款</strong>——
+        邮件联系即可，我们会尽快处理。
       </p>
 
-      <h2>如何申请退款</h2>
-      <p>
-        请通过邮件联系
-        <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>，
-        并附上你的购买邮箱与订单信息。我们会核对订单并按本政策处理。
-      </p>
+      <div class="card" style="margin:1.5rem 0">
+        <h2 class="mt-0">申请退款只需一封邮件</h2>
+        <p>
+          发邮件到
+          <a class="btn btn-primary" style="margin:0 0.25rem" href={`mailto:${SUPPORT_EMAIL}?subject=退款申请`}>{SUPPORT_EMAIL}</a>
+          ，附上以下信息，我们核对后按原渠道退回：
+        </p>
+        <ul>
+          <li>你的<strong>购买邮箱</strong>（结账时填写的邮箱）</li>
+          <li>你的<strong>许可证密钥或订单号</strong>（在购买确认邮件里）</li>
+          <li>（可选）简单说明遇到的问题，帮助我们改进</li>
+        </ul>
+        <p style="margin-bottom:0">
+          我们承诺<strong>尽快人工响应</strong>。有任何问题都欢迎先邮件我们——不必走银行争议流程。
+        </p>
+      </div>
 
       <h2>处理方式</h2>
       <ul>
-        <li>退款经核对后通过原支付渠道（Creem）退回。</li>
-        <li>退款完成后，对应许可证将被停用，相关设备的付费能力随之失效。</li>
-        <li>退款到账时间取决于支付渠道与发卡方。</li>
+        <li>核对订单后，通过原支付渠道（Creem）退回款项。</li>
+        <li>退款完成后，对应<strong>许可证将被停用</strong>，相关设备的付费能力随之失效。</li>
+        <li>退款到账时间取决于支付渠道与发卡方，通常数个工作日。</li>
       </ul>
 
-      <h2>建议先试用</h2>
+      <h2>先试用，减少退款</h2>
       <p>
-        下载与购买是两个独立步骤。建议先下载试用，确认 Appidge 适配你的工作流后再购买，
-        以减少退款需求。
+        下载与购买是两个独立步骤。建议<strong>先下载试用</strong>，确认 Appidge 适配你的工作流后再购买。
       </p>
 
+      <h2>窗口与例外</h2>
       <p>
-        具体退款条件、时限与例外，需由运营方结合适用法律与支付渠道条款最终确定。
+        14 天窗口外、或存在明显滥用（如反复购买后退款白嫖）的情形，是否退款及退款金额由运营方按适用法律与
+        <a href={`mailto:${SUPPORT_EMAIL}`}>支持沟通</a>裁量处理。具体退款条件、时限与例外，
+        需由运营方结合适用法律与支付渠道（Creem）条款最终确定。
       </p>
     </div>
   </section>

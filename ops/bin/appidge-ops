@@ -153,8 +153,13 @@ cmd_test() {
   print_header
   ops_note "1/4 ops/tests/test-config.sh"
   sh "$OPS_ROOT/ops/tests/test-config.sh"
-  ops_note "2/4 pnpm check（web+api lint/typecheck/test/build）"
-  ( cd "$OPS_ROOT" && pnpm check )
+  ops_note "2/4 pnpm check（web+api lint/typecheck/test/build；web 公开配置显式来自 $OPS_CONF）"
+  ( cd "$OPS_ROOT" \
+    && PUBLIC_SITE_URL="$PUBLIC_SITE_URL" \
+       PUBLIC_POLAR_CHECKOUT_URL="$PUBLIC_POLAR_CHECKOUT_URL" \
+       PUBLIC_API_BASE_URL="$PUBLIC_API_BASE_URL" \
+       PUBLIC_DOWNLOAD_URL="$PUBLIC_DOWNLOAD_URL" \
+       pnpm check )
   ops_note "3/4 pnpm check:swift"
   ( cd "$OPS_ROOT" && pnpm check:swift )
   ops_note "4/4 wrangler deploy --dry-run --env ${OPS_ENV}（api）"

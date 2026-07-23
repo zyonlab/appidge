@@ -1,11 +1,10 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro';
-import FaqBody from '../components/FaqBody.astro';
-import { faq } from '../i18n/faq';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import FaqBody from '../../components/FaqBody.astro';
+import { faq } from '../../i18n/faq';
 
-const t = faq.zh;
+const t = faq.en;
 
-// FAQPage 结构化数据 —— 答案用去标签纯文本。
 const stripTags = (html: string) => html.replace(/<[^>]+>/g, '');
 const jsonld = {
   '@context': 'https://schema.org',
@@ -18,6 +17,6 @@ const jsonld = {
 };
 ---
 
-<BaseLayout title={t.title} description={t.metaDescription} path="/faq" locale="zh" jsonld={jsonld}>
+<BaseLayout title={t.title} description={t.metaDescription} path="/faq" locale="en" jsonld={jsonld}>
   <FaqBody t={t} />
 </BaseLayout>

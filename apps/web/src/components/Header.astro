@@ -1,36 +1,58 @@
 ---
 import { SITE_NAME } from '../config/site';
+import { localePath, ui, type Locale } from '../i18n';
+
+interface Props {
+  locale: Locale;
+  /** locale 无关的逻辑路径（用于高亮当前项与语言切换互指）。 */
+  path: string;
+}
+
+const { locale, path } = Astro.props;
+const t = ui[locale];
 
 const nav = [
-  { href: '/', label: '首页' },
-  { href: '/download', label: '下载' },
-  { href: '/pricing', label: '定价' },
-  { href: '/faq', label: '常见问题' },
-  { href: '/refund', label: '退款政策' },
+  { path: '/', label: t.nav.home },
+  { path: '/download', label: t.nav.download },
+  { path: '/pricing', label: t.nav.pricing },
+  { path: '/faq', label: t.nav.faq },
+  { path: '/refund', label: t.nav.refund },
 ];
 
-const current = Astro.url.pathname.replace(/\/$/, '') || '/';
+const otherLocale: Locale = locale === 'zh' ? 'en' : 'zh';
+// 404 为全站共用单页（无 /en/404 产物），语言切换退回对应语言首页。
+const switchPath = path === '/404' ? '/' : path;
 ---
 
 <header class="site-header">
   <div class="container">
-    <a class="brand" href="/">{SITE_NAME}</a>
-    <nav class="site-nav" aria-label="主导航">
+    <a class="brand" href={localePath(locale, '/')} aria-label={SITE_NAME}>
+      <span class="brand-mark" aria-hidden="true"></span>{SITE_NAME}
+    </a>
+    <nav class="site-nav" aria-label={locale === 'zh' ? '主导航' : 'Main navigation'}>
       <ul>
         {
-          nav.map((item) => {
-            const itemPath = item.href.replace(/\/$/, '') || '/';
-            const isCurrent = itemPath === current;
-            return (
-              <li>
-                <a href={item.href} aria-current={isCurrent ? 'page' : undefined}>
-                  {item.label}
-                </a>
-              </li>
-            );
-          })
+          nav.map((item) => (
+            <li>
+              <a
+                href={localePath(locale, item.path)}
+                aria-current={item.path === path ? 'page' : undefined}
+              >
+                {item.label}
+              </a>
+            </li>
+          ))
         }
       </ul>
     </nav>
+    <div class="header-actions">
+      <a
+        class="lang-switch"
+        href={localePath(otherLocale, switchPath)}
+        title={t.langSwitch.title}
+        hreflang={otherLocale === 'zh' ? 'zh-Hans' : 'en'}>{t.langSwitch.label}</a
+      >
+      <a class="nav-cta" href={localePath(locale, '/download')}>{t.navCta}</a>
+    </div>
   </div>
 </header>

@@ -1,46 +1,11 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { POLAR_CHECKOUT_URL, DOWNLOAD_URL } from '../config/site';
+import DownloadBody from '../components/DownloadBody.astro';
+import { download } from '../i18n/download';
 
-const description =
-  '下载 Appidge for macOS。下载与购买是两个独立步骤：先下载试用，再购买许可证解锁。';
+const t = download.zh;
 ---
 
-<BaseLayout title="下载" description={description} path="/download">
-  <section class="section">
-    <div class="container prose">
-      <h1>下载 Appidge</h1>
-      <p>
-        Appidge 是 macOS 应用。下载与购买互相独立：你可以先下载试用，确认它适配你的
-        工作流后，再购买许可证解锁完整能力。
-      </p>
-
-      <div class="cta-row">
-        <a class="btn btn-primary" href={DOWNLOAD_URL} rel="noopener">下载 App（macOS）</a>
-        <a class="btn btn-secondary" href={POLAR_CHECKOUT_URL} rel="noopener">购买许可证</a>
-      </div>
-
-      <h2>系统要求</h2>
-      <ul>
-        <li>macOS 桌面系统。</li>
-        <li>
-          首次启动需按系统提示批准网络扩展（Network Extension）与相关权限，Appidge 才能
-          接管进程网络。
-        </li>
-      </ul>
-
-      <h2>安装步骤</h2>
-      <ol>
-        <li>点击上方「下载 App」获取安装包。</li>
-        <li>打开下载的镜像并将 Appidge 拖入「应用程序」。</li>
-        <li>首次启动时按系统提示批准所需权限。</li>
-        <li>如已购买许可证，在 App 内输入许可证密钥完成激活。</li>
-      </ol>
-
-      <h2>更新</h2>
-      <p>
-        应用内置自动更新，会从官方更新源检查并安装新版本，无需手动重新下载。
-      </p>
-    </div>
-  </section>
+<BaseLayout title={t.title} description={t.metaDescription} path="/download" locale="zh">
+  <DownloadBody t={t} />
 </BaseLayout>

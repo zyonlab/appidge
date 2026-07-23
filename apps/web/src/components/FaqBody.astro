@@ -1,0 +1,29 @@
+---
+/** FAQ 页正文（不含 BaseLayout）。 */
+import type { FaqCopy } from '../i18n/faq';
+
+interface Props {
+  t: FaqCopy;
+}
+
+const { t } = Astro.props;
+---
+
+<section class="section">
+  <div class="container">
+    <div class="sec-head">
+      <p class="sec-eyebrow">{t.eyebrow}</p>
+      <h1>{t.h2}</h1>
+    </div>
+    <div class="faq-list">
+      {
+        t.items.map((item) => (
+          <details>
+            <summary>{item.q}</summary>
+            <p class="a" set:html={item.aHtml} />
+          </details>
+        ))
+      }
+    </div>
+  </div>
+</section>

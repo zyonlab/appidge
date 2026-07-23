@@ -1,10 +1,10 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro';
-import HomeBody from '../components/HomeBody.astro';
-import { SITE_NAME, SITE_URL } from '../config/site';
-import { home } from '../i18n/home';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import HomeBody from '../../components/HomeBody.astro';
+import { SITE_NAME, SITE_URL } from '../../config/site';
+import { home } from '../../i18n/home';
 
-const t = home.zh;
+const t = home.en;
 
 const jsonld = {
   '@context': 'https://schema.org',
@@ -12,17 +12,17 @@ const jsonld = {
   name: SITE_NAME,
   applicationCategory: 'UtilitiesApplication',
   operatingSystem: 'macOS',
-  url: SITE_URL,
+  url: `${SITE_URL}/en/`,
   description: t.metaDescription,
 };
 ---
 
 <BaseLayout
-  title="首页"
+  title="Home"
   description={t.metaDescription}
   path="/"
-  locale="zh"
+  locale="en"
   jsonld={jsonld}
 >
-  <HomeBody locale="zh" t={t} />
+  <HomeBody locale="en" t={t} />
 </BaseLayout>

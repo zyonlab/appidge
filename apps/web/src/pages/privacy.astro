@@ -3,47 +3,108 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import DraftNotice from '../components/DraftNotice.astro';
 import { SUPPORT_EMAIL } from '../config/site';
 
-const description = 'Appidge 隐私政策（草稿）。本站无 cookie、无追踪；说明许可证激活涉及的最小数据处理。';
+const description =
+  'Appidge 隐私政策：网站无 Cookie、无追踪；应用规则与流量留在本地；许可证激活只处理必需的最小信息，支付数据由收款方 Polar 处理。';
 ---
 
-<BaseLayout title="隐私政策" description={description} path="/privacy">
-  <section class="section">
+<BaseLayout title="隐私政策" description={description} path="/privacy" locale="zh">
+  <article class="doc">
     <div class="container prose">
       <h1>隐私政策</h1>
-      <DraftNotice updated="2026-07-21" />
+      <div class="doc-meta">
+        <span><b>生效日期</b> <span class="placeholder-slot">【上线日期】</span></span>
+        <span><b>最后更新</b> 2026-07-23</span>
+        <span><b>适用范围</b> appidge.com 网站与 Appidge macOS 应用</span>
+      </div>
+      <DraftNotice locale="zh" updated="2026-07-23" />
 
-      <h2>本网站</h2>
-      <p>
-        本网站为纯静态页面，不使用 cookie、不加载第三方追踪脚本、不做用户画像分析。
+      <p class="lede">
+        一句话概括：<strong>网站不追踪你，应用的规则和流量留在你的 Mac 本地，
+        我们只处理许可证激活所必需的最小信息。</strong>
       </p>
 
-      <h2>购买</h2>
+      <h2><span class="num">1</span>本网站收集什么</h2>
       <p>
-        购买通过第三方支付服务商 Polar（Merchant of Record）的 Hosted Checkout 完成。你的支付信息由 Polar 处理，
-        请参阅其隐私条款。我们不接触也不存储你的完整支付卡信息。
+        appidge.com 是纯静态网站：<strong>不使用 Cookie，不加载第三方追踪脚本，不做用户画像</strong>。
+        托管服务商（Cloudflare）为提供服务与安全防护，可能按其政策短暂处理访问日志（如 IP 地址）；
+        我们不基于这些日志识别或追踪个人。
       </p>
 
-      <h2>许可证激活</h2>
+      <h2><span class="num">2</span>购买时谁处理你的数据</h2>
       <p>
-        激活与校验许可证时，Appidge 会向授权服务发送完成校验所必需的最小信息（如许可证密钥与
-        一个隐私友好的安装标识）。我们不以此为目的收集你的邮箱、真实主机名或硬件序列号。
+        购买通过 <strong>Polar</strong> 的托管结账页完成。Polar 是本产品的
+        <strong>收款方（Merchant of Record）</strong>：你的姓名、邮箱、支付信息、账单地址及
+        计税所需信息由 Polar 作为交易方收集和处理，适用
+        <a href="https://polar.sh/legal/privacy" rel="noopener">Polar 的隐私政策</a>。
+      </p>
+      <p>
+        我们<strong>不接触、不存储你的支付卡信息</strong>。为交付与支持目的，我们可从 Polar
+        获取订单相关的必要信息（如订单号、购买邮箱、许可证状态）。
       </p>
 
-      <h2>应用内数据</h2>
+      <h2><span class="num">3</span>许可证激活与校验</h2>
+      <p>激活或定期校验许可证时，Appidge 会向我们的授权服务发送完成校验所必需的最小信息：</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>数据</th><th>用途</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>许可证密钥</td>
+              <td>验证购买有效性</td>
+              <td>服务端以脱敏形式记录状态，不用于其他目的</td>
+            </tr>
+            <tr>
+              <td>安装标识</td>
+              <td>统计激活设备数</td>
+              <td>隐私友好的随机标识，<strong>不是</strong>你的邮箱、真实主机名或硬件序列号</td>
+            </tr>
+            <tr>
+              <td>应用版本号</td>
+              <td>兼容性判断</td>
+              <td>—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <p>
-        Appidge 的规则与网络接管在你的 Mac 本地运行。你的规则配置与被接管进程信息保留在本地，
-        不因使用本产品而上传给我们。
+        许可信息（密钥、安装标识、上次校验时间）在你的 Mac 上保存于
+        <strong>macOS 钥匙串</strong>，不落明文文件。
       </p>
 
-      <h2>联系</h2>
+      <h2><span class="num">4</span>应用内的数据</h2>
+      <ul>
+        <li>你的规则配置、被接管进程列表、连接信息保留在本地，<strong>不上传给我们</strong>。</li>
+        <li>你的网络流量由本机转发给你自己配置的代理或直连，<strong>不经过我们的任何服务器</strong>。</li>
+        <li>我们没有内置崩溃上报或使用统计；如未来加入，将默认征求同意并更新本政策。</li>
+      </ul>
+
+      <h2><span class="num">5</span>自动更新检查</h2>
       <p>
-        隐私相关问题请联系
-        <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>。
+        应用会定期向我们的更新服务器检查新版本。该请求用于返回更新信息，
+        不包含可识别你个人身份的内容；服务器访问日志的处理同第 1 节。
+        你可以在应用设置中关闭自动检查。
       </p>
 
+      <h2><span class="num">6</span>保留与删除</h2>
       <p>
-        本政策涵盖的数据类别、法律依据与保留期限，需由运营方结合适用法律最终确定。
+        与许可证相关的服务端记录在许可证有效期内保留，用于持续提供校验服务；
+        退款或停用后，保留必要的最小记录以防滥用并满足法定义务，期限为
+        <span class="placeholder-slot">【保留期限，由法律顾问确定】</span>。
       </p>
+
+      <h2><span class="num">7</span>你的权利</h2>
+      <p>
+        依适用法律，你可以请求访问、更正或删除我们持有的与你相关的数据，联系
+        <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a> 即可。
+        支付环节的数据请求（发票、账单信息等）可能需要同时向 Polar 提出，我们会协助你对接。
+      </p>
+
+      <h2><span class="num">8</span>联系与变更</h2>
+      <p>
+        隐私相关问题：<a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a><br />
+        数据控制者 / 运营方：<span class="placeholder-slot">【运营主体名称与所在地】</span>
+      </p>
+      <p>本政策如有重大变更，将在本页更新并标注新的生效日期。</p>
     </div>
-  </section>
+  </article>
 </BaseLayout>

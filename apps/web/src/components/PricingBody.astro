@@ -1,0 +1,56 @@
+---
+/** 定价页正文（不含 BaseLayout）。 */
+import { POLAR_CHECKOUT_URL, DOWNLOAD_URL } from '../config/site';
+import { localePath, type Locale } from '../i18n';
+import type { PricingCopy } from '../i18n/pricing';
+
+interface Props {
+  locale: Locale;
+  t: PricingCopy;
+}
+
+const { locale, t } = Astro.props;
+---
+
+<section class="section">
+  <div class="container">
+    <div class="sec-head">
+      <p class="sec-eyebrow">{t.eyebrow}</p>
+      <h1>{t.h2}</h1>
+      <p class="sec-sub">{t.sub}</p>
+    </div>
+
+    <div class="price-grid">
+      <div class="price-card">
+        <span class="tag">{t.card.tag}</span>
+        <h2>{t.card.name}</h2>
+        <p class="price-line">{t.card.priceLine}</p>
+        <ul class="price-feats">
+          {t.card.feats.map((f) => <li>{f}</li>)}
+        </ul>
+        <div class="cta-row">
+          <a class="btn btn-primary" href={POLAR_CHECKOUT_URL} rel="noopener">{t.card.ctaBuy}</a>
+          <a class="btn btn-secondary" href={DOWNLOAD_URL} rel="noopener">{t.card.ctaTry}</a>
+        </div>
+        <p class="refund-note" set:html={t.card.refundHtml} />
+        <p class="fine">
+          {t.card.fine}
+          <a href={localePath(locale, '/refund')}>{t.refundLink}</a>
+        </p>
+      </div>
+
+      <ol class="activate">
+        {
+          t.activate.map((s) => (
+            <li>
+              <div>
+                <b>{s.title}</b>
+                <span>{s.body}</span>
+              </div>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </div>
+</section>

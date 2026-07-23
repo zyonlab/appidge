@@ -1,0 +1,11 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import DownloadBody from '../../components/DownloadBody.astro';
+import { download } from '../../i18n/download';
+
+const t = download.en;
+---
+
+<BaseLayout title={t.title} description={t.metaDescription} path="/download" locale="en">
+  <DownloadBody t={t} />
+</BaseLayout>

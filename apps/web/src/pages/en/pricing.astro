@@ -1,0 +1,11 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PricingBody from '../../components/PricingBody.astro';
+import { pricing } from '../../i18n/pricing';
+
+const t = pricing.en;
+---
+
+<BaseLayout title={t.title} description={t.metaDescription} path="/pricing" locale="en">
+  <PricingBody locale="en" t={t} />
+</BaseLayout>

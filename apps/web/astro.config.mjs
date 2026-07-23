@@ -46,6 +46,15 @@ export default defineConfig({
     format: 'directory',
   },
   // 纯静态营销站：不引入任何客户端框架、无 SSR、无追踪脚本。
-  integrations: [sitemap()],
+  // sitemap i18n：中文在根路径（默认），英文在 /en/ 前缀；hreflang 与 BaseLayout 内的
+  // <link rel="alternate"> 保持同一映射。
+  integrations: [
+    sitemap({
+      i18n: {
+        defaultLocale: 'zh',
+        locales: { zh: 'zh-Hans', en: 'en' },
+      },
+    }),
+  ],
   devToolbar: { enabled: false },
 });

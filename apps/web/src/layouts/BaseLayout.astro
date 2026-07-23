@@ -2,42 +2,64 @@
 import '../styles/global.css';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
-import { SITE_NAME, SITE_URL, SITE_TAGLINE } from '../config/site';
+import { SITE_NAME, SITE_URL } from '../config/site';
+import { HREFLANG, HTML_LANG, LOCALES, OG_LOCALE, localePath, ui, type Locale } from '../i18n';
 
 interface Props {
   title: string;
   description: string;
-  /** 相对路径，如 "/pricing"。用于 canonical + OG。 */
+  /** locale 无关的逻辑路径，如 "/pricing"。canonical 与 hreflang 由 locale 推导。 */
   path?: string;
-  /** 页面级 JSON-LD（对象）。默认注入 WebSite/Organization。 */
+  /** 页面语言。默认中文（保持原有路径不变）。 */
+  locale?: Locale;
+  /** 页面级 JSON-LD（对象）。默认注入 WebSite。 */
   jsonld?: Record<string, unknown>;
 }
 
-const { title, description, path = '/', jsonld } = Astro.props;
+const { title, description, path = '/', locale = 'zh', jsonld } = Astro.props;
 
-const canonical = new URL(path, SITE_URL).href;
-const fullTitle = path === '/' ? `${SITE_NAME} · ${SITE_TAGLINE}` : `${title} · ${SITE_NAME}`;
+const t = ui[locale];
+const canonical = new URL(localePath(locale, path), SITE_URL).href;
+const isHome = path === '/';
+const tagline = locale === 'zh' ? '按进程控制网络去向' : 'Per-process proxy control for macOS';
+const fullTitle = isHome ? `${SITE_NAME} · ${tagline}` : `${title} · ${SITE_NAME}`;
 
 const defaultJsonld = {
   '@context': 'https://schema.org',
   '@type': 'WebSite',
   name: SITE_NAME,
   url: SITE_URL,
-  description: SITE_TAGLINE,
+  description: tagline,
 };
 const structuredData = jsonld ?? defaultJsonld;
 ---
 
 <!doctype html>
-<html lang="zh-Hans">
+<html lang={HTML_LANG[locale]}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content="light" />
     <meta name="robots" content="index, follow" />
+
+    {/* 双语互指 + x-default（默认指中文，与路径策略一致） */}
+    {
+      LOCALES.map((l) => (
+        <link
+          rel="alternate"
+          hreflang={HREFLANG[l]}
+          href={new URL(localePath(l, path), SITE_URL).href}
+        />
+      ))
+    }
+    <link
+      rel="alternate"
+      hreflang="x-default"
+      href={new URL(localePath('zh', path), SITE_URL).href}
+    />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
@@ -45,7 +67,7 @@ const structuredData = jsonld ?? defaultJsonld;
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
-    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:locale" content={OG_LOCALE[locale]} />
 
     <!-- Twitter / X card -->
     <meta name="twitter:card" content="summary" />
@@ -55,17 +77,17 @@ const structuredData = jsonld ?? defaultJsonld;
     <link rel="sitemap" href="/sitemap-index.xml" />
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f5eff'/%3E%3Ctext x='16' y='22' font-size='18' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'%3EA%3C/text%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23171310'/%3E%3Crect x='9' y='9' width='14' height='14' rx='3' fill='%23e7723b'/%3E%3C/svg%3E"
     />
 
     <script is:inline type="application/ld+json" set:html={JSON.stringify(structuredData)} />
   </head>
   <body>
-    <a class="skip-link" href="#main">跳到主内容</a>
-    <Header />
+    <a class="skip-link" href="#main">{t.skipToContent}</a>
+    <Header locale={locale} path={path} />
     <main id="main">
       <slot />
     </main>
-    <Footer />
+    <Footer locale={locale} />
   </body>
 </html>

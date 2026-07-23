@@ -1,0 +1,257 @@
+---
+/**
+ * 首页正文（不含 BaseLayout）——由 zh / en 两个页面以不同文案字典渲染。
+ * 活动进程面板为纯静态展示（check-site.mjs 契约：产物零运行时 JS），
+ * 规则栈的「已覆盖 / 最新生效」状态直接烘焙在标记里，动效仅用 CSS。
+ */
+import { POLAR_CHECKOUT_URL, DOWNLOAD_URL } from '../config/site';
+import { localePath, type Locale } from '../i18n';
+import type { HomeCopy } from '../i18n/home';
+
+interface Props {
+  locale: Locale;
+  t: HomeCopy;
+}
+
+const { locale, t } = Astro.props;
+
+// 静态演示数据 —— 目标用户日常可见的真实域名；流量数字为示意快照。
+const procs = [
+  { name: 'Claude Desktop', abbr: 'Ai', dest: 'api.anthropic.com:443', proxied: true, traffic: '412 KB/s' },
+  { name: 'Docker', abbr: 'Dk', dest: 'registry-1.docker.io:443', proxied: true, traffic: '3.1 MB/s' },
+  { name: 'pip', abbr: 'Py', dest: 'pypi.org:443', proxied: true, traffic: '986 KB/s' },
+  { name: 'huggingface-cli', abbr: 'HF', dest: 'cdn-lfs.huggingface.co:443', proxied: true, traffic: '8.2 MB/s' },
+  { name: 'git', abbr: '$', dest: 'github.com:443', proxied: false, traffic: '96 KB/s' },
+];
+
+const rules = [
+  { time: '14:32:05', host: 'api.anthropic.com', proxied: true, state: 'latest' },
+  { time: '14:31:48', host: 'registry-1.docker.io', proxied: true, state: '' },
+  { time: '14:30:12', host: 'github.com', proxied: false, state: '' },
+  { time: '14:28:56', host: 'api.anthropic.com', proxied: false, state: 'overridden' },
+];
+---
+
+<!-- Hero -->
+<section class="hero">
+  <div class="container">
+    <p class="hero-chip">{t.hero.chip}</p>
+    <h1>{t.hero.h1Pain}<br /><em>{t.hero.h1Em}</em></h1>
+    <p class="hero-sub" set:html={t.hero.subHtml} />
+    <div class="cta-row">
+      <a class="btn btn-primary" href={localePath(locale, '/download')}>{t.hero.ctaDownload}</a>
+      <a class="btn btn-secondary" href={POLAR_CHECKOUT_URL} rel="noopener">{t.hero.ctaBuy}</a>
+    </div>
+    <p class="hero-note" set:html={t.hero.noteHtml} />
+  </div>
+</section>
+
+<!-- 活动进程面板（静态展示） -->
+<div class="stage">
+  <div class="container stage-inner">
+    <figure class="panel" aria-label={t.panel.title}>
+      <div class="panel-head">
+        <span class="panel-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        {t.panel.title}
+        <span class="panel-live">{t.panel.live}</span>
+      </div>
+      <div class="proc-table-scroll">
+        <table class="proc-table">
+          <thead>
+            <tr>
+              <th>{t.panel.thProcess}</th>
+              <th>{t.panel.thDest}</th>
+              <th>{t.panel.thRoute}</th>
+              <th class="num">{t.panel.thTraffic}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              procs.map((p) => (
+                <tr>
+                  <td>
+                    <span class="proc-name">
+                      <span class="proc-icon">{p.abbr}</span>
+                      {p.name}
+                    </span>
+                  </td>
+                  <td class="proc-dest">{p.dest}</td>
+                  <td>
+                    <span class={`badge ${p.proxied ? 'badge-proxy' : 'badge-direct'}`}>
+                      {p.proxied ? t.panel.badgeProxy : t.panel.badgeDirect}
+                    </span>
+                  </td>
+                  <td class="proc-traffic">{p.traffic}</td>
+                </tr>
+              ))
+            }
+            <tr class="proc-row-loop">
+              <td>
+                <span class="proc-name"><span class="proc-icon">Px</span>{t.panel.loopName}</span>
+              </td>
+              <td class="proc-dest">{t.panel.loopDest}</td>
+              <td><span class="badge badge-loop">{t.panel.badgeLoop}</span></td>
+              <td class="proc-traffic">5.4 MB/s</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="rule-stack">
+        <div class="rule-stack-head">{t.panel.rulesHead}</div>
+        <ul class="rule-list">
+          {
+            rules.map((r) => (
+              <li class={r.state}>
+                <span class="t">{r.time}</span>
+                <span class="rule-body">
+                  {r.host} →
+                  <span class={r.proxied ? 'r-proxy' : 'r-direct'}>
+                    {r.proxied ? t.panel.ruleProxy : t.panel.ruleDirect}
+                  </span>
+                </span>
+                {r.state === 'latest' && <span class="rule-state">{t.panel.stateLatest}</span>}
+                {r.state === 'overridden' && (
+                  <span class="rule-state">{t.panel.stateOverridden}</span>
+                )}
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </figure>
+    <p class="stage-caption" set:html={t.panel.captionHtml} />
+  </div>
+</div>
+
+<!-- 场景 -->
+<section class="section band" id="scenes">
+  <div class="container">
+    <div class="sec-head">
+      <p class="sec-eyebrow">{t.scenes.eyebrow}</p>
+      <h2>{t.scenes.h2}</h2>
+      <p class="sec-sub">{t.scenes.sub}</p>
+    </div>
+    <div class="usecases">
+      {
+        t.scenes.cards.map((c) => (
+          <article class="ucard">
+            <h3>
+              {c.title}
+              {c.hot && <span class="hot">{t.scenes.hotTag}</span>}
+            </h3>
+            <p>{c.body}</p>
+            <div class="uc-tools">
+              {c.tools.map((tool) => (
+                <span>{tool}</span>
+              ))}
+            </div>
+          </article>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<!-- 工作原理 -->
+<section class="section" id="how">
+  <div class="container">
+    <div class="sec-head">
+      <p class="sec-eyebrow">{t.how.eyebrow}</p>
+      <h2>{t.how.h2}</h2>
+      <p class="sec-sub">{t.how.sub}</p>
+    </div>
+    <div class="steps">
+      {
+        t.how.steps.map((s) => (
+          <div class="step">
+            <span class="n">{s.n}</span>
+            <h3>{s.title}</h3>
+            <p>{s.body}</p>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<!-- 方案对比 -->
+<section class="section band" id="compare">
+  <div class="container">
+    <div class="sec-head">
+      <p class="sec-eyebrow">{t.compare.eyebrow}</p>
+      <h2>{t.compare.h2}</h2>
+    </div>
+    <div class="compare-wrap">
+      <table class="compare">
+        <thead>
+          <tr>
+            <th>{t.compare.thApproach}</th>
+            <th>{t.compare.thCoverage}</th>
+            <th>{t.compare.thGranularity}</th>
+            <th>{t.compare.thCost}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            t.compare.rows.map((r) => {
+              const cls = r.highlight ? 'col-hl' : '';
+              const mark = (m: 'yes' | 'no' | 'part') =>
+                m === 'yes' ? '✓' : m === 'no' ? '✗' : '△';
+              return (
+                <tr>
+                  <td class={cls}>{r.name}</td>
+                  <td class={cls}>
+                    <span class={`mark-${r.coverageMark}`}>{mark(r.coverageMark)}</span> {r.coverage}
+                  </td>
+                  <td class={cls}>
+                    <span class={`mark-${r.granularityMark}`}>{mark(r.granularityMark)}</span>{' '}
+                    {r.granularity}
+                  </td>
+                  <td class={cls}>{r.cost}</td>
+                </tr>
+              );
+            })
+          }
+        </tbody>
+      </table>
+    </div>
+    <p class="compare-note" set:html={t.compare.noteHtml} />
+  </div>
+</section>
+
+<!-- 非 VPN 声明 -->
+<section class="section" id="not-vpn">
+  <div class="container">
+    <div class="sec-head">
+      <p class="sec-eyebrow">{t.notvpn.eyebrow}</p>
+      <h2>{t.notvpn.h2}</h2>
+      <p class="sec-sub">{t.notvpn.sub}</p>
+    </div>
+    <div class="notvpn-points">
+      {
+        t.notvpn.points.map((p) => (
+          <div class="nv">
+            <span class={`sign sign-${p.sign}`} aria-hidden="true">
+              {p.sign === 'no' ? '✗' : '✓'}
+            </span>
+            <b>{p.title}</b>
+            <span>{p.body}</span>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<!-- 收尾 CTA -->
+<section class="final band">
+  <div class="container">
+    <p class="sec-eyebrow">{t.cta.eyebrow}</p>
+    <h2>{t.cta.h2}</h2>
+    <p class="sec-sub">{t.cta.sub}</p>
+    <div class="cta-row center">
+      <a class="btn btn-primary" href={DOWNLOAD_URL} rel="noopener">{t.cta.ctaDownload}</a>
+      <a class="btn btn-secondary" href={localePath(locale, '/pricing')}>{t.cta.ctaBuy}</a>
+    </div>
+  </div>
+</section>

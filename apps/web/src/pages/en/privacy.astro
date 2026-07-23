@@ -1,0 +1,132 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import DraftNotice from '../../components/DraftNotice.astro';
+import { SUPPORT_EMAIL } from '../../config/site';
+
+const description =
+  'Appidge privacy policy: no cookies or tracking on this site; rules and traffic stay on your Mac; license activation processes only the minimum required data, and payment data is handled by Polar, the Merchant of Record.';
+---
+
+<BaseLayout title="Privacy Policy" description={description} path="/privacy" locale="en">
+  <article class="doc">
+    <div class="container prose">
+      <h1>Privacy Policy</h1>
+      <div class="doc-meta">
+        <span><b>Effective</b> <span class="placeholder-slot">[launch date]</span></span>
+        <span><b>Last updated</b> 2026-07-23</span>
+        <span><b>Covers</b> the appidge.com website and the Appidge macOS app</span>
+      </div>
+      <DraftNotice locale="en" updated="2026-07-23" />
+
+      <p class="lede">
+        In one sentence: <strong>this site doesn't track you, the app's rules and traffic stay
+        on your Mac, and we process only the minimum needed to activate a license.</strong>
+      </p>
+
+      <h2><span class="num">1</span>What this website collects</h2>
+      <p>
+        appidge.com is a fully static site: <strong>no cookies, no third-party tracking
+        scripts, no profiling</strong>. Our hosting provider (Cloudflare) may briefly process
+        access logs (such as IP addresses) under its own policies to serve and protect the
+        site; we do not use those logs to identify or track individuals.
+      </p>
+
+      <h2><span class="num">2</span>Who handles your data at checkout</h2>
+      <p>
+        Purchases go through <strong>Polar</strong>'s hosted checkout. Polar is the
+        <strong>Merchant of Record</strong> for this product: your name, email, payment
+        details, billing address, and tax-related information are collected and processed by
+        Polar as the transacting party, under
+        <a href="https://polar.sh/legal/privacy" rel="noopener">Polar's privacy policy</a>.
+      </p>
+      <p>
+        We <strong>never see or store your card details</strong>. For delivery and support we
+        may receive order-related essentials from Polar (order number, purchase email, license
+        status).
+      </p>
+
+      <h2><span class="num">3</span>License activation and validation</h2>
+      <p>
+        When activating or periodically validating a license, Appidge sends our licensing
+        service only what the check requires:
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Data</th><th>Purpose</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>License key</td>
+              <td>Verify the purchase</td>
+              <td>Recorded server-side in redacted form; used for nothing else</td>
+            </tr>
+            <tr>
+              <td>Install identifier</td>
+              <td>Count activated devices</td>
+              <td>
+                A privacy-friendly random identifier — <strong>not</strong> your email, real
+                hostname, or hardware serial number
+              </td>
+            </tr>
+            <tr>
+              <td>App version</td>
+              <td>Compatibility</td>
+              <td>—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        On your Mac, license data (key, install identifier, last validation time) lives in the
+        <strong>macOS Keychain</strong> — never in plain text files.
+      </p>
+
+      <h2><span class="num">4</span>Data inside the app</h2>
+      <ul>
+        <li>
+          Your rule configuration, the list of intercepted processes, and connection details
+          stay local — <strong>never uploaded to us</strong>.
+        </li>
+        <li>
+          Your network traffic is forwarded locally to the proxy you configured, or directly —
+          <strong>it never passes through our servers</strong>.
+        </li>
+        <li>
+          There is no built-in crash reporting or usage analytics. If that ever changes, it
+          will be opt-in and this policy will be updated first.
+        </li>
+      </ul>
+
+      <h2><span class="num">5</span>Update checks</h2>
+      <p>
+        The app periodically asks our update server for new versions. The request returns
+        update information and contains nothing that identifies you personally; server access
+        logs are handled as in section 1. Automatic checks can be turned off in the app's
+        settings.
+      </p>
+
+      <h2><span class="num">6</span>Retention and deletion</h2>
+      <p>
+        Server-side license records are kept while the license is active, to keep validation
+        working. After a refund or deactivation, we retain the minimum needed to prevent abuse
+        and meet legal obligations, for
+        <span class="placeholder-slot">[retention period — to be set by counsel]</span>.
+      </p>
+
+      <h2><span class="num">7</span>Your rights</h2>
+      <p>
+        Under applicable law you may request access to, correction of, or deletion of data we
+        hold about you — email <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
+        Requests concerning payment data (invoices, billing details) may also need to go to
+        Polar; we'll help you get connected.
+      </p>
+
+      <h2><span class="num">8</span>Contact and changes</h2>
+      <p>
+        Privacy questions: <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a><br />
+        Data controller / operator:
+        <span class="placeholder-slot">[legal entity name and location]</span>
+      </p>
+      <p>Material changes to this policy will be posted here with a new effective date.</p>
+    </div>
+  </article>
+</BaseLayout>

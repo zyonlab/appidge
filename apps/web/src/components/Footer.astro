@@ -1,17 +1,24 @@
 ---
 import { SITE_NAME, SUPPORT_EMAIL } from '../config/site';
+import { localePath, ui, type Locale } from '../i18n';
 
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = ui[locale];
 const year = new Date().getFullYear();
 
 const productLinks = [
-  { href: '/download', label: '下载' },
-  { href: '/pricing', label: '定价' },
-  { href: '/faq', label: '常见问题' },
+  { path: '/download', label: t.nav.download },
+  { path: '/pricing', label: t.nav.pricing },
 ];
+const supportLinks = [{ path: '/faq', label: t.nav.faq }];
 const legalLinks = [
-  { href: '/refund', label: '退款政策' },
-  { href: '/privacy', label: '隐私政策' },
-  { href: '/terms', label: '服务条款' },
+  { path: '/refund', label: t.nav.refund },
+  { path: '/privacy', label: t.footer.privacy },
+  { path: '/terms', label: t.footer.terms },
 ];
 ---
 
@@ -19,28 +26,34 @@ const legalLinks = [
   <div class="container">
     <div class="footer-grid">
       <div>
-        <p class="brand" style="color:var(--fg)">{SITE_NAME}</p>
-        <p style="max-width:22rem">按进程控制网络去向的 macOS 透明代理工具。</p>
+        <a class="brand" href={localePath(locale, '/')}>
+          <span class="brand-mark" aria-hidden="true"></span>{SITE_NAME}
+        </a>
+        <p class="footer-blurb">{t.footer.blurb}</p>
       </div>
-      <nav aria-label="产品">
+      <nav aria-label={t.footer.product}>
+        <h4>{t.footer.product}</h4>
         <ul>
-          <li><strong style="color:var(--fg)">产品</strong></li>
-          {productLinks.map((l) => <li><a href={l.href}>{l.label}</a></li>)}
+          {productLinks.map((l) => <li><a href={localePath(locale, l.path)}>{l.label}</a></li>)}
         </ul>
       </nav>
-      <nav aria-label="法律">
+      <nav aria-label={t.footer.support}>
+        <h4>{t.footer.support}</h4>
         <ul>
-          <li><strong style="color:var(--fg)">法律</strong></li>
-          {legalLinks.map((l) => <li><a href={l.href}>{l.label}</a></li>)}
-        </ul>
-      </nav>
-      <nav aria-label="联系">
-        <ul>
-          <li><strong style="color:var(--fg)">联系</strong></li>
+          {supportLinks.map((l) => <li><a href={localePath(locale, l.path)}>{l.label}</a></li>)}
           <li><a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a></li>
         </ul>
       </nav>
+      <nav aria-label={t.footer.legal}>
+        <h4>{t.footer.legal}</h4>
+        <ul>
+          {legalLinks.map((l) => <li><a href={localePath(locale, l.path)}>{l.label}</a></li>)}
+        </ul>
+      </nav>
     </div>
-    <p class="footer-meta">© {year} {SITE_NAME}. 保留所有权利。</p>
+    <div class="footer-meta">
+      <p>© {year} {SITE_NAME}. {t.footer.rights} · {t.footer.meta}</p>
+      <p>{t.footer.trademark}</p>
+    </div>
   </div>
 </footer>

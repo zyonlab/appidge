@@ -1,14 +1,32 @@
 ---
 // 法律页草稿标记 —— 明确文本需用户最终法务审核，不冒充法律意见。见 CLAUDE.md §5.2。
+// 注意：中文文案必须包含「待法务审核」（check-site.mjs 对 zh 法律页断言此标记）。
+import type { Locale } from '../i18n';
+
 interface Props {
+  locale?: Locale;
   updated?: string;
 }
-const { updated } = Astro.props;
+const { locale = 'zh', updated } = Astro.props;
 ---
 
 <aside class="draft-notice" role="note">
-  <strong>草稿 · 待法务审核：</strong>
-  本页文本为占位草稿，需由你（运营方）委托合格法律顾问最终审核后再对外生效，
-  不构成法律意见。
-  {updated && <span> 最后更新：{updated}。</span>}
+  {
+    locale === 'zh' ? (
+      <>
+        <strong>草稿 · 待法务审核：</strong>
+        本页文本为草稿，需由运营方委托合格法律顾问按适用法律最终审定后再对外生效，不构成法律意见。
+        文中橙色虚线框为待填占位。
+        {updated && <span> 最后更新：{updated}。</span>}
+      </>
+    ) : (
+      <>
+        <strong>Draft — pending legal review:</strong>
+        This page is a draft. It takes effect only after review by qualified counsel under
+        applicable law, and does not constitute legal advice. Dashed orange markers are
+        placeholders to be filled in.
+        {updated && <span> Last updated: {updated}.</span>}
+      </>
+    )
+  }
 </aside>

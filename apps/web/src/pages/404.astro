@@ -1,17 +1,22 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 
-const description = '页面未找到 —— 返回 Appidge 首页。';
+// Cloudflare Pages 全站共用单个 404.html，因此本页做轻量双语。
+const description = '页面未找到 —— 返回 Appidge 首页。Page not found — back to the Appidge homepage.';
 ---
 
-<BaseLayout title="页面未找到" description={description} path="/404">
-  <section class="section">
-    <div class="container prose text-center">
-      <h1>404 · 页面未找到</h1>
-      <p style="margin-inline:auto">你要找的页面不存在，或已被移动。</p>
-      <div class="cta-row" style="justify-content:center">
-        <a class="btn btn-primary" href="/">返回首页</a>
-        <a class="btn btn-secondary" href="/download">下载 App</a>
+<BaseLayout title="页面未找到" description={description} path="/404" locale="zh">
+  <section class="final">
+    <div class="container">
+      <p class="sec-eyebrow">404</p>
+      <h1>页面未找到 · Page not found</h1>
+      <p class="sec-sub" style="margin: 14px auto 34px; max-width: 34em;">
+        你要找的页面不存在，或已被移动。<br />
+        The page you're looking for doesn't exist or has moved.
+      </p>
+      <div class="cta-row center">
+        <a class="btn btn-primary" href="/">返回首页 · Home</a>
+        <a class="btn btn-secondary" href="/download">下载 App · Download</a>
       </div>
     </div>
   </section>

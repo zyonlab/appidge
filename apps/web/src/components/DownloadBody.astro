@@ -1,0 +1,37 @@
+---
+/** 下载页正文（不含 BaseLayout）。 */
+import { POLAR_CHECKOUT_URL, DOWNLOAD_URL } from '../config/site';
+import type { DownloadCopy } from '../i18n/download';
+
+interface Props {
+  t: DownloadCopy;
+}
+
+const { t } = Astro.props;
+---
+
+<section class="doc">
+  <div class="container prose">
+    <p class="sec-eyebrow">{t.eyebrow}</p>
+    <h1>{t.h1}</h1>
+    <p class="lede">{t.intro}</p>
+
+    <div class="cta-row">
+      <a class="btn btn-primary" href={DOWNLOAD_URL} rel="noopener">{t.ctaDownload}</a>
+      <a class="btn btn-secondary" href={POLAR_CHECKOUT_URL} rel="noopener">{t.ctaBuy}</a>
+    </div>
+
+    <h2>{t.requirementsTitle}</h2>
+    <ul>
+      {t.requirements.map((r) => <li>{r}</li>)}
+    </ul>
+
+    <h2>{t.installTitle}</h2>
+    <ol class="steps-inline">
+      {t.installSteps.map((s) => <li>{s}</li>)}
+    </ol>
+
+    <h2>{t.updatesTitle}</h2>
+    <p>{t.updatesBody}</p>
+  </div>
+</section>

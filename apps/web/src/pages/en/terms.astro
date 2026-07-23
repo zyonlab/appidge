@@ -1,0 +1,198 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import DraftNotice from '../../components/DraftNotice.astro';
+import { SUPPORT_EMAIL } from '../../config/site';
+
+const description =
+  'Appidge Terms of Service: license grant and trial, product nature (not a VPN, no nodes included), purchases via Polar as Merchant of Record, acceptable use, disclaimers, and limitation of liability.';
+---
+
+<BaseLayout title="Terms of Service" description={description} path="/terms" locale="en">
+  <article class="doc">
+    <div class="container prose">
+      <h1>Terms of Service</h1>
+      <div class="doc-meta">
+        <span><b>Effective</b> <span class="placeholder-slot">[launch date]</span></span>
+        <span><b>Last updated</b> 2026-07-23</span>
+        <span><b>Applies to</b> the Appidge macOS app and related services</span>
+      </div>
+      <DraftNotice locale="en" updated="2026-07-23" />
+
+      <p class="lede">
+        By using or purchasing Appidge you agree to these terms. Pay particular attention to
+        section 2 (what the product is), section 4 (Merchant of Record), and section 6
+        (acceptable use).
+      </p>
+
+      <h2><span class="num">1</span>Definitions</h2>
+      <ul>
+        <li><strong>“Software”</strong> means the Appidge macOS application, its components, and updates.</li>
+        <li>
+          <strong>“Operator”, “we”</strong> means
+          <span class="placeholder-slot">[legal entity name]</span>.
+        </li>
+        <li>
+          <strong>“License”</strong> means the purchased entitlement to use the Software's paid
+          features under these terms.
+        </li>
+        <li>
+          <strong>“Polar”</strong> means Polar (polar.sh) — the Merchant of Record for this
+          product; its legal entity name is as stated in Polar's own terms.
+        </li>
+      </ul>
+
+      <h2><span class="num">2</span>What the product is — and is not</h2>
+      <p>
+        The Software is a <strong>process-level network forwarding utility that runs locally on
+        your Mac</strong>: by the rules you set, it forwards each process's connections to a
+        proxy service you configured yourself, or directly.
+      </p>
+      <div class="callout">
+        <h3>The Software is not a VPN and includes no network service</h3>
+        <ul>
+          <li>
+            We <strong>do not provide, sell, or resell</strong> any VPN, proxy nodes, servers,
+            or traffic relay services.
+          </li>
+          <li>
+            Your traffic <strong>never passes through our servers</strong>. The forwarding
+            target is a proxy you choose and configure; its availability, legality, and
+            security are between you and its provider.
+          </li>
+          <li>
+            A license unlocks <strong>software features</strong>. It includes no network access
+            or node service of any kind.
+          </li>
+        </ul>
+      </div>
+
+      <h2><span class="num">3</span>License grant and trial</h2>
+      <ul>
+        <li>The Software is free to download and try; trial scope and duration are stated in the app.</li>
+        <li>
+          Upon purchase you receive a <strong>non-exclusive, non-transferable</strong> license
+          for use on up to the permitted number of devices; the activation limit is stated at
+          checkout and in the product description.
+        </li>
+        <li>
+          License keys are for your own use (or the entity named at purchase) and
+          <strong>may not be resold, shared, or published</strong>.
+        </li>
+        <li>
+          No reverse engineering, removal of technical protections, or circumvention of license
+          validation, except where mandatory law permits.
+        </li>
+      </ul>
+
+      <h2><span class="num">4</span>Purchases and Merchant of Record (Polar)</h2>
+      <ul>
+        <li>
+          Purchases are completed through Polar's hosted checkout.
+          <strong>Polar is the Merchant of Record</strong>: orders, invoices, taxes, and payment
+          processing are handled by Polar under its
+          <a href="https://polar.sh/legal/terms" rel="noopener">terms</a>; Polar is the party
+          you pay and the name on your statement.
+        </li>
+        <li>Price, currency, and tax are as shown at checkout.</li>
+        <li>
+          The software license itself is granted by the Operator under these terms; payment
+          disputes may also involve Polar's applicable policies.
+        </li>
+      </ul>
+
+      <h2><span class="num">5</span>Refunds</h2>
+      <p>
+        Full refund within 14 days of purchase, no questions asked — details in the
+        <a href="/en/refund">refund policy</a>. Once refunded, the corresponding license is
+        deactivated.
+      </p>
+
+      <h2><span class="num">6</span>Acceptable use</h2>
+      <ul>
+        <li>You must use the Software <strong>in compliance with the law of your jurisdiction</strong>.</li>
+        <li>
+          You set the rules and you choose the upstream proxy:
+          <strong>you are fully responsible for your rule configuration, the proxy services you
+          connect, and the network activity that results</strong>.
+        </li>
+        <li>
+          No unlawful use of any kind — including unauthorized access to others' systems,
+          distributing malware, or any network activity prohibited by law.
+        </li>
+        <li>Violations may lead to termination under section 10.</li>
+      </ul>
+
+      <h2><span class="num">7</span>Updates and service availability</h2>
+      <ul>
+        <li>
+          We may ship updates from time to time (features and security fixes); significant
+          changes are noted in release notes.
+        </li>
+        <li>
+          License validation is provided on a <strong>commercially reasonable efforts</strong>
+          basis. If the service is temporarily unreachable, the Software allows an offline
+          grace period rather than locking paid features immediately.
+        </li>
+        <li>
+          We don't promise perpetual compatibility with every third-party proxy or future
+          macOS release, but we make reasonable efforts to keep mainstream setups working.
+        </li>
+      </ul>
+
+      <h2><span class="num">8</span>Intellectual property and third-party trademarks</h2>
+      <p>
+        The Software and this site's content are the Operator's intellectual property.
+        Proxifier, Clash, Surge, Docker, and other names mentioned here are trademarks of
+        their respective owners, used only to indicate compatibility or category —
+        <strong>Appidge is not affiliated with or endorsed by any of them</strong>.
+      </p>
+
+      <h2><span class="num">9</span>Disclaimers and limitation of liability</h2>
+      <ul>
+        <li>
+          The Software is provided <strong>“as is”</strong>. To the maximum extent permitted by
+          law, no express or implied warranties are given (including merchantability or fitness
+          for a particular purpose).
+        </li>
+        <li>
+          To the maximum extent permitted by law, the Operator is not liable for indirect
+          losses, data loss, or business interruption; aggregate liability is capped at
+          <span class="placeholder-slot">[the amount you actually paid / to be set by counsel]</span>.
+        </li>
+        <li>
+          Nothing here excludes liability that cannot be excluded under mandatory law, or
+          limits your statutory rights as a consumer.
+        </li>
+      </ul>
+
+      <h2><span class="num">10</span>Termination</h2>
+      <ul>
+        <li>You may stop using the Software and deactivate your license at any time.</li>
+        <li>
+          On material breach (especially sections 3 and 6) we may terminate your license after
+          notice; licenses terminated for abuse are not refunded unless the law requires
+          otherwise.
+        </li>
+        <li>A completed refund terminates the license automatically.</li>
+      </ul>
+
+      <h2><span class="num">11</span>Changes, governing law, contact</h2>
+      <ul>
+        <li>
+          Material changes will be posted here with a new effective date; continued use after a
+          change constitutes acceptance.
+        </li>
+        <li>
+          These terms are governed by the law of
+          <span class="placeholder-slot">[jurisdiction]</span>; disputes are resolved by
+          <span class="placeholder-slot">[courts/arbitration — to be set by counsel]</span>.
+          Mandatory consumer protection rules prevail.
+        </li>
+        <li>
+          Contact: <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>; Operator:
+          <span class="placeholder-slot">[legal entity name and address]</span>.
+        </li>
+      </ul>
+    </div>
+  </article>
+</BaseLayout>

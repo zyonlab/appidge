@@ -192,7 +192,7 @@ struct SettingsView: View {
 }
 
 /// 「许可证」设置面板。**只读 State、只 dispatch Action**——网络与 Keychain 都在 Store 的
-/// effect handler（注入协议）里，View 不碰。购买只打开 Hosted Checkout；v1 用户从 Creem 邮件
+/// effect handler（注入协议）里，View 不碰。购买只打开 Hosted Checkout；v1 用户从 Polar 邮件
 /// 复制 key 回来粘贴激活，无浏览器回跳自动灌 key。授权服务故障绝不阻塞其它设置或接管路径。
 struct LicenseSettingsView: View {
     var store: Store
@@ -262,7 +262,7 @@ struct LicenseSettingsView: View {
             }
         }
         .controlSize(.small)
-        Text("购买后从 Creem 的确认邮件里复制 license key，粘贴到上方激活。")
+        Text("购买后从 Polar 的确认邮件或客户门户复制 license key，粘贴到上方激活。")
             .font(.caption).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -303,7 +303,7 @@ struct LicenseSettingsView: View {
     private static func errorHint(_ code: String) -> LocalizedStringKey {
         switch code {
         case "activationLimit": "激活名额已用尽：请在其它设备「本机停用」后再试，或联系支持。"
-        case "invalidLicense": "license key 无效：请核对是否从 Creem 邮件完整复制。"
+        case "invalidLicense": "license key 无效：请核对是否从 Polar 邮件完整复制。"
         default: "暂时无法连接授权服务，请检查网络后重试。"
         }
     }

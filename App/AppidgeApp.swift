@@ -95,7 +95,7 @@ struct AppidgeApp: App {
         let processIdentityResolver: any LocalProcessIdentityResolving = LibprocSecCodeProcessIdentityResolver()
         // 授权 effect 处理器：注入真实 API 客户端 / Keychain / 时钟（协议边界，测试用 mock）。
         // 与转发/路由完全独立——授权 effect 只经这里，绝不触碰网络接管路径。openCheckout 打开
-        // Creem Hosted Checkout 链接（v1 无浏览器回跳，用户从邮件复制 key 回来激活）。
+        // Polar Hosted Checkout 链接（v1 无浏览器回跳，用户从邮件复制 key 回来激活）。
         let licenseHandler = LicenseEffectHandler.makeProduction(openCheckout: { url in
             guard let checkoutURL = URL(string: url) else { return }
             Task { @MainActor in NSWorkspace.shared.open(checkoutURL) }

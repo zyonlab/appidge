@@ -1,0 +1,26 @@
+// Config/AppConfig.xcconfig
+// 非秘密、已提交的应用运行期配置。可按环境覆盖:直接改本文件、用另一个 xcconfig include 覆盖,
+// 或构建期传 `xcodebuild LICENSE_API_BASE_URL=... build`。
+// 这里不放任何签名信息或密钥(那些在 git-ignore 的 Config/Signing.xcconfig)。
+//
+// 注意:空赋值仍然 *定义* 变量,使 Info.plist 里的 $(VAR) 展开成空字符串,而不是字面量 token。
+// 写作 `VAR = ` (等号后什么都不跟)。
+
+// License facade · Worker API base URL。
+// 空 = Swift 层安全回退到本地开发地址 http://127.0.0.1:8787。
+// staging: https://api-staging.appidge.com
+// prod:    https://api.appidge.com
+LICENSE_API_BASE_URL =
+
+// 购买许可证 · Polar Hosted Checkout Link。
+// 空 = 隐藏 App 内购买入口,直到配置好为止。
+LICENSE_CHECKOUT_URL =
+
+// Sparkle 自动升级 appcast feed 地址。
+// 默认 = prod,保持当前发布行为不变。
+// staging 覆盖: https://updates.appidge.com/appcast.xml
+// 注意:xcconfig 把 `//` 当行注释起点,URL 里的双斜杠会被吞掉;用空展开 $() 隔断两个斜杠,
+//       展开后仍是 https://updates.appidge.com/appcast.xml。命令行 xcodebuild VAR=... 覆盖不受此限。
+SPARKLE_FEED_URL = https:/$()/updates.appidge.com/appcast.xml
+// 让编译器把 SwiftUI 本地化字符串提取/合并进 catalog（IDE 构建自动同步；防新串回退成中文源）。
+SWIFT_EMIT_LOC_STRINGS = YES

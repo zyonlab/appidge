@@ -24,13 +24,23 @@
 	<string></string>
 	<key>NSSystemExtensionUsageDescription</key>
 	<string>appidge 需要一个系统扩展来按进程转发 / 拦截网络流量。</string>
-	<!-- Sparkle 自动升级 · appcast feed 地址(CLAUDE.md §5.6 固定为 updates 子域直达 R2,不经 Worker)。 -->
+	<!-- Sparkle 自动升级 · appcast feed 地址(CLAUDE.md §5.6 固定为 updates 子域直达 R2,不经 Worker)。
+	     构建期由 SPARKLE_FEED_URL 注入(默认 prod,见 Config/AppConfig.xcconfig)。 -->
 	<key>SUFeedURL</key>
-	<string>https://updates.appidge.app/appcast.xml</string>
-	<!-- Sparkle EdDSA(ed25519)更新签名公钥。TODO: 用 Sparkle 的 generate_keys 生成密钥对后,
-	     把 base64 公钥填到这里;私钥永不进 git(存 macOS 钥匙串,见 docs/sparkle-autoupdate.md)。 -->
+	<string>$(SPARKLE_FEED_URL)</string>
+	<!-- License facade · Worker API base URL。构建期由 LICENSE_API_BASE_URL 注入;
+	     为空时 Swift 层(LicenseBuildConfig.apiBaseURL)回退到 http://127.0.0.1:8787 本地开发。 -->
+	<key>LicenseAPIBaseURL</key>
+	<string>$(LICENSE_API_BASE_URL)</string>
+	<!-- 购买许可证 · Polar Hosted Checkout Link。构建期由 LICENSE_CHECKOUT_URL 注入;
+	     为空时 App 内购买入口隐藏。 -->
+	<key>LicenseCheckoutURL</key>
+	<string>$(LICENSE_CHECKOUT_URL)</string>
+	<!-- Sparkle EdDSA(ed25519)更新签名公钥。由 Sparkle generate_keys 生成的密钥对之公钥;
+	     公钥可公开、须提交(App 靠它验签更新),私钥仅存 macOS 登录钥匙串、永不进 git
+	     (见 docs/sparkle-autoupdate.md)。全环境共用同一 keypair(公钥不随 staging/prod 变)。 -->
 	<key>SUPublicEDKey</key>
-	<string>TODO-REPLACE-WITH-ED-PUBLIC-KEY</string>
+	<string>WT7KwlPpH0/u5fUsQP4KQEw1xJYlcNMHPtdCbeC5hE4=</string>
 	<!-- 自动检查更新(用户仍可在首次弹窗里改;详细策略见 docs/sparkle-autoupdate.md)。 -->
 	<key>SUEnableAutomaticChecks</key>
 	<true/>

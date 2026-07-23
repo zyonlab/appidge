@@ -22,12 +22,15 @@ import { dirname, join, relative } from 'node:path';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const dist = join(root, 'dist');
 
-// 生产式公开配置（非 secret，非 mock）。注入 process.env 使其优先于本地 .env。
+// 生产式公开配置（非 secret，非 mock）。外部 env 优先，便于 CI/部署注入真实 Polar link；
+// 本地没有 link 时使用明确的 `.invalid` 测试 fixture，绝不把不存在的 URL 冒充生产 checkout。
 const BUILD_ENV = {
-  PUBLIC_SITE_URL: 'https://appidge.com',
-  PUBLIC_POLAR_CHECKOUT_URL: 'https://buy.polar.sh/appidge-license',
-  PUBLIC_API_BASE_URL: 'https://api.appidge.app',
-  PUBLIC_DOWNLOAD_URL: 'https://updates.appidge.app',
+  PUBLIC_SITE_URL: process.env.PUBLIC_SITE_URL?.trim() || 'https://appidge.com',
+  PUBLIC_POLAR_CHECKOUT_URL:
+    process.env.PUBLIC_POLAR_CHECKOUT_URL?.trim() || 'https://checkout.example.invalid/appidge-ci',
+  PUBLIC_API_BASE_URL: process.env.PUBLIC_API_BASE_URL?.trim() || 'https://api.appidge.com',
+  PUBLIC_DOWNLOAD_URL:
+    process.env.PUBLIC_DOWNLOAD_URL?.trim() || 'https://updates.appidge.com/appidge-latest.dmg',
 };
 
 const failures = [];
@@ -139,7 +142,8 @@ const FORBIDDEN = [
   'mock-checkout',
   'mock', // 任何 mock 残留
   'PLACEHOLDER',
-  'api.appidge.app', // 私有 API 地址不应出现在营销站产物
+  'api.appidge.com', // 私有 API 地址不应出现在营销站产物
+  'api.appidge.app', // 迁移前旧域名也不能残留
   'x-api-key',
   'sk_live_',
   'sk_test_',

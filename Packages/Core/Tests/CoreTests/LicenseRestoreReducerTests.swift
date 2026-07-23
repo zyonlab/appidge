@@ -64,7 +64,7 @@ struct LicenseRestoreReducerTests {
 
     @Test("isLicenseActive gates paid capability by phase")
     func capabilityGating() {
-        let active: [LicensePhase] = [.licensed, .validating, .gracePeriod, .deactivating]
+        let active: [LicensePhase] = [.licensed, .gracePeriod, .deactivating]
         let locked: [LicensePhase] = [.unlicensed, .activating, .revoked, .expired, .recoverableError("x")]
         for phase in active {
             var state = AppState(); state.licensePhase = phase
@@ -74,6 +74,13 @@ struct LicenseRestoreReducerTests {
             var state = AppState(); state.licensePhase = phase
             #expect(!state.isLicenseActive, "\(phase) should be locked")
         }
+        var activeValidation = AppState()
+        activeValidation.license = info(.active, lastValidatedAt: t0)
+        activeValidation.licensePhase = .validating
+        #expect(activeValidation.isLicenseActive)
+        var expiredValidation = activeValidation
+        expiredValidation.license?.status = .expired
+        #expect(!expiredValidation.isLicenseActive)
     }
 
     @Test("resetState (profile switch) preserves license phase and record")
@@ -106,7 +113,7 @@ struct LicenseRestoreReducerTests {
         }
     }
 
-    @Test("isValidateDue: due only when active, with a record, and past the daily interval")
+    @Test("isValidateDue: active and expired records retry after the daily interval; revoked never does")
     func validateDue() {
         #expect(!AppState().isValidateDue(now: t0)) // no license
         var licensed = AppState()
@@ -117,6 +124,10 @@ struct LicenseRestoreReducerTests {
         var revoked = licensed
         revoked.licensePhase = .revoked
         #expect(!revoked.isValidateDue(now: t0.addingTimeInterval(48 * 3600)))        // locked → never due
+        var expired = licensed
+        expired.licensePhase = .expired
+        expired.license?.status = .expired
+        #expect(expired.isValidateDue(now: t0.addingTimeInterval(48 * 3600)))         // recovery remains possible
     }
 
     @Test("purchase requested opens the configured checkout link, no state change")

@@ -108,7 +108,23 @@ struct LicenseEffectHandlerTests {
         let keychain = InMemoryLicenseKeychainStore(failSave: true)
         let handler = makeHandler(api: MockLicenseAPIClient(), keychain: keychain)
         let info = LicenseInfo(licenseKey: "K12345678", instanceId: "i", status: .active, activations: 1, activationLimit: 3, lastValidatedAt: t0)
-        #expect(await handler.handle(.persistLicense(info)) == .licensePersistenceFailed)
+        #expect(await handler.handle(.persistLicense(info)) == .licensePersistenceFailed(.save))
+    }
+
+    @Test("safe deactivate clear leaves a revoked tombstone when physical Keychain delete fails")
+    func safeDeactivateClearFailure() async {
+        let active = LicenseInfo(
+            licenseKey: "K12345678", instanceId: "i", status: .active,
+            activations: 1, activationLimit: 3, lastValidatedAt: t0
+        )
+        var tombstone = active
+        tombstone.status = .revoked
+        let keychain = InMemoryLicenseKeychainStore(stored: active, failClear: true)
+        let handler = makeHandler(api: MockLicenseAPIClient(), keychain: keychain)
+
+        #expect(await handler.handle(.clearPersistedLicense(fallback: tombstone))
+            == .licensePersistenceFailed(.clear))
+        #expect(await keychain.current()?.status == .revoked)
     }
 
     @Test("load returns the stored record; a keychain read failure degrades safely to nil (unlicensed)")

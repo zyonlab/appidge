@@ -4,20 +4,6 @@ import Network
 import EngineKit
 import IPCContract
 
-/// 本 app bundle 的根路径（形如 `/…/appidge.app`）——从扩展自身位置往上找到 `.app` 容器
-/// （扩展在 `<app>.app/Contents/Library/SystemExtensions/<uuid>/<ext>.systemextension`）。
-/// 放文件级常量（不进 `ProxyExtensionProvider` 类体，避免撑破 type_body_length）；只被本文件的
-/// `selfBypassReason` 使用——凡从本 bundle 内运行的可执行文件（含 Sparkle Autoupdate/Updater/XPC
-/// 等辅助组件，签名标识 org.sparkle-project.*、不在 ownProcessIdentifiers）都强制直连、别再代理。
-private let ownAppBundlePath: String? = {
-    var url = Bundle.main.bundleURL.resolvingSymlinksInPath()
-    while url.pathComponents.count > 1 {
-        if url.pathExtension == "app" { return url.path }
-        url = url.deletingLastPathComponent()
-    }
-    return nil
-}()
-
 /// `effectiveRuleSync` 拆到独立文件(压 `ProxyExtensionProvider.swift` 的 file_length/
 /// type_body_length,同 `TCPFlowPump.swift`/`ProxyExtensionProviderUDP.swift` 的既有先例)——
 /// 跨文件访问 provider 的成员,故 `matchRules` 在主文件里放宽到非 `private`。
@@ -150,7 +136,7 @@ extension ProxyExtensionProvider {
         // 凡从本 app bundle 内运行的可执行文件都放行——覆盖 Sparkle 的 Autoupdate/Updater/XPC 等
         // 辅助组件（签名标识 org.sparkle-project.*、不在 selfIdentifiers，可执行文件也非扩展本体，
         // 但都落在本 bundle 内）发起的取 appcast / 下载更新流量，别再被自己代理（否则自更新失败）。
-        if ProcessOriginExclusion.isWithinBundle(sourcePath: sourcePath, bundlePrefix: ownAppBundlePath) {
+        if ProcessOriginExclusion.isWithinBundle(sourcePath: sourcePath, bundlePrefix: hostAppBundlePath) {
             return "bypass:self-bundle"
         }
         return nil

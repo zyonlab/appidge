@@ -33,6 +33,14 @@ struct MenuBarView: View {
     /// 装上了(`.active`)再看引擎健康度。与底部状态栏(`StatusBar`)同一套判定,换成菜单里
     /// 更直观的符号呈现。绿=已接管,橙=待批准/安装中,红=未安装/异常,次要灰=未接入。
     private var status: StatusPresentation {
+        guard store.state.isLicenseActive else {
+            return StatusPresentation(
+                symbol: "lock.fill",
+                tint: .orange,
+                text: "未授权 · 接管已停止",
+                help: "激活许可证后才会启动网络接管与开放规则编辑。"
+            )
+        }
         switch store.state.extensionActivation {
         case .active:
             return store.state.isEngineHealthy
@@ -152,7 +160,7 @@ struct MenuBarView: View {
             // 6. 紧急恢复:浏览器等断网时的一键出口(停止会话 + 移除代理配置,全部应用立即恢复
             //    原生直连,无需重启电脑)。放菜单栏是因为主窗口此时可能根本打不开/没人想找设置。
             Button {
-                Task { await TransparentProxyController.reset() }
+                TransparentProxyController.reset()
             } label: {
                 Label("紧急恢复直连（重置接管）", systemImage: "exclamationmark.arrow.circlepath")
             }

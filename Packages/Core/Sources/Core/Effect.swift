@@ -34,9 +34,12 @@ public enum Effect: Sendable, Equatable {
     case deactivateLicense(licenseKey: String, instanceId: String)
     /// 把授权记录写进 Keychain；`nil` = 清除（停用）。授权信息**只**经 Keychain 出入。
     case persistLicense(LicenseInfo?)
+    /// 停用后的安全清除：先原子覆盖成 revoked tombstone，再删除。即使删除失败，下次启动
+    /// 也只能恢复为 revoked，不会把旧 active blob 复活。
+    case clearPersistedLicense(fallback: LicenseInfo?)
     /// 启动时从 Keychain 读回授权记录，结果经 `.licenseRestored` 回灌。
     case loadPersistedLicense
-    /// 打开 Polar Hosted Checkout 链接（"购买许可证"）。URL 由 App 层构建期配置提供。
+    /// 打开官网定价页或 Polar Hosted Checkout（"购买许可证"）。URL 由 App 层构建期配置提供。
     /// v1 不做浏览器回跳自动灌 key——用户从 Polar 邮件复制 key 回 App 激活。
     case openCheckout(url: String)
 }

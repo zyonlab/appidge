@@ -3,7 +3,7 @@ import { env } from "cloudflare:test";
 import { handleRequest } from "../src/index";
 import { ctxWith, resetSchema, signedWebhookRequest, fixedClock } from "./helpers";
 import { signStandardWebhook } from "../src/crypto";
-import { getEntitlementByLicenseKeyId } from "../src/db";
+import { getEntitlementByLicenseKeyId, getRefundTombstoneByOrder } from "../src/db";
 
 const CLOCK = "2026-07-22T00:00:00Z";
 const CLOCK_MS = Date.parse(CLOCK);
@@ -152,6 +152,21 @@ describe("webhook idempotency & ordering", () => {
   it("order.refunded revokes existing order row (backup path)", async () => {
     await post(grantEvent("benefit_grant.created", { order: "ord_X" }), "msg_g2");
     await post(orderRefundEvent({ order: "ord_X" }), "msg_ref2");
+    const ent = await entOf();
+    expect(ent?.status).toBe("revoked");
+    expect(ent?.reason).toBe("refund");
+  });
+
+  it("order.refunded BEFORE grant persists a tombstone and the later grant is born revoked", async () => {
+    await post(orderRefundEvent({ order: "ord_REFUND_FIRST" }), "msg_refund_first");
+    expect(await getRefundTombstoneByOrder(env.DB, "ord_REFUND_FIRST")).toMatchObject({
+      order_id: "ord_REFUND_FIRST",
+      reason: "refund",
+      source_event_id: "msg_refund_first",
+    });
+    expect(await entOf()).toBeNull();
+
+    await post(grantEvent("benefit_grant.created", { order: "ord_REFUND_FIRST" }), "msg_grant_late");
     const ent = await entOf();
     expect(ent?.status).toBe("revoked");
     expect(ent?.reason).toBe("refund");

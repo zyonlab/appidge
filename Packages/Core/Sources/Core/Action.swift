@@ -96,8 +96,9 @@ public enum Action: Sendable, Equatable {
     case licenseRestored(LicenseInfo?, now: Date)
     /// 周期性时钟推进（携带本地 now）。纯本地判定：抬高水位、宽限耗尽/订阅到期 → 落 expired；不发网络。
     case licenseClockTick(now: Date)
-    /// 请求购买（打开 Hosted Checkout）。checkoutURL 由 App 层构建期配置提供。→ 产出 `.openCheckout`。
+    /// 请求购买（打开稳定购买入口）。checkoutURL 由 App 层构建期配置提供。→ 产出 `.openCheckout`。
     case licensePurchaseRequested(checkoutURL: String)
-    /// Keychain 持久化失败（非致命）。→ 保持当前相位，不锁用户，仅记日志。
-    case licensePersistenceFailed
+    /// Keychain 持久化失败。普通保存失败不锁当前会话；停用清除失败时 Keychain handler 已先写
+    /// revoked tombstone，保证旧 active 记录不会在下次启动复活。
+    case licensePersistenceFailed(LicensePersistenceOperation)
 }

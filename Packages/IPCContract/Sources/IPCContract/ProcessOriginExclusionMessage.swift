@@ -15,14 +15,19 @@ public struct ProcessOriginExclusionMessage: Sendable, Equatable, Codable {
     /// (或识别有漏),降一级到最保守的处理,当场断环。
     public let hardBypassIdentifiers: [String]
     public let hardBypassExecutablePaths: [String]
+    /// 主 App 在自身进程里解析出的真实 bundle 根路径。系统扩展安装后运行在
+    /// `/Library/SystemExtensions/...`，不能再靠向上遍历 `Bundle.main` 找宿主，必须由 App 经 XPC 下发。
+    public let hostAppBundlePath: String?
 
     public init(
         identifiers: [String], executablePaths: [String] = [],
-        hardBypassIdentifiers: [String] = [], hardBypassExecutablePaths: [String] = []
+        hardBypassIdentifiers: [String] = [], hardBypassExecutablePaths: [String] = [],
+        hostAppBundlePath: String? = nil
     ) {
         self.identifiers = identifiers
         self.executablePaths = executablePaths
         self.hardBypassIdentifiers = hardBypassIdentifiers
         self.hardBypassExecutablePaths = hardBypassExecutablePaths
+        self.hostAppBundlePath = hostAppBundlePath
     }
 }

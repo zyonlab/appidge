@@ -8,7 +8,7 @@ const dir = path.dirname(fileURLToPath(import.meta.url));
 // 从 migration 读取 DDL 作为测试 schema 的单一真相；按顺序应用所有迁移（0002 重建 entitlements），
 // 剥掉注释后按 ';' 切成语句数组，交给测试 helper 逐条 prepare().run()
 //（比 D1 .exec() 解析多语句更稳）。
-const MIGRATIONS = ["0001_init.sql", "0002_polar.sql"];
+const MIGRATIONS = ["0001_init.sql", "0002_polar.sql", "0003_refund_tombstones.sql"];
 const ddlStatements = MIGRATIONS.flatMap((file) =>
   readFileSync(path.join(dir, "migrations", file), "utf8")
     .split("\n")

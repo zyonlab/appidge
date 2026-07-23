@@ -73,12 +73,15 @@ extension Reducer {
         return (state, [.deactivateLicense(licenseKey: info.licenseKey, instanceId: info.instanceId)])
     }
 
-    /// 停用成功：清空本地记录、落 `.unlicensed`，清 Keychain。
+    /// 停用成功：立即锁定本会话并清空内存；Keychain 先原子覆盖成 revoked tombstone 再删除，
+    /// 即使删除失败，下次启动也不会恢复旧 active blob。
     static func licenseDeactivateSucceeded(_ state: AppState) -> (AppState, [Effect]) {
         var state = state
+        var tombstone = state.license
+        tombstone?.status = .revoked
         state.license = nil
         state.licensePhase = .unlicensed
-        return (state, [.persistLicense(nil)])
+        return (state, [.clearPersistedLicense(fallback: tombstone)])
     }
 
     /// 停用失败不误锁：仍有记录则回落 `.licensed`（保留访问、允许重试），否则 `.unlicensed`。

@@ -26,6 +26,19 @@ set +a
 : "${TEAM_ID:?TEAM_ID missing in .env}"
 : "${APP_BUNDLE_ID:?APP_BUNDLE_ID missing in .env}"
 
+# 公开的 Release 授权配置。显式作为 xcodebuild setting 注入，避免本地 xcconfig 被 staging
+# 脚本或手工操作留空后仍产出一个无法激活/购买的强制 gate 包。可在 .env 中按环境覆盖。
+LICENSE_API_BASE_URL="${LICENSE_API_BASE_URL:-https://api.appidge.com}"
+LICENSE_CHECKOUT_URL="${LICENSE_CHECKOUT_URL:-https://appidge.com/pricing}"
+case "$LICENSE_API_BASE_URL" in
+  https://*) ;;
+  *) echo "LICENSE_API_BASE_URL 必须是 HTTPS URL：$LICENSE_API_BASE_URL" >&2; exit 1 ;;
+esac
+case "$LICENSE_CHECKOUT_URL" in
+  https://*) ;;
+  *) echo "LICENSE_CHECKOUT_URL 必须是 HTTPS URL：$LICENSE_CHECKOUT_URL" >&2; exit 1 ;;
+esac
+
 [ -f Config/Signing.xcconfig ] || {
   echo "缺 Config/Signing.xcconfig —— 先跑 ./scripts/gen-signing-xcconfig.sh" >&2
   exit 1
@@ -159,8 +172,10 @@ cat > "$EXPORT_PLIST" <<PLIST
 </plist>
 PLIST
 
-note "2/5 xcodebuild archive（Release 配置，scheme App，同时归档 App + ProxyExtension）"
-xcodebuild -scheme App -configuration Release archive -archivePath "$ARCHIVE_PATH"
+note "2/5 xcodebuild archive（Release 配置，授权端点已校验，scheme App，同时归档 App + ProxyExtension）"
+xcodebuild -scheme App -configuration Release archive -archivePath "$ARCHIVE_PATH" \
+  LICENSE_API_BASE_URL="$LICENSE_API_BASE_URL" \
+  LICENSE_CHECKOUT_URL="$LICENSE_CHECKOUT_URL"
 
 note "3/5 xcodebuild -exportArchive（Developer ID 导出）"
 xcodebuild -exportArchive \

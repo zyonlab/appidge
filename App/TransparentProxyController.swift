@@ -1,6 +1,7 @@
 import Foundation
 @preconcurrency import NetworkExtension
 import os.log
+import AppFeature
 
 private let tpLog = Logger(subsystem: "com.appidge.app", category: "TransparentProxy")
 
@@ -27,21 +28,73 @@ enum TransparentProxyController {
         manager = managers.first ?? manager
     }
 
-    /// 会话操作(start / restart)是否已有一次在进行中(@MainActor 上 await 前同步占旗)。
-    /// **start 与 restart 共用同一把锁**:否则并发时 restart 在停、start 在起,互相打架、会话卡死或
-    /// 绑错 provider。同一时刻只允许一次会话操作,余者跳过——那一次已把会话带到正确状态。
-    private static var sessionOpInFlight = false
+    /// 所有启停请求进入同一个串行 worker。`revision` 是 capability 世代号：任何异步操作在
+    /// `await` 后都必须确认自己仍是最新请求，旧 start/restart 才不能越过后来的 revoke/stop。
+    private static var sessionCoordinator = ProxySessionIntentCoordinator()
+    private static var sessionWorker: Task<Void, Never>?
 
-    /// 建/存配置并启动会话。幂等:已在跑就不重复启。
-    static func start() async {
-        guard !sessionOpInFlight else {
-            emit("start(): 已有会话操作在进行,跳过本次(防并发双 startVPNTunnel / 与 restart 打架)")
+    /// 请求会话运行。同步登记意图后由串行 worker 执行；调用方无需再包一层不受控的 `Task`。
+    static func start() {
+        request(.running)
+    }
+
+    /// 请求停止会话。先同步停掉已知 manager，再由 worker 加载系统偏好做全量确认；
+    /// 同时递增 revision，使所有在途 start/restart 在下一次恢复执行时自动失效。
+    static func stop() {
+        request(.stopped)
+    }
+
+    /// 请求重绑到当前 provider。与 start/stop 共用同一 worker 和世代号。
+    static func restart() {
+        request(.restarting)
+    }
+
+    /// 请求紧急停止并移除透明代理配置。
+    static func reset() {
+        request(.resetting)
+    }
+
+    private static func request(_ intent: ProxySessionIntent) {
+        sessionCoordinator.request(intent)
+        if intent == .stopped || intent == .resetting {
+            stopKnownManagersImmediately()
+        }
+        guard sessionWorker == nil else { return }
+        sessionWorker = Task { @MainActor in
+            await reconcileSessionIntent()
+        }
+    }
+
+    /// 单消费者循环：若某次 await 期间来了更新请求，旧操作退出/跳过，循环立即处理最新意图。
+    private static func reconcileSessionIntent() async {
+        while true {
+            let ticket = sessionCoordinator.currentTicket
+            switch ticket.intent {
+            case .running:
+                await performStart(ticket: ticket)
+            case .stopped:
+                await performStop(ticket: ticket)
+            case .restarting:
+                await performRestart(ticket: ticket)
+            case .resetting:
+                await performReset(ticket: ticket)
+            }
+
+            guard sessionCoordinator.isCurrent(ticket) else { continue }
+            sessionCoordinator.complete(ticket)
+            sessionWorker = nil
             return
         }
-        sessionOpInFlight = true
-        defer { sessionOpInFlight = false }
+    }
+
+    /// 建/存配置并启动会话。幂等:已在跑就不重复启。
+    private static func performStart(ticket: ProxySessionIntentTicket) async {
         do {
             let mgr = try await loadOrCreate()
+            guard sessionCoordinator.isCurrent(ticket) else {
+                emit("start cancelled: a newer stop/restart request superseded it")
+                return
+            }
             switch mgr.connection.status {
             case .connected, .connecting:
                 emit("session already \(statusName(mgr.connection.status))")
@@ -59,21 +112,27 @@ enum TransparentProxyController {
     /// 会话继续绑在待卸载的旧 provider 实例上(流量被交给僵尸扩展 → 黑洞),等价于用户手动在
     /// 系统设置里关开一次网络扩展。这里程序化地做:停会话 → 等它真的断开 → 重新起。
     /// 用于:启动首次重绑(startOnLaunch)、版本握手发现会话绑了旧扩展、或用户点「重启接管」。
-    static func restart() async {
-        guard !sessionOpInFlight else {
-            emit("restart(): 已有会话操作在进行,跳过本次(与 start / 另一个 restart 打架)")
-            return
-        }
-        sessionOpInFlight = true
-        defer { sessionOpInFlight = false }
+    private static func performRestart(ticket: ProxySessionIntentTicket) async {
         emit("restart(): stopping session to rebind to the current provider")
         do {
             let mgr = try await loadOrCreate()
+            guard sessionCoordinator.isCurrent(ticket) else {
+                emit("restart cancelled before stop: a newer capability request superseded it")
+                return
+            }
             mgr.connection.stopVPNTunnel()
             // 等到真的 disconnected 再起(最多 ~5s);不等的话 startVPNTunnel 可能被忽略。
             for _ in 0..<50 {
+                guard sessionCoordinator.isCurrent(ticket) else {
+                    emit("restart cancelled after stop: session must remain stopped")
+                    return
+                }
                 if mgr.connection.status == .disconnected || mgr.connection.status == .invalid { break }
                 try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+            guard sessionCoordinator.isCurrent(ticket) else {
+                emit("restart cancelled before startVPNTunnel(): session must remain stopped")
+                return
             }
             try mgr.connection.startVPNTunnel()
             emit("restart(): startVPNTunnel() called — session should now bind to the latest provider")
@@ -86,9 +145,10 @@ enum TransparentProxyController {
     /// 停止会话(不删配置)。没有活动会话 = 扩展不再收到任何 flow,所有应用立即恢复原生联网。
     /// 之前只停缓存的 manager,本会话没 start 过(比如上次 app 异常退出后重开)就停了个寂寞——
     /// 现在先 load 系统偏好里的配置再停,保证停的是真正在跑的那个会话。
-    static func stop() async {
+    private static func performStop(ticket: ProxySessionIntentTicket) async {
         do {
             let managers = try await NETransparentProxyManager.loadAllFromPreferences()
+            guard sessionCoordinator.isCurrent(ticket) else { return }
             remember(managers)
             for mgr in managers {
                 mgr.connection.stopVPNTunnel()
@@ -98,6 +158,7 @@ enum TransparentProxyController {
             }
             emit("stopVPNTunnel() called on \(managers.count) manager(s)")
         } catch {
+            guard sessionCoordinator.isCurrent(ticket) else { return }
             manager?.connection.stopVPNTunnel()
             emit("stop: loadAllFromPreferences failed (\(error.localizedDescription)), stopped cached session only")
         }
@@ -108,9 +169,10 @@ enum TransparentProxyController {
     /// 开机后没人再 startVPNTunnel;这里把同样的效果做成一个按钮,并且清掉配置本身)。
     /// 系统扩展保持安装;重新开启接管 = 重启 app 或点「启用」(会重建配置,首次重建可能再弹一次
     /// "添加 VPN/代理配置"授权)。
-    static func reset() async {
+    private static func performReset(ticket: ProxySessionIntentTicket) async {
         do {
             let managers = try await NETransparentProxyManager.loadAllFromPreferences()
+            guard sessionCoordinator.isCurrent(ticket) else { return }
             guard !managers.isEmpty else {
                 manager?.connection.stopVPNTunnel()
                 manager = nil
@@ -130,12 +192,27 @@ enum TransparentProxyController {
         }
     }
 
+    /// 不等待系统偏好读取，先停本进程已经见过的 manager。后续 `performStop` 仍会全量加载，
+    /// 覆盖“旧进程留下会话、当前进程尚未见过”的情况。
+    private static func stopKnownManagersImmediately() {
+        var targets = knownManagers
+        if let cached = manager, !targets.contains(where: { $0 === cached }) {
+            targets.append(cached)
+        }
+        for mgr in targets {
+            mgr.connection.stopVPNTunnel()
+        }
+        emit("stop requested — immediately stopped \(targets.count) known session(s)")
+    }
+
     /// app 退出路径的同步兜底(`applicationWillTerminate` 里没法 await):停掉本进程见过的**所有**
     /// 会话 manager,而不只是缓存的那一个——会话可能由别的实例(如语言切换重启出的新实例)持有,
     /// 只停一个会漏掉、留下僵尸接管全系统断网。宗旨:**UI 不在,接管就不该在**——规则没人管、出问题
     /// 没人能停,catch-all 拦截挂在系统上直到重启,正是"Chrome 断网只能重启电脑"的处境。
     /// 只停会话、不删配置,下次启动照常静默接管。
     static func stopCachedSessionForTermination() {
+        sessionCoordinator.request(.stopped)
+        sessionWorker?.cancel()
         // knownManagers 覆盖本进程 start/stop/restart 期间 loadAllFromPreferences 见过的全部会话;
         // 极端情况下(本进程从没加载过)回落到停缓存的 manager,尽最大努力不留僵尸接管。
         var targets = knownManagers

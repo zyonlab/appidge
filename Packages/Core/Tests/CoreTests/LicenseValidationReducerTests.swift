@@ -31,13 +31,49 @@ struct LicenseValidationReducerTests {
         #expect(effects == [.validateLicense(licenseKey: "K12345678", instanceId: "inst_1")])
     }
 
-    @Test("validate requested is a no-op when unlicensed or already locked (won't unlock revoked)")
+    @Test("validate requested is a no-op when unlicensed or revoked")
     func validateRequestedGuarded() {
         #expect(Reducer.reduce(AppState(), .licenseValidateRequested(now: t0)).0.licensePhase == .unlicensed)
         var revoked = licensedState(lastValidatedAt: t0); revoked.licensePhase = .revoked
         let (next, effects) = Reducer.reduce(revoked, .licenseValidateRequested(now: t0))
         #expect(next.licensePhase == .revoked)
         #expect(effects.isEmpty)
+    }
+
+    @Test("expired license can revalidate without temporarily reopening the paid capability")
+    func expiredCanRevalidate() {
+        var expired = licensedState(lastValidatedAt: t0)
+        expired.licensePhase = .expired
+        expired.license?.status = .expired
+
+        let (validating, effects) = Reducer.reduce(
+            expired,
+            .licenseValidateRequested(now: t0.addingTimeInterval(grace + 1))
+        )
+        #expect(validating.licensePhase == .validating)
+        #expect(!validating.isLicenseActive)
+        #expect(effects == [.validateLicense(licenseKey: "K12345678", instanceId: "inst_1")])
+
+        let refreshedAt = t0.addingTimeInterval(grace + 2)
+        let (recovered, _) = Reducer.reduce(
+            validating,
+            .licenseValidateSucceeded(response: response(.active, validatedAt: refreshedAt), now: refreshedAt)
+        )
+        #expect(recovered.licensePhase == .licensed)
+        #expect(recovered.isLicenseActive)
+    }
+
+    @Test("transient failure while recovering an expired license stays locked and retryable")
+    func expiredTransientStaysExpired() {
+        var state = licensedState(lastValidatedAt: t0)
+        state.licensePhase = .validating
+        state.license?.status = .expired
+        let (next, _) = Reducer.reduce(
+            state,
+            .licenseValidateFailed(.transient, now: t0.addingTimeInterval(grace + 1))
+        )
+        #expect(next.licensePhase == .expired)
+        #expect(!next.isLicenseActive)
     }
 
     @Test("validate succeeded refreshes lastValidatedAt and returns to licensed")

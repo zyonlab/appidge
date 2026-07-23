@@ -89,6 +89,7 @@ struct OnboardingView: View {
             HStack(spacing: 8) {
                 Button("启用扩展") { SystemExtensionActivator.shared.activate() }
                     .buttonStyle(.borderedProminent)
+                    .disabled(!store.state.isLicenseActive)
                 Button("打开系统设置") { SystemSettingsOpener.openExtensionsPane() }
             }
 
@@ -152,6 +153,7 @@ struct OnboardingView: View {
     }
 
     private func finish() {
+        guard store.state.isLicenseActive else { return }
         SystemExtensionActivator.shared.activate()   // 幂等:引导里没点启用也兜底激活一次
         store.dispatch(.onboardingCompleted)
         Task { await FilePersistenceStore().save(PersistedConfiguration(from: store.state)) }

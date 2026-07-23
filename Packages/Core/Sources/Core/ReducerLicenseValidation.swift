@@ -20,9 +20,10 @@ extension Reducer {
             return licenseClockTick(now: now, state)
         case .licensePurchaseRequested(let url):
             return (state, [.openCheckout(url: url)])
-        case .licensePersistenceFailed:
-            // 非致命：保持相位，不锁用户。本会话已授权但未落盘，下次启动可能需重激活。
-            return (state, [.log("license keychain persistence failed")])
+        case .licensePersistenceFailed(let operation):
+            // 保存失败不锁当前会话；clear 失败时 handler 已先写 revoked tombstone，旧 active
+            // 记录不会复活。两者都保留明确日志，便于诊断真实 Keychain 故障。
+            return (state, [.log("license keychain \(operation.rawValue) failed")])
         default:
             return nil
         }
@@ -30,10 +31,16 @@ extension Reducer {
 
     // MARK: 校验
 
-    /// 请求例行校验：仅在有记录且当前放行时进 `.validating`（乐观保留访问）。已锁定
-    /// （revoked/expired/未激活）不因一次校验请求解锁。
+    /// 请求例行/恢复校验：licensed/grace 乐观保留访问；expired 也允许请求，但记录 status
+    /// 仍是 expired，因此 `.validating` 在途不会暂时打开付费 gate。revoked 永不自动解锁。
     static func licenseValidateRequested(now: Date, _ state: AppState) -> (AppState, [Effect]) {
-        guard let info = state.license, state.isLicenseActive else { return (state, []) }
+        guard let info = state.license else { return (state, []) }
+        switch state.licensePhase {
+        case .licensed, .gracePeriod, .expired:
+            break
+        case .unlicensed, .activating, .validating, .deactivating, .revoked, .recoverableError:
+            return (state, [])
+        }
         var state = state
         state.licensePhase = .validating
         return (state, [.validateLicense(licenseKey: info.licenseKey, instanceId: info.instanceId)])
@@ -74,7 +81,9 @@ extension Reducer {
         case .transient:
             info.bumpHighWater(now)
             state.license = info
-            let exhausted = info.isExpiredByDate(now) || info.graceElapsed(now) > AppState.licenseGracePeriod
+            let exhausted = info.status == .expired
+                || info.isExpiredByDate(now)
+                || info.graceElapsed(now) > AppState.licenseGracePeriod
             state.licensePhase = exhausted ? .expired : .gracePeriod
         }
         return (state, [.persistLicense(info)])

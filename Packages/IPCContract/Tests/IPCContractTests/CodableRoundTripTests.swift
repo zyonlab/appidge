@@ -210,10 +210,12 @@ struct CodableRoundTripTests {
     func processOriginExclusionMessageWithPathsRoundTrip() throws {
         let message = ProcessOriginExclusionMessage(
             identifiers: ["com.example.yunti"],
-            executablePaths: ["/usr/local/bin/xray", "/usr/local/bin/xray-helper"]
+            executablePaths: ["/usr/local/bin/xray", "/usr/local/bin/xray-helper"],
+            hostAppBundlePath: "/Applications/appidge.app"
         )
         #expect(try roundTrip(message) == message)
         #expect(message.executablePaths.count == 2)
+        #expect(message.hostAppBundlePath == "/Applications/appidge.app")
     }
 
     @Test("AppToExtensionMessage.applyProcessOriginExclusions round-trips through the envelope")

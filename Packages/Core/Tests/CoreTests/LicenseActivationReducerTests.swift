@@ -89,7 +89,9 @@ struct LicenseActivationReducerTests {
         let (next, effects) = Reducer.reduce(state, .licenseDeactivateSucceeded)
         #expect(next.licensePhase == .unlicensed)
         #expect(next.license == nil)
-        #expect(effects == [.persistLicense(nil)])
+        var tombstone = state.license
+        tombstone?.status = .revoked
+        #expect(effects == [.clearPersistedLicense(fallback: tombstone)])
     }
 
     @Test("deactivate failed does NOT lock: falls back to licensed while a record remains")

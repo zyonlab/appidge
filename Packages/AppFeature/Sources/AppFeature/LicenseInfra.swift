@@ -20,7 +20,7 @@ public enum LicenseCoding {
 /// 构建期公开配置。**绝不硬编码生产地址**：facade base URL / checkout 链接读自 App 主包 Info.plist，
 /// 缺失时 base 回落到本地 dev（`127.0.0.1:8787`），永不误用生产。appVersion 读自包信息。
 public enum LicenseBuildConfig {
-    /// facade 基址（无尾斜杠）。生产由构建配置注入 `LicenseAPIBaseURL=https://api.appidge.app`。
+    /// facade 基址（无尾斜杠）。生产由构建配置注入 `LicenseAPIBaseURL=https://api.appidge.com`。
     public static var apiBaseURL: String {
         guard let value = Bundle.main.object(forInfoDictionaryKey: "LicenseAPIBaseURL") as? String,
               !value.isEmpty else {
@@ -29,7 +29,7 @@ public enum LicenseBuildConfig {
         return value.hasSuffix("/") ? String(value.dropLast()) : value
     }
 
-    /// Polar Hosted Checkout 链接。为空表示未配置——UI 隐藏「购买」入口。
+    /// 稳定购买入口（官网定价页或 Polar Hosted Checkout）。为空表示未配置——UI 隐藏入口。
     public static var checkoutURL: String {
         (Bundle.main.object(forInfoDictionaryKey: "LicenseCheckoutURL") as? String) ?? ""
     }
@@ -126,7 +126,8 @@ public struct URLSessionLicenseAPIClient: LicenseAPIClient {
 /// 授权记录的真实 Keychain 出口（`kSecClassGenericPassword`，单条 JSON blob）。
 /// license key / instance id / lastValidatedAt / 时钟高水位**只**存这里，绝不落明文 plist/UserDefaults。
 /// 与 ``KeychainCredentialStore`` 同构：真实实现不进自动化测试（CI 无钥匙串/entitlement），
-/// 由 ``InMemoryLicenseKeychainStore`` 承担状态机测试。写入用「先删后加」保证覆盖。
+/// 由 ``InMemoryLicenseKeychainStore`` 承担状态机测试。写入优先 `SecItemUpdate` 原子覆盖，
+/// 仅在 item 不存在时 `SecItemAdd`，避免“先删成功、后加失败”永久丢失旧有效记录。
 public final class KeychainLicenseStore: LicenseKeychainStore, @unchecked Sendable {
     public enum KeychainError: Error, Equatable {
         case status(OSStatus)
@@ -143,11 +144,17 @@ public final class KeychainLicenseStore: LicenseKeychainStore, @unchecked Sendab
 
     public func saveLicense(_ info: LicenseInfo) async throws {
         let data = try LicenseCoding.encoder.encode(info)
+        let update = [kSecValueData as String: data]
+        let updateStatus = SecItemUpdate(baseQuery as CFDictionary, update as CFDictionary)
+        if updateStatus == errSecSuccess { return }
+        guard updateStatus == errSecItemNotFound else {
+            throw KeychainError.status(updateStatus)
+        }
+
         var attributes = baseQuery
-        SecItemDelete(attributes as CFDictionary) // 先删旧的，避免 duplicate
         attributes[kSecValueData as String] = data
-        let status = SecItemAdd(attributes as CFDictionary, nil)
-        guard status == errSecSuccess else { throw KeychainError.status(status) }
+        let addStatus = SecItemAdd(attributes as CFDictionary, nil)
+        guard addStatus == errSecSuccess else { throw KeychainError.status(addStatus) }
     }
 
     public func loadLicense() async throws -> LicenseInfo? {
@@ -180,7 +187,7 @@ public final class KeychainLicenseStore: LicenseKeychainStore, @unchecked Sendab
 
 public extension LicenseEffectHandler {
     /// 生产装配：真实 URLSession facade 客户端 + Keychain + 系统时钟 + 构建期配置。
-    /// `openCheckout` 由 App 层注入（打开 Hosted Checkout 链接）。
+    /// `openCheckout` 由 App 层注入（打开官网购买页或 Hosted Checkout）。
     static func makeProduction(openCheckout: @escaping @Sendable (String) -> Void) -> LicenseEffectHandler {
         LicenseEffectHandler(
             apiClient: URLSessionLicenseAPIClient(),

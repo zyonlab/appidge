@@ -51,18 +51,15 @@ cat > "$REPO/Config/AppConfig.xcconfig" <<'PRODEOF'
 // 或构建期传 `xcodebuild LICENSE_API_BASE_URL=... build`。
 // 这里不放任何签名信息或密钥(那些在 git-ignore 的 Config/Signing.xcconfig)。
 //
-// 注意:空赋值仍然 *定义* 变量,使 Info.plist 里的 $(VAR) 展开成空字符串,而不是字面量 token。
-// 写作 `VAR = ` (等号后什么都不跟)。
-
 // License facade · Worker API base URL。
-// 空 = Swift 层安全回退到本地开发地址 http://127.0.0.1:8787。
+// Release 默认直连生产 facade；本地/staging 可用另一个 xcconfig 或 xcodebuild 参数覆盖。
 // staging: https://api-staging.appidge.com
 // prod:    https://api.appidge.com
-LICENSE_API_BASE_URL =
+LICENSE_API_BASE_URL = https:/$()/api.appidge.com
 
-// 购买许可证 · Polar Hosted Checkout Link。
-// 空 = 隐藏 App 内购买入口,直到配置好为止。
-LICENSE_CHECKOUT_URL =
+// App 内稳定购买入口指向官网定价页；真实 Polar Checkout 由官网部署配置持有，
+// 日后更换 checkout 无需重新发布 macOS App。
+LICENSE_CHECKOUT_URL = https:/$()/appidge.com/pricing
 
 // Sparkle 自动升级 appcast feed 地址。
 // 默认 = prod,保持当前发布行为不变。

@@ -58,7 +58,9 @@
 集成全量闸门（主 Agent 复跑）：5 Swift 包绿 · SwiftLint strict 0(185 文件) · `xcodebuild App Debug` SUCCEEDED(真实签名) · `pnpm check` 8/8。
 
 ### 待接线（config，非阻塞）
-- 生产需把 `LicenseAPIBaseURL=https://api.appidge.com`（可选 `LicenseCheckoutURL`）注入 App 构建配置/Info.plist；缺失时客户端安全回落 `http://127.0.0.1:8787`（本地 dev，绝不误连生产）。Agent E 未改 Info.plist/project 文件（避 xcodegen 漂移丢 Sparkle），留给集成方/Agent A 接线。
+- Release 已默认注入 `LicenseAPIBaseURL=https://api.appidge.com` 与稳定购买入口
+  `LicenseCheckoutURL=https://appidge.com/pricing`；归档脚本还会显式校验并注入这两个 HTTPS
+  build setting。真实 Polar Checkout 由官网部署配置持有，替换链接无需重发 macOS App。
 - ⚠️ **构建配置漂移警告**：`project.yml` 未含 Sparkle 包（Sparkle 只在 `project.pbxproj` 手工加入）。**不要跑 `xcodegen generate`**，否则会重生成 pbxproj 丢掉 Sparkle。修复方向：把 Sparkle 远程 SPM 包补进 `project.yml` 的 `packages:` 与 App target `dependencies:`，再 `xcodegen generate` 对齐——需人工核对生成结果与现有 pbxproj 一致后再提交。
 
 ## 已解决：SwiftLint strict 预存违规（commit `02f7955`）

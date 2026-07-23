@@ -6,7 +6,11 @@ import type { UpstreamLicenseResult } from "../polar/client";
 import { json } from "../responses";
 import { parseActivate, parseValidate, parseDeactivate } from "../validation";
 import { licenseFingerprint } from "../crypto";
-import { isLocallyRevokedByFingerprint, upsertAppMapping } from "../db";
+import {
+  isLocallyRevokedByFingerprint,
+  isLocallyRevokedByLicenseKeyId,
+  upsertAppMapping,
+} from "../db";
 
 export type LicenseStatus = "active" | "expired" | "revoked";
 
@@ -50,11 +54,16 @@ export async function handleActivate(ctx: AppContext, body: unknown): Promise<Re
   const input = parseActivate(body);
   const result = await ctx.license.activate(input.licenseKey, input.instanceName);
   const validatedAt = isoNoMillis(ctx.now());
-  const status = statusFromUpstream(result);
+  let status = statusFromUpstream(result);
   const fingerprint = await licenseFingerprint(ctx.env.LICENSE_HMAC_PEPPER, input.licenseKey);
   // 惰性登记 fingerprint ↔ license_key_id，供 webhook 精确吊销后 validate 本地-优先命中。
   if (status === "active") {
     await upsertAppMapping(ctx.env.DB, { licenseKeyId: result.licenseKeyId, fingerprint, now: validatedAt });
+    // revoke webhook 可能先于首次 activate 到达，当时本地只有 license_key_id、没有 fingerprint。
+    // 映射写回后必须按上游刚返回的 id 再查一次，不能把一致性窗口内的上游 active 回给客户端。
+    if (await isLocallyRevokedByLicenseKeyId(ctx.env.DB, result.licenseKeyId)) {
+      status = "revoked";
+    }
   }
   ctx.logger.info("license.activate", { fingerprint, status, instanceId: result.instanceId });
   return json(toState(result, status, validatedAt), 200);
@@ -82,10 +91,13 @@ export async function handleValidate(ctx: AppContext, body: unknown): Promise<Re
   }
 
   const result = await ctx.license.validate(input.licenseKey, input.instanceId);
-  const status = statusFromUpstream(result);
+  let status = statusFromUpstream(result);
   // 惰性登记映射（仅上游 active 时），让后续 webhook 吊销能被本地-优先捕获。
   if (status === "active") {
     await upsertAppMapping(ctx.env.DB, { licenseKeyId: result.licenseKeyId, fingerprint, now: validatedAt });
+    if (await isLocallyRevokedByLicenseKeyId(ctx.env.DB, result.licenseKeyId)) {
+      status = "revoked";
+    }
   }
   ctx.logger.info("license.validate", { fingerprint, status, instanceId: input.instanceId });
   return json(toState(result, status, validatedAt), 200);

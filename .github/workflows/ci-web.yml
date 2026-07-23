@@ -24,6 +24,13 @@ jobs:
   check:
     name: pnpm check (lint / typecheck / test / build)
     runs-on: ubuntu-latest
+    env:
+      # Astro 在加载配置时就校验这些公开构建变量；干净 checkout 没有被忽略的 apps/web/.env。
+      PUBLIC_SITE_URL: https://appidge.com
+      # 生产仓库可配置真实 Polar link；fallback 仅为不部署的 CI 静态产物，避免伪装成真实 checkout。
+      PUBLIC_POLAR_CHECKOUT_URL: ${{ vars.PUBLIC_POLAR_CHECKOUT_URL || 'https://checkout.example.invalid/appidge-ci' }}
+      PUBLIC_API_BASE_URL: https://api.appidge.com
+      PUBLIC_DOWNLOAD_URL: https://updates.appidge.com/appidge-latest.dmg
     steps:
       - uses: actions/checkout@v4
 

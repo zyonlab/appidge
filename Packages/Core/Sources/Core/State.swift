@@ -70,8 +70,11 @@ public struct AppState: Sendable, Equatable {
     /// 只有明确的 revoked/expired（及未激活/激活中/可恢复错误）才关闭付费能力。
     public var isLicenseActive: Bool {
         switch licensePhase {
-        case .licensed, .validating, .gracePeriod, .deactivating:
+        case .licensed, .gracePeriod, .deactivating:
             return true
+        case .validating:
+            // expired 记录也允许发起恢复校验，但校验在途不能借 `.validating` 暂时解锁。
+            return license?.status == .active
         case .unlicensed, .activating, .revoked, .expired, .recoverableError:
             return false
         }
@@ -86,10 +89,16 @@ public struct AppState: Sendable, Equatable {
     /// 例行校验间隔，默认每日一次。是否到期由 App 层调度器据此判断。
     public static let licenseValidateInterval: TimeInterval = 24 * 60 * 60
 
-    /// 是否到了该做一次例行校验（有记录、当前放行、距上次成功校验 ≥ 每日间隔）。用参照时刻算，
-    /// 防时钟回拨绕过。App 层调度器据此决定是否 dispatch `.licenseValidateRequested`。
+    /// 是否到了该做一次例行/恢复校验。已授权与 grace 按每日间隔校验；expired 仍保留记录，
+    /// 也必须继续尝试，以便续订或网络恢复后回到 licensed。revoked 永不自动解锁。
     public func isValidateDue(now: Date) -> Bool {
-        guard let info = license, isLicenseActive else { return false }
+        guard let info = license else { return false }
+        switch licensePhase {
+        case .licensed, .gracePeriod, .expired:
+            break
+        case .unlicensed, .activating, .validating, .deactivating, .revoked, .recoverableError:
+            return false
+        }
         return info.referenceNow(now).timeIntervalSince(info.lastValidatedAt) >= Self.licenseValidateInterval
     }
 

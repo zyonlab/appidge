@@ -15,17 +15,17 @@ import {
   upsertActiveEntitlement,
   revokeByLicenseKeyId,
   revokeByOrder,
+  recordRefundTombstone,
 } from "../db";
 import { intVar } from "../env";
+import { readJsonBody } from "../validation";
 
 export async function handleWebhook(ctx: AppContext, req: Request): Promise<Response> {
   const maxBytes = intVar(ctx.env.MAX_BODY_BYTES, 16384);
 
   // 原始字节（验签必须用原始 bytes，不能先反序列化再序列化）
-  const raw = await req.arrayBuffer();
-  if (raw.byteLength > maxBytes) {
-    return errorResponse("invalid_request", 400, "Request body too large");
-  }
+  const body = await readJsonBody(req, maxBytes);
+  const raw = body.bytes;
 
   const webhookId = req.headers.get("webhook-id");
   const ok = await verifyStandardWebhook(
@@ -46,7 +46,7 @@ export async function handleWebhook(ctx: AppContext, req: Request): Promise<Resp
   // 验签通过后才解析
   let payload: unknown;
   try {
-    payload = JSON.parse(new TextDecoder().decode(raw));
+    payload = JSON.parse(body.text);
   } catch {
     return errorResponse("invalid_request", 400, "Malformed JSON body");
   }
@@ -144,11 +144,17 @@ async function dispatch(ctx: AppContext, event: CanonicalEvent, now: string): Pr
       // 兜底：Polar 通常也会发 benefit_grant.revoked 精确吊销；这里按 order 尽力吊销。
       const reason = event.eventType === "order.refunded" ? "refund" : "refund";
       if (event.orderId) {
+        // 先保存退款事实，再更新已有 entitlement。若 grant 尚未来，后续 grant 的原子 upsert
+        // 会命中 tombstone 并直接创建 revoked；不能把 0 行 UPDATE 当成已完成后丢掉退款。
+        await recordRefundTombstone(ctx.env.DB, {
+          orderId: event.orderId,
+          reason,
+          sourceEventId: event.eventId,
+          now,
+        });
         const affected = await revokeByOrder(ctx.env.DB, { orderId: event.orderId, reason, now });
         if (affected === 0) {
-          // 该 order 尚无本地 entitlement 行（refund 先于 grant，或用户从未激活）：
-          // 依赖随后到达的 benefit_grant.revoked 或上游 validate 自动 revoked，不凭模糊字段吊销。
-          ctx.logger.warn("webhook.revoke_unmapped", { eventId: event.eventId, reason });
+          ctx.logger.info("webhook.refund_tombstoned", { eventId: event.eventId, reason });
         }
         return;
       }

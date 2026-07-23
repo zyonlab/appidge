@@ -96,7 +96,7 @@ struct AppidgeApp: App {
         let processIdentityResolver: any LocalProcessIdentityResolving = LibprocSecCodeProcessIdentityResolver()
         // 授权 effect 处理器：注入真实 API 客户端 / Keychain / 时钟（协议边界，测试用 mock）。
         // 与转发/路由完全独立——授权 effect 只经这里，绝不触碰网络接管路径。openCheckout 打开
-        // Polar Hosted Checkout 链接（v1 无浏览器回跳，用户从邮件复制 key 回来激活）。
+        // 稳定购买入口（Release 默认官网定价页，由官网再跳真实 Polar Checkout）。
         let licenseHandler = LicenseEffectHandler.makeProduction(openCheckout: { url in
             guard let checkoutURL = URL(string: url) else { return }
             Task { @MainActor in NSWorkspace.shared.open(checkoutURL) }
@@ -125,7 +125,9 @@ struct AppidgeApp: App {
     var body: some Scene {
         WindowGroup(id: "main") {
             Group {
-                if store.state.hasCompletedOnboarding {
+                if !store.state.isLicenseActive {
+                    LicenseGateView(store: store)
+                } else if store.state.hasCompletedOnboarding {
                     MainWindow(store: store, profiles: profilesModel, tabSelection: tabSelection)
                 } else {
                     OnboardingView(store: store)
@@ -142,8 +144,10 @@ struct AppidgeApp: App {
                     // 扩展获批(.active)后,必须由 app 侧启动透明代理会话,系统才会把流量交给 provider。
                     // 起会话绑到当前 active 的 provider;升级窗口里若绑到旧的,靠版本握手在新 provider
                     // 确认接管后重绑一次(见 maybeHealStaleBinding)。
-                    if case .active = activation {
-                        Task { await TransparentProxyController.start() }
+                    if case .active = activation,
+                       store.state.isLicenseActive,
+                       store.state.hasCompletedOnboarding {
+                        TransparentProxyController.start()
                     }
                 }
                 SystemExtensionActivator.shared.diagnose() // 启动即打印 app 看到的扩展目录(排查 not-found)
@@ -172,6 +176,11 @@ struct AppidgeApp: App {
                         if store.state.isValidateDue(now: now) {
                             store.dispatch(.licenseValidateRequested(now: now))
                         }
+                    }
+                    if Self.shouldSynchronizeLicenseCapability(
+                        for: action, isActive: store.state.isLicenseActive
+                    ) {
+                        synchronizeLicenseCapability()
                     }
                     guard Self.isPersistenceRelevant(action) else { return }
                     // 立即同步落盘(去掉 400ms 防抖):每次改动一发生就在磁盘上,crash / 强杀也不丢。
@@ -205,9 +214,9 @@ struct AppidgeApp: App {
                 // 尝试起会话一次(不依赖 activate() 的 .completed 回调,旧版本它可能不回)。
                 SystemExtensionActivator.shared.checkStatus { state in
                     if case .disabled = state { return }
-                    if store.state.hasCompletedOnboarding {
+                    if store.state.hasCompletedOnboarding && store.state.isLicenseActive {
                         SystemExtensionActivator.shared.activate()
-                        Task { await TransparentProxyController.start() }
+                        TransparentProxyController.start()
                     }
                 }
             }
@@ -257,6 +266,7 @@ struct AppidgeApp: App {
     /// 版本握手自愈「升级后会话绑死旧 provider=黑洞」:运行==包内且曾见不匹配→重绑一次;运行≠包内【持续】=死锁→延迟8s后做一次有界重启逼 NE 换到最新 provider(只一次防旧 bug 无限环,仍不行留手动「重启接管」兜底)。
     @MainActor
     private func maybeHealStaleBinding() {
+        guard store.state.isLicenseActive, store.state.hasCompletedOnboarding else { return }
         guard let running = store.state.runningExtensionVersion,
               let bundled = store.state.bundledExtensionVersion else { return }
         if running != bundled {
@@ -266,15 +276,17 @@ struct AppidgeApp: App {
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(8))
                 guard let r = store.state.runningExtensionVersion,
-                      let b = store.state.bundledExtensionVersion, r != b else { return }
+                      let b = store.state.bundledExtensionVersion, r != b,
+                      store.state.isLicenseActive,
+                      store.state.hasCompletedOnboarding else { return }
                 reboundAfterUpgrade = true
-                await TransparentProxyController.restart()
+                TransparentProxyController.restart()
             }
             return
         }
         guard sawExtensionMismatch, !reboundAfterUpgrade else { return }
         reboundAfterUpgrade = true
-        Task { await TransparentProxyController.restart() }
+        TransparentProxyController.restart()
     }
 
     /// 启动时把上次保存的配置（扫描到的目录、分配过规则的进程、是否已完成引导）
@@ -322,6 +334,41 @@ struct AppidgeApp: App {
         }
     }
 
+    /// 授权相位变化后，把真实透明代理会话同步到 capability gate。有效/宽限授权且已走完引导
+    /// 才允许安装并启动；未激活、吊销、过期或停用成功都立即停止会话，保留设置/诊断恢复出口。
+    private static func shouldSynchronizeLicenseCapability(
+        for action: Core.Action, isActive: Bool
+    ) -> Bool {
+        switch action {
+        case .licenseActivateSucceeded, .licenseActivateFailed,
+             .licenseValidateSucceeded, .licenseValidateFailed,
+             .licenseDeactivateSucceeded, .licenseRestored:
+            return true
+        case .licenseClockTick:
+            // 每小时 tick 只在它刚关闭 capability 时停会话；有效授权不重复 activate/start。
+            return !isActive
+        default:
+            return false
+        }
+    }
+
+    @MainActor
+    private func synchronizeLicenseCapability() {
+        guard store.state.isLicenseActive, store.state.hasCompletedOnboarding else {
+            TransparentProxyController.stop()
+            return
+        }
+        SystemExtensionActivator.shared.checkStatus { state in
+            guard store.state.isLicenseActive, store.state.hasCompletedOnboarding else {
+                TransparentProxyController.stop()
+                return
+            }
+            if case .disabled = state { return }
+            SystemExtensionActivator.shared.activate()
+            TransparentProxyController.start()
+        }
+    }
+
     @MainActor
     private func persistCurrentConfiguration() {
         // 配置 JSON **同步立即**落盘——改动一发生就在磁盘上,crash / 强杀不丢(退出钩子同一条路径)。
@@ -341,7 +388,7 @@ struct AppidgeApp: App {
     ) async -> Core.Action? {
         switch effect {
         case .activateLicense, .validateLicense, .deactivateLicense,
-             .persistLicense, .loadPersistedLicense, .openCheckout:
+             .persistLicense, .clearPersistedLicense, .loadPersistedLicense, .openCheckout:
             return await licenseHandler.handle(effect)
         case .log:
             return nil
@@ -378,7 +425,12 @@ struct AppidgeApp: App {
         case .applyUDPPolicy(let policy):
             return ProxyConfigMapping.udpPolicyMessage(policy)
         case .applyProcessOriginExclusions(let direct, let hardBypass):
-            return ProxyConfigMapping.processOriginExclusionsMessage(direct: direct, hardBypass: hardBypass)
+            let hostBundle = Bundle.main.bundleURL.resolvingSymlinksInPath().standardizedFileURL.path
+            return ProxyConfigMapping.processOriginExclusionsMessage(
+                direct: direct,
+                hardBypass: hardBypass,
+                hostAppBundlePath: hostBundle
+            )
         default:
             return nil
         }

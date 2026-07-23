@@ -5,6 +5,7 @@ import { ctxWith, resetSchema, fixedClock, jsonPost } from "./helpers";
 import { licenseFingerprint } from "../src/crypto";
 import { revokeByLicenseKeyId } from "../src/db";
 import { FixedWindowRateLimiter } from "../src/ratelimit";
+import { MockPolarClient } from "../src/polar/mock";
 import activateSuccess from "../../../contracts/fixtures/facade/activate.success.json";
 import errorActivationLimit from "../../../contracts/fixtures/facade/error.activation_limit.json";
 
@@ -82,6 +83,26 @@ describe("POST /v1/licenses/activate", () => {
     expect(res.status).toBe(502);
     expect(await res.json()).toMatchObject({ error: "upstream_unavailable" });
   });
+
+  it("revoke webhook BEFORE first activate still overrides an upstream active result", async () => {
+    const licenseKey = "MOCK-LICENSE-0000-0000-0000";
+    const upstream = await new MockPolarClient().validate(licenseKey, "inst_probe");
+    await revokeByLicenseKeyId(env.DB, {
+      licenseKeyId: upstream.licenseKeyId,
+      orderId: "ord_before_activate",
+      reason: "refund",
+      sourceEventId: "evt_before_activate",
+      now: CLOCK,
+    });
+
+    const res = await call("/v1/licenses/activate", {
+      licenseKey,
+      instanceName: "appidge-install-test",
+      appVersion: "1.0.0",
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ status: "revoked" });
+  });
 });
 
 describe("POST /v1/licenses/validate", () => {
@@ -142,6 +163,23 @@ describe("POST /v1/licenses/validate", () => {
     const r2 = await call("/v1/licenses/validate", body);
     expect(r2.status).toBe(200);
     expect((await r2.json() as { status: string }).status).toBe("revoked");
+  });
+
+  it("revoke webhook BEFORE first validate is rechecked after license_key_id mapping", async () => {
+    const licenseKey = "MOCK-LICENSE-0000-0000-0000";
+    const instanceId = "inst_MOCK_0000000000";
+    const upstream = await new MockPolarClient().validate(licenseKey, instanceId);
+    await revokeByLicenseKeyId(env.DB, {
+      licenseKeyId: upstream.licenseKeyId,
+      orderId: "ord_before_validate",
+      reason: "refund",
+      sourceEventId: "evt_before_validate",
+      now: CLOCK,
+    });
+
+    const res = await call("/v1/licenses/validate", { licenseKey, instanceId, appVersion: "1.0.0" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ status: "revoked" });
   });
 });
 
@@ -228,6 +266,34 @@ describe("input validation & abuse guards", () => {
       appVersion: "1.0.0",
     });
     expect(res.status).toBe(400);
+  });
+
+  it("streamed oversize body without Content-Length stops reading at the configured limit", async () => {
+    let cancelled = false;
+    let pulls = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls += 1;
+        if (pulls <= 4) {
+          controller.enqueue(new Uint8Array(6000));
+        } else {
+          controller.close();
+        }
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const req = new Request("https://api.appidge.com/v1/licenses/activate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: stream,
+    });
+    const res = await handleRequest(req, ctxWith({ now: fixedClock(CLOCK) }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: "invalid_request" });
+    expect(cancelled).toBe(true);
+    expect(pulls).toBeLessThanOrEqual(3);
   });
 
   it("rate limit path → rate_limited (429)", async () => {

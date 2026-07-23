@@ -7,6 +7,7 @@ export async function resetSchema(): Promise<void> {
   // 先清（若存在）再建，确保干净。
   await env.DB.prepare("DROP TABLE IF EXISTS webhook_events").run();
   await env.DB.prepare("DROP TABLE IF EXISTS entitlements").run();
+  await env.DB.prepare("DROP TABLE IF EXISTS refund_tombstones").run();
   for (const stmt of env.TEST_DDL) {
     await env.DB.prepare(stmt).run();
   }

@@ -3,12 +3,12 @@ info:
   title: Appidge Licensing Facade API
   version: 1.0.0
   description: >-
-    App ↔ Worker 之间的唯一契约。macOS 客户端只调用本 facade（api.appidge.app），
+    App ↔ Worker 之间的唯一契约。macOS 客户端只调用本 facade（api.appidge.com），
     绝不直连带 Bearer token 的 Polar API。Worker 在服务端持有 Polar access token 并转译，
     对客户端稳定化状态与错误，不透传 Polar 内部响应。
     本文件是语言边界真相：Swift DTO 与 TypeScript DTO 都以此为准，配合 contracts/fixtures 做契约测试。
 servers:
-  - url: https://api.appidge.app
+  - url: https://api.appidge.com
     description: 生产
   - url: http://127.0.0.1:8787
     description: 本地 wrangler dev（MOCK_MODE 默认开）

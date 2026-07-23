@@ -29,11 +29,11 @@
 	<key>SUFeedURL</key>
 	<string>$(SPARKLE_FEED_URL)</string>
 	<!-- License facade · Worker API base URL。构建期由 LICENSE_API_BASE_URL 注入;
-	     为空时 Swift 层(LicenseBuildConfig.apiBaseURL)回退到 http://127.0.0.1:8787 本地开发。 -->
+	     Release 默认值见 Config/AppConfig.xcconfig，本地开发可显式覆盖。 -->
 	<key>LicenseAPIBaseURL</key>
 	<string>$(LICENSE_API_BASE_URL)</string>
-	<!-- 购买许可证 · Polar Hosted Checkout Link。构建期由 LICENSE_CHECKOUT_URL 注入;
-	     为空时 App 内购买入口隐藏。 -->
+	<!-- 稳定购买入口。Release 默认指向官网定价页，由官网再跳真实 Polar Checkout;
+	     构建期可用 LICENSE_CHECKOUT_URL 覆盖。 -->
 	<key>LicenseCheckoutURL</key>
 	<string>$(LICENSE_CHECKOUT_URL)</string>
 	<!-- Sparkle EdDSA(ed25519)更新签名公钥。由 Sparkle generate_keys 生成的密钥对之公钥;

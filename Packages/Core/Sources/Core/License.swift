@@ -247,3 +247,10 @@ public enum LicenseValidationFailure: String, Sendable, Equatable {
     /// 暂时性 → 进入离线宽限，绝不锁定。
     case transient
 }
+
+/// Keychain 持久化操作类型。清除失败与普通保存失败的安全含义不同：停用后的清除必须确保
+/// 旧 active 记录不会在下次启动复活，因此 action 需要保留操作类别供 reducer/日志明确处理。
+public enum LicensePersistenceOperation: String, Sendable, Equatable {
+    case save
+    case clear
+}

@@ -52,6 +52,8 @@ public struct LicenseEffectHandler: Sendable {
             return await deactivate(licenseKey: key, instanceId: instanceId)
         case .persistLicense(let info):
             return await persist(info)
+        case .clearPersistedLicense(let fallback):
+            return await clearPersistedLicense(fallback: fallback)
         case .loadPersistedLicense:
             return await load()
         case .openCheckout(let url):
@@ -101,7 +103,28 @@ public struct LicenseEffectHandler: Sendable {
             return nil
         } catch {
             // 写盘失败不致命：保持本会话已授权，不锁用户（reducer 对该 action 只记日志）。
-            return .licensePersistenceFailed
+            return .licensePersistenceFailed(info == nil ? .clear : .save)
+        }
+    }
+
+    /// 上游已确认停用后，不能直接删除旧 active blob：删除若失败，下次启动会把它复活。
+    /// 先用原子 save 覆盖成 revoked tombstone，再尝试删除；删除失败也只会恢复 revoked。
+    /// 若 tombstone 写入失败仍继续尝试删除，任一路成功都能阻止旧 active 记录恢复。
+    private func clearPersistedLicense(fallback: LicenseInfo?) async -> Core.Action? {
+        if let fallback {
+            do {
+                try await keychain.saveLicense(fallback)
+            } catch {
+                // 继续尝试 delete；暂时不返回，避免错过另一条可成功的安全路径。
+            }
+        }
+        do {
+            try await keychain.clearLicense()
+            return nil
+        } catch {
+            // tombstone 已写成功时虽然物理删除失败，但安全状态已持久化；仍回报 clear 失败供诊断。
+            // 两步都失败时同样显式上报，绝不静默假装已清理。
+            return .licensePersistenceFailed(.clear)
         }
     }
 

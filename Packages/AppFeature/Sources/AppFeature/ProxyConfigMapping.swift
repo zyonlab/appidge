@@ -39,13 +39,15 @@ public enum ProxyConfigMapping {
     /// 消息。`Set` 无序,wire 上用 `[String]` 承载(和其它列表型 DTO 一致),顺序不作约定。
     public static func processOriginExclusionsMessage(
         direct: Core.OriginExclusionDiscovery,
-        hardBypass: Core.OriginExclusionDiscovery
+        hardBypass: Core.OriginExclusionDiscovery,
+        hostAppBundlePath: String? = nil
     ) -> IPCContract.AppToExtensionMessage {
         .applyProcessOriginExclusions(IPCContract.ProcessOriginExclusionMessage(
             identifiers: Array(direct.identifiers),
             executablePaths: Array(direct.executablePaths),
             hardBypassIdentifiers: Array(hardBypass.identifiers),
-            hardBypassExecutablePaths: Array(hardBypass.executablePaths)
+            hardBypassExecutablePaths: Array(hardBypass.executablePaths),
+            hostAppBundlePath: hostAppBundlePath
         ))
     }
 

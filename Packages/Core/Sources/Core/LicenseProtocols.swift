@@ -19,7 +19,7 @@ public protocol LicenseKeychainStore: Sendable {
     func clearLicense() async throws
 }
 
-/// license facade 客户端——**可注入**。只调用自有 Worker facade（api.appidge.app），
+/// license facade 客户端——**可注入**。只调用自有 Worker facade（api.appidge.com），
 /// **绝不**直连带 `Bearer token` 的 Polar API。返回 `Result`，错误统一为 ``LicenseAPIError``
 /// （网络/服务器/解码/结构化 facade 错误码），网络→失败归类的翻译在 AppFeature 侧完成。
 public protocol LicenseAPIClient: Sendable {

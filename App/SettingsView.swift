@@ -15,8 +15,8 @@ enum SystemSettingsOpener {
 /// 内置规则说明。这些是「全局、少改」的项,从主窗口移到这里,让主窗口专注连接监视。
 struct SettingsView: View {
     var store: Store
-    /// 界面语言。默认英文;改动写入 AppleLanguages 并重启 app 生效(见 `LanguageBootstrap`)。
-    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = .english
+    /// 界面语言。首次默认与 `LanguageBootstrap` 同源跟随系统；改动写入 AppleLanguages 并重启。
+    @AppStorage(AppLanguage.storageKey) private var appLanguage: AppLanguage = AppLanguage.defaultLanguage
 
     var body: some View {
         Form {
@@ -53,6 +53,7 @@ struct SettingsView: View {
                         if !store.state.extensionActivation.isRunning {
                             Button("启用") { SystemExtensionActivator.shared.activate() }
                                 .controlSize(.small)
+                                .disabled(!store.state.isLicenseActive)
                             Button("打开系统设置") { SystemSettingsOpener.openExtensionsPane() }
                                 .controlSize(.small)
                         }
@@ -88,13 +89,14 @@ struct SettingsView: View {
                 LabeledContent("恢复出口") {
                     HStack(spacing: 8) {
                         Button("重启接管") {
-                            Task { await TransparentProxyController.restart() }
+                            TransparentProxyController.restart()
                         }
+                        .disabled(!store.state.isLicenseActive)
                         Button("停止接管") {
-                            Task { await TransparentProxyController.stop() }
+                            TransparentProxyController.stop()
                         }
                         Button("重置（移除代理配置）", role: .destructive) {
-                            Task { await TransparentProxyController.reset() }
+                            TransparentProxyController.reset()
                         }
                     }
                     .controlSize(.small)
@@ -116,6 +118,7 @@ struct SettingsView: View {
                     Text("直连放行").tag(UDPPolicy.direct)
                     Text("SOCKS5 代理").tag(UDPPolicy.proxySOCKS5)
                 }
+                .disabled(!store.state.isLicenseActive)
                 Text(Self.udpHint(store.state.udpPolicy))
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -126,6 +129,7 @@ struct SettingsView: View {
                     get: { store.state.isPacketCaptureEnabled },
                     set: { store.dispatch(.setPacketCaptureEnabled($0)) }
                 ))
+                .disabled(!store.state.isLicenseActive)
                 Text("开启后逐连接把原始字节写进 App Group 容器的 captures/*.dmp（占磁盘、涉隐私）。")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -192,7 +196,7 @@ struct SettingsView: View {
 }
 
 /// 「许可证」设置面板。**只读 State、只 dispatch Action**——网络与 Keychain 都在 Store 的
-/// effect handler（注入协议）里，View 不碰。购买只打开 Hosted Checkout；v1 用户从 Polar 邮件
+/// effect handler（注入协议）里，View 不碰。购买只打开官网/Hosted Checkout；v1 用户从 Polar 邮件
 /// 复制 key 回来粘贴激活，无浏览器回跳自动灌 key。授权服务故障绝不阻塞其它设置或接管路径。
 struct LicenseSettingsView: View {
     var store: Store
@@ -257,6 +261,9 @@ struct LicenseSettingsView: View {
             let trimmed = keyInput.trimmingCharacters(in: .whitespacesAndNewlines)
             Button("激活") { store.dispatch(.licenseActivateRequested(licenseKey: trimmed)) }
                 .disabled(trimmed.count < 8 || store.state.licensePhase == .activating)
+            if store.state.licensePhase == .expired, store.state.license != nil {
+                Button("重新校验") { store.dispatch(.licenseValidateRequested(now: Date())) }
+            }
             if !LicenseBuildConfig.checkoutURL.isEmpty {
                 Button("购买许可证") { store.dispatch(.licensePurchaseRequested(checkoutURL: LicenseBuildConfig.checkoutURL)) }
             }
@@ -305,6 +312,85 @@ struct LicenseSettingsView: View {
         case "activationLimit": "激活名额已用尽：请在其它设备「本机停用」后再试，或联系支持。"
         case "invalidLicense": "license key 无效：请核对是否从 Polar 邮件完整复制。"
         default: "暂时无法连接授权服务，请检查网络后重试。"
+        }
+    }
+}
+
+/// 未授权时的主窗口 capability gate。它只暴露激活、恢复校验、购买与设置入口；代理启动、
+/// 规则编辑和其它付费界面完全不构建，避免仅靠按钮约定造成绕过。
+struct LicenseGateView: View {
+    var store: Store
+    @State private var keyInput = ""
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Image("PigeonLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 88, height: 88)
+                .accessibilityLabel("appidge")
+            Text("激活 Appidge").font(.title2).bold()
+            Text(statusText)
+                .foregroundStyle(statusColor)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 460)
+
+            TextField("粘贴 license key", text: $keyInput)
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: 420)
+                .disabled(store.state.licensePhase == .activating)
+
+            HStack(spacing: 10) {
+                let trimmed = keyInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                Button("激活") {
+                    store.dispatch(.licenseActivateRequested(licenseKey: trimmed))
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(trimmed.count < 8 || store.state.licensePhase == .activating)
+
+                if store.state.licensePhase == .expired, store.state.license != nil {
+                    Button("重新校验") {
+                        store.dispatch(.licenseValidateRequested(now: Date()))
+                    }
+                    .disabled(store.state.licensePhase == .validating)
+                }
+
+                if !LicenseBuildConfig.checkoutURL.isEmpty {
+                    Button("购买许可证") {
+                        store.dispatch(.licensePurchaseRequested(checkoutURL: LicenseBuildConfig.checkoutURL))
+                    }
+                }
+            }
+
+            if store.state.licensePhase == .activating || store.state.licensePhase == .validating {
+                ProgressView().controlSize(.small)
+            }
+
+            Button("打开设置与恢复工具") { openSettings() }
+                .buttonStyle(.link)
+        }
+        .padding(40)
+        .frame(minWidth: 560, minHeight: 460)
+    }
+
+    private var statusText: LocalizedStringKey {
+        switch store.state.licensePhase {
+        case .unlicensed: "输入购买后获得的许可证密钥，激活后才能启动网络接管与编辑规则。"
+        case .activating: "正在激活许可证…"
+        case .revoked: "此许可证已被吊销。你可以输入新的许可证密钥，或联系支持。"
+        case .expired: "许可证已过期或离线宽限已耗尽。联网后可重新校验，续订后会恢复。"
+        case .recoverableError: "激活未完成，请检查密钥或网络后重试。"
+        case .validating: "正在重新校验许可证…"
+        case .licensed, .gracePeriod, .deactivating: "许可证已激活。"
+        }
+    }
+
+    private var statusColor: Color {
+        switch store.state.licensePhase {
+        case .revoked, .expired: .red
+        case .recoverableError: .orange
+        default: .secondary
         }
     }
 }

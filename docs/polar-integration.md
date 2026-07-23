@@ -31,7 +31,8 @@ Creem 的死结：webhook 不带 license、license API 不回 order → 无公�
 - LicenseKeyStatus 枚举：**`granted` / `revoked` / `disabled`**。facade 映射：`granted`→active（除非 `expires_at` 已过→expired）；`revoked`/`disabled`→revoked。
 
 ## 3. 结账
-- **Hosted Checkout Link（推荐起步，无代码）**：Product 上挂 checkout link，app「购买」按钮 → `NSWorkspace.open(url)`。官网同链接。
+- **Hosted Checkout Link（推荐起步，无代码）**：Product 上挂 checkout link；官网持有真实链接，
+  App「购买」按钮打开稳定的官网定价页，避免 Polar link 变化时必须重发 App。
 - **key 送达**：购买确认邮件 + **Polar 客户门户（customer portal）**。v1 不做浏览器回跳自动灌 key —— 用户从邮件/门户复制 key 回 App 粘贴激活。
 
 ## 4. License API（组织级端点，核心）
@@ -68,7 +69,7 @@ Creem 的死结：webhook 不带 license、license API 不回 order → 无公�
 ## 7. 后台准备清单（人工闸门）
 - [ ] 注册 Polar，创建 organization，拿 **organization_id**。
 - [ ] 建 Product（买断/订阅），挂 **License Keys benefit**，设 `limit_activations`。
-- [ ] 拿该产品 **Hosted Checkout Link**（填官网 `PUBLIC_POLAR_CHECKOUT_URL` 与 App 构建配置）。
+- [ ] 拿该产品 **Hosted Checkout Link**（填官网部署的 `PUBLIC_POLAR_CHECKOUT_URL`；App 固定打开官网定价页）。
 - [ ] 建 **organization access token**（`polar_oat_`）→ `wrangler secret put POLAR_ACCESS_TOKEN`。
 - [ ] 配 Webhook endpoint（指向 `/v1/webhooks/polar`），记 secret → `wrangler secret put POLAR_WEBHOOK_SECRET`。
 - [ ] 填 `POLAR_ORGANIZATION_ID` / `POLAR_PRODUCT_ID` / `POLAR_BENEFIT_ID`（wrangler [vars]）。

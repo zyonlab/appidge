@@ -15,7 +15,44 @@ export async function readJsonBody(req: Request, maxBytes: number): Promise<RawR
   if (!/^application\/json\b/i.test(ct)) {
     throw new ApiError("invalid_request", "Content-Type must be application/json");
   }
-  const bytes = await req.arrayBuffer();
+  const declaredLength = req.headers.get("content-length");
+  if (declaredLength !== null) {
+    const parsed = Number.parseInt(declaredLength, 10);
+    if (Number.isFinite(parsed) && parsed > maxBytes) {
+      throw new ApiError("invalid_request", "Request body too large");
+    }
+  }
+
+  const reader = req.body?.getReader();
+  if (!reader) {
+    const bytes = new ArrayBuffer(0);
+    return { bytes, text: "" };
+  }
+
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      try {
+        await reader.cancel("request body too large");
+      } catch {
+        // cancel 是尽力而为；无论底层是否接受取消，都立即停止继续读取。
+      }
+      throw new ApiError("invalid_request", "Request body too large");
+    }
+    chunks.push(value);
+  }
+
+  const combined = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    combined.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  const bytes = combined.buffer;
   if (bytes.byteLength > maxBytes) {
     throw new ApiError("invalid_request", "Request body too large");
   }

@@ -124,6 +124,9 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     // **完全旁路档**(环检测自愈加入):数据通路彻底不接管。环命中说明直连档不够,降到最保守。
     private var storedHardBypassIdentifiers: Set<String> = []
     private var storedHardBypassPaths: Set<String> = []
+    // 主 App 经 XPC 下发的真实 .app 根路径。安装后的系统扩展位于 /Library/SystemExtensions，
+    // 无法从 Bundle.main 向上找到宿主；Sparkle helper 的 bundle-path bypass 必须用这条路径。
+    private var storedHostAppBundlePath: String?
     // 观测事件的合并+节流:本地代理的高频短连接观测按 (进程×目标) 确定性 id upsert + 同目标
     // 每 2s 最多一条,避免 app 侧连接表被洪流驱动重排(见 EngineKit.ObserveCoalescer)。锁保护。
     // 非 private:emitObservedFlow 在同 target 的跨文件 extension 里访问(同其它 stored 成员先例)。
@@ -168,6 +171,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     /// **完全旁路档**(环检测自愈):数据通路彻底不接管。
     var hardBypassIdentifiers: Set<String> { configLock.withLock { storedHardBypassIdentifiers } }
     var hardBypassPaths: Set<String> { configLock.withLock { storedHardBypassPaths } }
+    var hostAppBundlePath: String? { configLock.withLock { storedHostAppBundlePath } }
 
     /// 自身 ∪ 本地代理 ∪ 完全旁路的并集——UDP 路径用这个"全排除"语义(本地代理/被旁路进程的
     /// UDP 一律放行直连)。TCP 的 `resolveDecision` 用上面分开的各档,不用这两个。
@@ -276,12 +280,14 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             storedDynamicOriginExclusionPaths = Set(message.executablePaths)
             storedHardBypassIdentifiers = Set(message.hardBypassIdentifiers)
             storedHardBypassPaths = Set(message.hardBypassExecutablePaths)
+            storedHostAppBundlePath = message.hostAppBundlePath
         }
         ExtDiag.log(
             "applyProcessOriginExclusions received: direct=\(message.identifiers.joined(separator: ","))"
             + "/\(message.executablePaths.joined(separator: ",")) "
             + "hardBypass=\(message.hardBypassIdentifiers.joined(separator: ","))"
             + "/\(message.hardBypassExecutablePaths.joined(separator: ","))"
+            + " hostAppBundle=\(message.hostAppBundlePath ?? "-")"
         )
     }
 

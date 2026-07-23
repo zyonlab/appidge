@@ -12,15 +12,29 @@ import type { LicenseClient, UpstreamLicenseResult } from "./client";
 const TIMEOUT_MS = 8000;
 
 // Polar LicenseKeyStatus：granted | revoked | disabled。
-// granted → active（除非 expires_at 已过 → expired）；revoked/disabled/未知 → inactive（facade → revoked）。
-function normalizeStatus(rawStatus: unknown, expiresAt: string | null, nowMs: number): UpstreamLicenseResult["status"] {
-  const s = String(rawStatus ?? "").toLowerCase();
-  if (expiresAt) {
+// 只有明确 revoked/disabled 才能形成不可逆的本地吊销；缺失/未知状态属于上游契约漂移，
+// 必须按 transient failure 进入客户端宽限，绝不能误翻成 revoked。
+export function normalizeStatus(
+  rawStatus: unknown,
+  expiresAt: string | null,
+  nowMs: number,
+): UpstreamLicenseResult["status"] {
+  if (typeof rawStatus !== "string") {
+    throw new ApiError("upstream_unavailable", "Malformed upstream response");
+  }
+  const s = rawStatus.toLowerCase();
+  if (s !== "granted" && s !== "revoked" && s !== "disabled") {
+    throw new ApiError("upstream_unavailable", "Unknown upstream license status");
+  }
+  if (expiresAt !== null) {
     const t = Date.parse(expiresAt);
-    if (Number.isFinite(t) && t <= nowMs) return "expired";
+    if (!Number.isFinite(t)) {
+      throw new ApiError("upstream_unavailable", "Malformed upstream response");
+    }
+    if (t <= nowMs) return "expired";
   }
   if (s === "granted") return "active";
-  return "inactive"; // revoked / disabled / 未知
+  return "inactive"; // 仅明确 revoked / disabled
 }
 
 // Polar LicenseKeyRead（validate 直接返回；activate 嵌在 .license_key）。
@@ -96,10 +110,13 @@ export class HttpPolarClient implements LicenseClient {
 
   private lkToResult(lk: PolarLicenseKey, fallbackInstance: string): UpstreamLicenseResult {
     const expiresAt = lk.expires_at ?? null;
+    if (typeof lk.id !== "string" || lk.id.length === 0) {
+      throw new ApiError("upstream_unavailable", "Malformed upstream response");
+    }
     return {
       status: normalizeStatus(lk.status, expiresAt, this.now().getTime()),
       instanceId: lk.activation?.id ?? fallbackInstance,
-      licenseKeyId: lk.id ?? "",
+      licenseKeyId: lk.id,
       expiresAt,
       activations: typeof lk.usage === "number" ? lk.usage : 0,
       activationLimit: lk.limit_activations === undefined ? null : lk.limit_activations,
@@ -107,12 +124,19 @@ export class HttpPolarClient implements LicenseClient {
   }
 
   async activate(licenseKey: string, instanceName: string): Promise<UpstreamLicenseResult> {
-    const j = (await this.call("/v1/license-keys/activate", {
+    const raw = await this.call("/v1/license-keys/activate", {
       key: licenseKey,
       organization_id: this.organizationId,
       label: instanceName,
-    })) as PolarActivation;
-    const lk = j.license_key ?? {};
+    });
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+      throw new ApiError("upstream_unavailable", "Malformed upstream response");
+    }
+    const j = raw as PolarActivation;
+    if (typeof j.license_key !== "object" || j.license_key === null || Array.isArray(j.license_key)) {
+      throw new ApiError("upstream_unavailable", "Malformed upstream response");
+    }
+    const lk = j.license_key;
     const result = this.lkToResult(lk, j.id ?? "");
     // activate 的 activation id 在顶层 .id；license_key_id 在顶层或 lk.id。
     result.instanceId = j.id ?? result.instanceId;
@@ -121,12 +145,15 @@ export class HttpPolarClient implements LicenseClient {
   }
 
   async validate(licenseKey: string, instanceId: string): Promise<UpstreamLicenseResult> {
-    const j = (await this.call("/v1/license-keys/validate", {
+    const raw = await this.call("/v1/license-keys/validate", {
       key: licenseKey,
       organization_id: this.organizationId,
       activation_id: instanceId,
-    })) as PolarLicenseKey;
-    return this.lkToResult(j, instanceId);
+    });
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+      throw new ApiError("upstream_unavailable", "Malformed upstream response");
+    }
+    return this.lkToResult(raw as PolarLicenseKey, instanceId);
   }
 
   async deactivate(licenseKey: string, instanceId: string): Promise<void> {

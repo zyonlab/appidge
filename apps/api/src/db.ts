@@ -27,6 +27,14 @@ export interface WebhookEventRow {
   processed_at: string | null;
 }
 
+export interface RefundTombstoneRow {
+  order_id: string;
+  reason: string;
+  source_event_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // 登记 webhook 事件；返回它在本次是否为「新登记」（用于决定是否执行副作用）。
 // 已存在且 processed=1 → 幂等重复，返回 { isNew:false, alreadyProcessed:true }。
 // 已存在但 processed=0 → 上次副作用未完成，允许安全重试。
@@ -75,14 +83,37 @@ export async function upsertActiveEntitlement(
     .prepare(
       `INSERT INTO entitlements
          (license_key_id, license_fingerprint, order_id, customer_id, benefit_id, product_id, status, reason, source_event_id, created_at, updated_at)
-       VALUES (?, NULL, ?, ?, ?, ?, 'active', 'grant', ?, ?, ?)
+       VALUES (
+         ?, NULL, ?, ?, ?, ?,
+         CASE
+           WHEN ? IS NOT NULL AND EXISTS (
+             SELECT 1 FROM refund_tombstones WHERE order_id = ?
+           ) THEN 'revoked'
+           ELSE 'active'
+         END,
+         CASE
+           WHEN ? IS NOT NULL THEN COALESCE(
+             (SELECT reason FROM refund_tombstones WHERE order_id = ?),
+             'grant'
+           )
+           ELSE 'grant'
+         END,
+         ?, ?, ?
+       )
        ON CONFLICT(license_key_id) DO UPDATE SET
          order_id    = COALESCE(excluded.order_id, entitlements.order_id),
          customer_id = COALESCE(excluded.customer_id, entitlements.customer_id),
          benefit_id  = COALESCE(excluded.benefit_id, entitlements.benefit_id),
          product_id  = COALESCE(excluded.product_id, entitlements.product_id),
-         status      = CASE WHEN entitlements.status = 'revoked' THEN 'revoked' ELSE 'active' END,
-         reason      = CASE WHEN entitlements.status = 'revoked' THEN entitlements.reason ELSE 'grant' END,
+         status      = CASE
+           WHEN entitlements.status = 'revoked' OR excluded.status = 'revoked' THEN 'revoked'
+           ELSE 'active'
+         END,
+         reason      = CASE
+           WHEN entitlements.status = 'revoked' THEN entitlements.reason
+           WHEN excluded.status = 'revoked' THEN excluded.reason
+           ELSE 'grant'
+         END,
          updated_at  = excluded.updated_at`,
     )
     .bind(
@@ -91,6 +122,10 @@ export async function upsertActiveEntitlement(
       e.customerId ?? null,
       e.benefitId ?? null,
       e.productId ?? null,
+      e.orderId ?? null,
+      e.orderId ?? null,
+      e.orderId ?? null,
+      e.orderId ?? null,
       e.sourceEventId,
       e.now,
       e.now,
@@ -131,6 +166,25 @@ export async function revokeByOrder(
   return res.meta.changes ?? 0;
 }
 
+// refund.created / order.refunded 可能先于 benefit_grant.created 到达。先永久记录 order tombstone，
+// 后来的 grant 在同一条原子 upsert 中检查它，绝不会把已退款订单创建成 active。
+export async function recordRefundTombstone(
+  db: D1Database,
+  e: { orderId: string; reason: string; sourceEventId: string; now: string },
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO refund_tombstones (order_id, reason, source_event_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(order_id) DO UPDATE SET
+         reason = excluded.reason,
+         source_event_id = excluded.source_event_id,
+         updated_at = excluded.updated_at`,
+    )
+    .bind(e.orderId, e.reason, e.sourceEventId, e.now, e.now)
+    .run();
+}
+
 // app 路径（activate/validate 成功）惰性登记 fingerprint ↔ license_key_id 映射。
 // **绝不把已 revoked 翻回 active**；仅补全 fingerprint 供 validate 本地-优先命中。
 export async function upsertAppMapping(
@@ -157,6 +211,25 @@ export async function getEntitlementByLicenseKeyId(db: D1Database, licenseKeyId:
     .prepare("SELECT * FROM entitlements WHERE license_key_id = ?")
     .bind(licenseKeyId)
     .first<EntitlementRow>();
+}
+
+export async function getRefundTombstoneByOrder(
+  db: D1Database,
+  orderId: string,
+): Promise<RefundTombstoneRow | null> {
+  return await db
+    .prepare("SELECT * FROM refund_tombstones WHERE order_id = ?")
+    .bind(orderId)
+    .first<RefundTombstoneRow>();
+}
+
+export async function isLocallyRevokedByLicenseKeyId(db: D1Database, licenseKeyId: string): Promise<boolean> {
+  if (!licenseKeyId) return false;
+  const row = await db
+    .prepare("SELECT status FROM entitlements WHERE license_key_id = ? LIMIT 1")
+    .bind(licenseKeyId)
+    .first<{ status: string }>();
+  return row?.status === "revoked";
 }
 
 // 本地是否已 revoke（退款/拒付）。validate 时本地 deny 优先于上游 active。

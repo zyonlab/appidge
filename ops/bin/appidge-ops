@@ -1,0 +1,493 @@
+#!/bin/sh
+# ops/bin/appidge-ops —— Appidge staging/production 统一运维入口（POSIX sh）。
+# 规格：docs/claude-code-staging-production-free-plan.md §6；runbook：ops/README.md。
+#
+#   ops/bin/appidge-ops <command> <staging|production> [options]
+#
+# commands: show-config preflight test plan migrate-api deploy-api deploy-web
+#           build-macos prepare-updates publish-updates smoke release-manifest
+# options : --remote --apply --confirm-production --build-number <正整数>
+#
+# 安全模型（fail closed）：
+#   - 无 --apply：任何远端写命令只打印计划/做 dry-run，不修改远端。
+#   - staging 写操作要求显式 --apply。
+#   - production 写操作要求 --apply + --confirm-production + APPIDGE_PRODUCTION_APPROVED=YES，
+#     缺任一即拒绝；guard 在任何远端/耗时动作之前执行。
+#   - 配置缺失/占位/环境交叉 → preflight 逐项列出并非零退出。
+#   - 不读取、不打印任何 secret（wrangler secret 只看名字，不看值）。
+set -eu
+
+OPS_BIN_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+OPS_ROOT=$(CDPATH= cd -- "$OPS_BIN_DIR/../.." && pwd)
+export OPS_ROOT
+# shellcheck disable=SC1091
+. "$OPS_ROOT/ops/lib/common.sh"
+
+usage() {
+  sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+  cat <<'EOF'
+
+示例：
+  ops/bin/appidge-ops preflight staging
+  ops/bin/appidge-ops plan production
+  ops/bin/appidge-ops deploy-api staging --apply
+  APPIDGE_PRODUCTION_APPROVED=YES ops/bin/appidge-ops deploy-api production --apply --confirm-production
+EOF
+}
+
+[ $# -ge 1 ] || { usage >&2; exit 2; }
+CMD=$1; shift
+case "$CMD" in
+  -h|--help|help) usage; exit 0 ;;
+esac
+[ $# -ge 1 ] || { echo "缺环境参数（staging|production）" >&2; usage >&2; exit 2; }
+ENV_ARG=$1; shift
+
+REMOTE=0; APPLY=0; CONFIRM=0; BUILD_NUMBER=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --remote) REMOTE=1 ;;
+    --apply) APPLY=1 ;;
+    --confirm-production) CONFIRM=1 ;;
+    --build-number)
+      shift
+      BUILD_NUMBER="${1:-}"
+      case "$BUILD_NUMBER" in
+        ''|*[!0-9]*|0) ops_die "--build-number 需要正整数：'${BUILD_NUMBER:-}'" ;;
+      esac ;;
+    *) ops_die "未知选项：$1（--remote/--apply/--confirm-production/--build-number）" ;;
+  esac
+  shift
+done
+
+# ---------------------------------------------------------------------------
+# 生产写保护最先执行：写意图命令 + --apply 时立即校验三重保护（在读取配置/联网之前）。
+# ---------------------------------------------------------------------------
+case "$CMD" in
+  migrate-api|deploy-api|deploy-web|publish-updates)
+    if [ "$APPLY" = 1 ]; then guard_remote_write "$ENV_ARG" "$APPLY" "$CONFIRM"; fi
+    ;;
+esac
+
+load_environment "$ENV_ARG"
+
+require_build_number() {
+  [ -n "$BUILD_NUMBER" ] || ops_die "$CMD 需要 --build-number <正整数>（staging/prod 共用全局单调递增序列）"
+}
+
+UPDATES_HOST=$(url_host "$SPARKLE_FEED_URL")
+API_HOST=$(url_host "$PUBLIC_API_BASE_URL")
+WEB_HOST=$(url_host "$PUBLIC_SITE_URL")
+
+preflight_local() {
+  fail_reset
+  validate_config_urls
+  validate_wrangler_topology
+  validate_production_identifiers
+  check_tools
+  fail_flush
+}
+
+# 远端只读检查（--remote；需已登录 wrangler，绝不读 secret 值）
+preflight_remote() {
+  ops_note "── 远端只读检查（--remote）──"
+  if ! wrangler_run api whoami >/dev/null 2>&1; then
+    fail_add "wrangler 未登录/无凭证（export CLOUDFLARE_API_TOKEN 或 wrangler login）——远端检查跳过"
+    return 0
+  fi
+  ops_note "wrangler 登录 OK"
+  secrets=$(wrangler_run api secret list --env "$OPS_ENV" 2>/dev/null || true)
+  for s in POLAR_ACCESS_TOKEN POLAR_WEBHOOK_SECRET LICENSE_HMAC_PEPPER; do
+    printf '%s' "$secrets" | grep -q "\"$s\"" \
+      || fail_add "Worker secret 名缺失（--env ${OPS_ENV}）：${s}（wrangler secret put $s --env ${OPS_ENV}）"
+  done
+  if ! wrangler_run api d1 list 2>/dev/null | grep -q "$API_D1_DATABASE_NAME"; then
+    fail_add "远端 D1 不存在：${API_D1_DATABASE_NAME}（wrangler d1 create ${API_D1_DATABASE_NAME}）"
+  fi
+  ops_note "pending migrations（只读）："
+  wrangler_run api d1 migrations list "$API_D1_DATABASE_NAME" --remote --env "$OPS_ENV" \
+    || fail_add "无法查询 $API_D1_DATABASE_NAME 远端 migration 状态"
+  wrangler_run api deployments list --env "$OPS_ENV" 2>/dev/null \
+    || ops_warn "无法查询当前 deployments（可能尚未部署过）"
+}
+
+plan_only_note() {
+  ops_note "[plan-only] 未给 --apply：只输出计划/dry-run，未修改远端。"
+}
+
+# ---------------------------------------------------------------------------
+# 命令实现
+# ---------------------------------------------------------------------------
+cmd_show_config() {
+  print_header
+  ops_note "配置来源 : $OPS_CONF"
+  ops_note "──公开配置（allowlist；不含任何 secret）──"
+  for k in $OPS_ALLOW_KEYS; do
+    eval "v=\${$k:-}"
+    case "$k" in
+      PUBLIC_POLAR_CHECKOUT_URL)
+        # checkout 是公开链接，但避免无意义扩散完整链接：只显示 host（占位则原样显示）
+        if is_placeholder "$v"; then printf '  %-28s= %s\n' "$k" "$v"
+        else printf '  %-28s= https://%s/…\n' "$k" "$(url_host "$v")"; fi ;;
+      *) printf '  %-28s= %s\n' "$k" "$v" ;;
+    esac
+  done
+  ops_note "──已隐藏：根 .env、apps/api/.dev.vars、Worker secret 值、Apple 公证凭证──"
+}
+
+cmd_preflight() {
+  print_header
+  ops_note "工作区状态（只提示，不强制 clean；release 场景由 build-macos 把关）："
+  git -C "$OPS_ROOT" status --short | sed 's/^/  /' || true
+  fail_reset
+  validate_config_urls
+  validate_wrangler_topology
+  validate_production_identifiers
+  check_tools
+  if [ "$REMOTE" = 1 ]; then preflight_remote; fi
+  fail_flush
+  ops_note "preflight $OPS_ENV OK"
+}
+
+cmd_test() {
+  print_header
+  ops_note "1/4 ops/tests/test-config.sh"
+  sh "$OPS_ROOT/ops/tests/test-config.sh"
+  ops_note "2/4 pnpm check（web+api lint/typecheck/test/build；web 公开配置显式来自 $OPS_CONF）"
+  ( cd "$OPS_ROOT" \
+    && PUBLIC_SITE_URL="$PUBLIC_SITE_URL" \
+       PUBLIC_POLAR_CHECKOUT_URL="$PUBLIC_POLAR_CHECKOUT_URL" \
+       PUBLIC_API_BASE_URL="$PUBLIC_API_BASE_URL" \
+       PUBLIC_DOWNLOAD_URL="$PUBLIC_DOWNLOAD_URL" \
+       pnpm check )
+  ops_note "3/4 pnpm check:swift"
+  ( cd "$OPS_ROOT" && pnpm check:swift )
+  ops_note "4/4 wrangler deploy --dry-run --env ${OPS_ENV}（api）"
+  wrangler_run api deploy --dry-run --outdir "$OPS_ROOT/apps/api/dist" --env "$OPS_ENV"
+  if [ -f "$OPS_ROOT/.env" ] && [ -f "$OPS_ROOT/Config/Signing.xcconfig" ]; then
+    ops_note "原生签名构建凭证存在——但签名归档耗时数分钟，请显式运行 build-macos"
+  else
+    ops_note "SKIP：原生签名构建（本机缺 .env/Signing.xcconfig 凭证，不假装成功）"
+  fi
+}
+
+cmd_plan() {
+  print_header
+  ops_note "── 发布计划（只读，不修改文件/远端）──"
+  ops_note "routes:"
+  ops_note "  web     : ${WEB_HOST}（apps/web/wrangler.jsonc --env ${OPS_ENV}）"
+  ops_note "  api     : ${API_HOST}（apps/api/wrangler.toml --env ${OPS_ENV}）"
+  ops_note "  updates : ${UPDATES_HOST}（infra/updates/wrangler.jsonc --env ${OPS_ENV}）"
+  ops_note "D1        : $API_D1_DATABASE_NAME"
+  ops_note "migrations（本地全量；远端 pending 用 preflight --remote 查）:"
+  ls "$OPS_ROOT/apps/api/migrations" | sed 's/^/  /'
+  ops_note "web 公开配置    : SITE=$PUBLIC_SITE_URL API=$PUBLIC_API_BASE_URL DOWNLOAD=$PUBLIC_DOWNLOAD_URL CHECKOUT(host)=$(url_host "$PUBLIC_POLAR_CHECKOUT_URL")"
+  ops_note "macOS 公开配置  : API=$LICENSE_API_BASE_URL CHECKOUT=$LICENSE_CHECKOUT_URL FEED=$SPARKLE_FEED_URL"
+  ops_note "artifact 路径   : build/releases/$OPS_ENV/<version>-<build>/（DMG/appcast/release-manifest.json）"
+  ops_note "smoke URLs      : https://$WEB_HOST/ /pricing /download | https://$API_HOST/healthz | https://$UPDATES_HOST/appcast.xml"
+  ops_note "顺序            : migrate-api → deploy-api → deploy-web → build-macos → prepare-updates → publish-updates → smoke → release-manifest"
+  if [ "$OPS_ENV" = production ]; then
+    ops_note "production 保护 : --apply + --confirm-production + APPIDGE_PRODUCTION_APPROVED=YES（缺一 fail closed）"
+  else
+    ops_note "staging 保护    : 远端写需显式 --apply"
+  fi
+}
+
+cmd_migrate_api() {
+  print_header
+  preflight_local
+  ops_note "migration 文件："
+  ls "$OPS_ROOT/apps/api/migrations" | sed 's/^/  /'
+  if [ "$APPLY" != 1 ]; then
+    plan_only_note
+    ops_note "计划命令：wrangler d1 migrations list/apply \"$API_D1_DATABASE_NAME\" --remote --env $OPS_ENV"
+    if ! wrangler_run api d1 migrations list "$API_D1_DATABASE_NAME" --remote --env "$OPS_ENV"; then
+      ops_warn "无法查询远端 migration（未登录/库未创建）——人工闸门，见 ops/README.md"
+    fi
+    return 0
+  fi
+  guard_remote_write "$OPS_ENV" "$APPLY" "$CONFIRM"
+  ops_note "apply 前再次显示远端 pending："
+  wrangler_run api d1 migrations list "$API_D1_DATABASE_NAME" --remote --env "$OPS_ENV"
+  wrangler_run api d1 migrations apply "$API_D1_DATABASE_NAME" --remote --env "$OPS_ENV" \
+    || ops_die "migration 失败——禁止继续 deploy-api（回滚用补偿 migration 前滚，不做 down migration）"
+  ops_note "migrations 应用完成"
+}
+
+cmd_deploy_api() {
+  print_header
+  preflight_local
+  ops_note "pnpm --filter api test"
+  ( cd "$OPS_ROOT" && pnpm --filter api test )
+  ops_note "wrangler deploy --dry-run --env $OPS_ENV"
+  wrangler_run api deploy --dry-run --outdir "$OPS_ROOT/apps/api/dist" --env "$OPS_ENV"
+  if [ "$APPLY" != 1 ]; then plan_only_note; return 0; fi
+  guard_remote_write "$OPS_ENV" "$APPLY" "$CONFIRM"
+  ops_note "记录当前 deployment（回滚点）："
+  wrangler_run api deployments list --env "$OPS_ENV" 2>/dev/null | head -20 || true
+  wrangler_run api deploy --env "$OPS_ENV"
+  ops_note "部署后健康检查：https://$API_HOST/healthz"
+  curl -fsS -m 30 "https://$API_HOST/healthz" || ops_die "healthz 失败——考虑 wrangler rollback --env $OPS_ENV"
+  echo
+}
+
+cmd_deploy_web() {
+  print_header
+  preflight_local
+  # 发布配置显式来自 ops/environments/<env>.conf，不读 apps/web/.env
+  export PUBLIC_SITE_URL PUBLIC_POLAR_CHECKOUT_URL PUBLIC_API_BASE_URL PUBLIC_DOWNLOAD_URL
+  ops_note "pnpm --filter web typecheck / test / build（注入 $OPS_ENV 公开配置）"
+  ( cd "$OPS_ROOT" && pnpm --filter web typecheck && pnpm --filter web test && pnpm --filter web build )
+
+  dist="$OPS_ROOT/apps/web/dist"
+  [ -d "$dist" ] || ops_die "构建产物缺失：$dist"
+  if [ "$OPS_ENV" = staging ]; then
+    for bad in "https://appidge.com" "https://www.appidge.com" "https://api.appidge.com" "https://updates.appidge.com"; do
+      if grep -RFq "$bad" "$dist"; then
+        ops_die "staging 产物包含 production URL：${bad}（环境交叉，拒绝部署）"
+      fi
+    done
+  else
+    for bad in "-staging.appidge.com" "staging.appidge.com" "sandbox" ".invalid"; do
+      if grep -RFq "$bad" "$dist"; then
+        ops_die "production 产物包含 staging/sandbox 痕迹：${bad}（环境交叉，拒绝部署）"
+      fi
+    done
+  fi
+  grep -RFq "$(url_host "$PUBLIC_POLAR_CHECKOUT_URL")" "$dist" || ops_die "产物缺 checkout CTA（$(url_host "$PUBLIC_POLAR_CHECKOUT_URL")）"
+  grep -RFq "$PUBLIC_DOWNLOAD_URL" "$dist" || ops_die "产物缺 download CTA（${PUBLIC_DOWNLOAD_URL}）"
+  ops_note "产物环境一致性 + CTA 检查通过"
+
+  ops_note "wrangler deploy --dry-run --env ${OPS_ENV}（web）"
+  wrangler_run web deploy --dry-run --env "$OPS_ENV"
+  if [ "$APPLY" != 1 ]; then plan_only_note; return 0; fi
+  guard_remote_write "$OPS_ENV" "$APPLY" "$CONFIRM"
+  wrangler_run web deploy --env "$OPS_ENV"
+  ops_note "已部署：https://$WEB_HOST/"
+}
+
+feed_max_build() { # $1=feed url → 输出 feed 内最大 sparkle:version；查询失败输出空
+  curl -fsS -m 20 "$1" 2>/dev/null \
+    | grep -oE 'sparkle:version="[0-9]+"' | grep -oE '[0-9]+' | sort -n | tail -1
+}
+
+cmd_build_macos() {
+  print_header
+  require_build_number
+  preflight_local
+
+  # build 号单调性：production 必须高于两个 feed 的最高历史 build；查不到 feed 即失败。
+  for feed in "https://updates-staging.appidge.com/appcast.xml" "https://updates.appidge.com/appcast.xml"; do
+    maxb=$(feed_max_build "$feed" || true)
+    if [ -n "${maxb:-}" ]; then
+      ops_note "feed $feed 最高 build：$maxb"
+      [ "$BUILD_NUMBER" -gt "$maxb" ] \
+        || ops_die "--build-number $BUILD_NUMBER 未高于 $feed 的最高历史 build ${maxb}（staging/prod 共用全局单调序列）"
+    else
+      if [ "$OPS_ENV" = production ]; then
+        ops_die "production build 前无法查询 $feed 确认 build 号单调性——fail closed（人工确认后重试）"
+      else
+        ops_warn "无法查询 ${feed}（可能尚未发布过）——staging 允许继续，但请人工确认 build 号"
+      fi
+    fi
+  done
+
+  if [ "$OPS_ENV" = staging ]; then
+    ops_warn "⚠️ staging 与 production 共用 Bundle ID/App Group/系统扩展 ID——staging 安装会覆盖 production 安装，只能在内部测试 Mac 使用。"
+  fi
+
+  pbx="$OPS_ROOT/appidge.xcodeproj/project.pbxproj"; appconf="$OPS_ROOT/Config/AppConfig.xcconfig"
+  h_before=$(shasum -a 256 "$pbx" "$appconf" | awk '{print $1}' | tr '\n' ' ')
+
+  APPIDGE_BUILD_NUMBER="$BUILD_NUMBER"
+  APPIDGE_ENVIRONMENT="$OPS_ENV"
+  export APPIDGE_BUILD_NUMBER APPIDGE_ENVIRONMENT LICENSE_API_BASE_URL LICENSE_CHECKOUT_URL SPARKLE_FEED_URL
+  ( cd "$OPS_ROOT" && sh scripts/archive-and-notarize.sh )
+  ( cd "$OPS_ROOT" && sh scripts/make-dmg.sh )
+
+  h_after=$(shasum -a 256 "$pbx" "$appconf" | awk '{print $1}' | tr '\n' ' ')
+  [ "$h_before" = "$h_after" ] || ops_die "构建改写了 tracked 配置（pbxproj/AppConfig）——违反无副作用约定"
+
+  plist="$OPS_ROOT/build/export/appidge.app/Contents/Info.plist"
+  [ -f "$plist" ] || ops_die "缺导出产物：$plist"
+  pb() { /usr/libexec/PlistBuddy -c "Print :$1" "$plist"; }
+  [ "$(pb CFBundleVersion)" = "$BUILD_NUMBER" ] || ops_die "产物 CFBundleVersion=$(pb CFBundleVersion) ≠ $BUILD_NUMBER"
+  [ "$(pb SUFeedURL)" = "$SPARKLE_FEED_URL" ] || ops_die "产物 SUFeedURL=$(pb SUFeedURL) ≠ $SPARKLE_FEED_URL"
+  [ "$(pb LicenseAPIBaseURL)" = "$LICENSE_API_BASE_URL" ] || ops_die "产物 LicenseAPIBaseURL 不符"
+  [ "$(pb LicenseCheckoutURL)" = "$LICENSE_CHECKOUT_URL" ] || ops_die "产物 LicenseCheckoutURL 不符"
+  ops_note "build-macos $OPS_ENV OK：build=${BUILD_NUMBER}，三个 URL 已按环境注入并验证"
+}
+
+find_generate_appcast() {
+  for base in "$HOME/Library/Developer/Xcode/DerivedData" \
+              "$HOME/Library/Caches/org.swift.swiftpm/artifacts"; do
+    [ -d "$base" ] || continue
+    p=$(find "$base" -name generate_appcast -type f -perm -u+x 2>/dev/null | head -1)
+    if [ -n "$p" ]; then printf '%s' "$p"; return 0; fi
+  done
+  return 1
+}
+
+release_dir_for_build() { # 需要已存在版本 DMG 求 marketing version
+  dmg=$(ls -t "$OPS_ROOT"/build/appidge-*-"$BUILD_NUMBER".dmg 2>/dev/null | head -1 || true)
+  [ -n "$dmg" ] || ops_die "找不到 build/appidge-<version>-$BUILD_NUMBER.dmg——先 build-macos $OPS_ENV --build-number $BUILD_NUMBER"
+  ver=$(basename "$dmg" | sed -E 's/^appidge-(.+)-[0-9]+\.dmg$/\1/')
+  RELEASE_DIR="$OPS_ROOT/build/releases/$OPS_ENV/$ver-$BUILD_NUMBER"
+  RELEASE_DMG="$dmg"
+  MARKETING_VERSION="$ver"
+}
+
+check_appcast_consistency() { # $1=目录（含 appcast.xml 与 dmg）
+  d=$1
+  ac="$d/appcast.xml"
+  [ -f "$ac" ] || ops_die "缺 $ac"
+  grep -q "url=\"https://$UPDATES_HOST/" "$ac" \
+    || ops_die "appcast enclosure host 不是 ${UPDATES_HOST}（环境交叉，拒绝）"
+  other_host=$([ "$OPS_ENV" = staging ] && echo "updates.appidge.com" || echo "updates-staging.appidge.com")
+  if grep -q "://$other_host/" "$ac"; then
+    ops_die "appcast 指向另一环境 host：${other_host}（拒绝）"
+  fi
+  grep -q "sparkle:version=\"$BUILD_NUMBER\"" "$ac" || ops_die "appcast 缺 build $BUILD_NUMBER 条目"
+  grep -q 'sparkle:edSignature="' "$ac" || ops_die "appcast 缺 EdDSA 签名"
+  dmg_in_dir=$(ls "$d"/appidge-*-"$BUILD_NUMBER".dmg 2>/dev/null | head -1 || true)
+  [ -n "$dmg_in_dir" ] || ops_die "目录缺版本 DMG：$d"
+  len=$(grep -oE 'length="[0-9]+"' "$ac" | tail -1 | grep -oE '[0-9]+')
+  sz=$(file_size "$dmg_in_dir")
+  [ "$len" = "$sz" ] || ops_die "appcast length=$len ≠ DMG 实际 $sz"
+  assert_static_assets_within_limit "$d" || ops_die "静态文件超 25MiB——迁移 DMG 到 R2 后再发布"
+}
+
+cmd_prepare_updates() {
+  print_header
+  require_build_number
+  preflight_local
+  release_dir_for_build
+  mkdir -p "$RELEASE_DIR"
+  cp "$RELEASE_DMG" "$RELEASE_DIR/"
+  GEN=$(find_generate_appcast) || ops_die "找不到 Sparkle generate_appcast（DerivedData/SPM artifacts）——先在 Xcode 解析 Sparkle 包"
+  ops_note "generate_appcast：$GEN"
+  "$GEN" "$RELEASE_DIR" --download-url-prefix "https://$UPDATES_HOST/"
+  cp "$RELEASE_DIR/appidge-$MARKETING_VERSION-$BUILD_NUMBER.dmg" "$RELEASE_DIR/appidge-latest.dmg"
+  check_appcast_consistency "$RELEASE_DIR"
+  pub="$OPS_ROOT/infra/updates/public"
+  rm -rf "$pub"; mkdir -p "$pub"
+  cp "$RELEASE_DIR/appcast.xml" "$RELEASE_DIR"/*.dmg "$pub/"
+  ops_note "prepare-updates OK：$RELEASE_DIR → infra/updates/public/（仅本地，未部署）"
+}
+
+cmd_publish_updates() {
+  print_header
+  require_build_number
+  preflight_local
+  pub="$OPS_ROOT/infra/updates/public"
+  check_appcast_consistency "$pub"
+  # route 再确认（preflight 已查，但发布前贴身复查）
+  route=$(wrangler_env_pattern "$OPS_ROOT/infra/updates/wrangler.jsonc" "$OPS_ENV")
+  [ "$route" = "$UPDATES_HOST" ] || ops_die "infra/updates route（${route}）≠ 环境配置 host（${UPDATES_HOST}）"
+  ops_note "wrangler deploy --dry-run --env ${OPS_ENV}（updates）"
+  wrangler_run updates deploy --dry-run --env "$OPS_ENV"
+  if [ "$APPLY" != 1 ]; then plan_only_note; return 0; fi
+  guard_remote_write "$OPS_ENV" "$APPLY" "$CONFIRM"
+  wrangler_run updates deploy --env "$OPS_ENV"
+  ops_note "已发布：https://$UPDATES_HOST/appcast.xml（版本 DMG+latest+appcast 同一 version 原子上线）"
+}
+
+cmd_smoke() {
+  print_header
+  fail_reset
+  ok() { ops_note "✅ $1"; }
+  ck() { # $1=desc $2=url [$3=grep]
+    body=$(curl -fsS -m 30 "$2" 2>/dev/null) || { fail_add "$1：GET $2 失败"; return 0; }
+    if [ -n "${3:-}" ] && ! printf '%s' "$body" | grep -q "$3"; then
+      fail_add "$1：$2 内容缺少 '$3'"
+    else
+      ok "$1"
+    fi
+  }
+  ck "web 首页" "https://$WEB_HOST/" ""
+  ck "web /pricing" "https://$WEB_HOST/pricing" "$(url_host "$PUBLIC_POLAR_CHECKOUT_URL")"
+  ck "web /download" "https://$WEB_HOST/download" "$PUBLIC_DOWNLOAD_URL"
+  ck "web canonical 属于本环境" "https://$WEB_HOST/" "https://$WEB_HOST"
+  ck "api /healthz" "https://$API_HOST/healthz" '"ok"'
+  hz=$(curl -fsS -m 30 "https://$API_HOST/healthz" 2>/dev/null || true)
+  printf '%s' "$hz" | grep -q '"mockMode": *false' && ok "api mockMode=false" \
+    || fail_add "api mockMode 非 false（${API_HOST}）"
+  ck "updates appcast" "https://$UPDATES_HOST/appcast.xml" "url=\"https://$UPDATES_HOST/"
+  other_host=$([ "$OPS_ENV" = staging ] && echo "updates.appidge.com" || echo "updates-staging.appidge.com")
+  ac=$(curl -fsS -m 30 "https://$UPDATES_HOST/appcast.xml" 2>/dev/null || true)
+  printf '%s' "$ac" | grep -q "://$other_host/" && fail_add "appcast 交叉指向 $other_host" || ok "feed 不交叉"
+  if [ -n "$BUILD_NUMBER" ]; then
+    printf '%s' "$ac" | grep -q "sparkle:version=\"$BUILD_NUMBER\"" \
+      && ok "appcast 含 build $BUILD_NUMBER" || fail_add "appcast 缺 build $BUILD_NUMBER"
+  fi
+  curl -fsSI -m 60 "https://$UPDATES_HOST/appidge-latest.dmg" >/dev/null 2>&1 \
+    && ok "appidge-latest.dmg HEAD 200" || fail_add "appidge-latest.dmg HEAD 失败"
+  if [ "$OPS_ENV" = production ]; then
+    ops_note "production smoke 默认只做 health/静态检查；真实 license 写操作需单独授权"
+  else
+    ops_note "staging activate/validate/deactivate 闭环需用户提供 sandbox license key（人工闸门）"
+  fi
+  ops_note "macOS 升级链路：scripts/verify-staging-update.sh --feed https://$UPDATES_HOST/appcast.xml（真机系统扩展/Sparkle 升级仍是人工闸门）"
+  fail_flush
+  ops_note "smoke $OPS_ENV OK"
+}
+
+cmd_release_manifest() {
+  print_header
+  require_build_number
+  release_dir_for_build
+  [ -d "$RELEASE_DIR" ] || ops_die "缺 ${RELEASE_DIR}——先 prepare-updates"
+  mf="$RELEASE_DIR/release-manifest.json"
+  sha=$(git -C "$OPS_ROOT" rev-parse HEAD)
+  now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  {
+    printf '{\n'
+    printf '  "environment": "%s",\n' "$OPS_ENV"
+    printf '  "gitSha": "%s",\n' "$sha"
+    printf '  "marketingVersion": "%s",\n' "$MARKETING_VERSION"
+    printf '  "buildNumber": %s,\n' "$BUILD_NUMBER"
+    printf '  "createdAt": "%s",\n' "$now"
+    printf '  "webSiteUrl": "%s",\n' "$PUBLIC_SITE_URL"
+    printf '  "apiBaseUrl": "%s",\n' "$PUBLIC_API_BASE_URL"
+    printf '  "updatesBaseUrl": "https://%s",\n' "$UPDATES_HOST"
+    printf '  "checkoutHost": "%s",\n' "$(url_host "$PUBLIC_POLAR_CHECKOUT_URL")"
+    printf '  "d1DatabaseName": "%s",\n' "$API_D1_DATABASE_NAME"
+    printf '  "migrations": ['
+    first=1
+    for m in $(ls "$OPS_ROOT/apps/api/migrations"); do
+      [ "$first" = 1 ] || printf ', '
+      printf '"%s"' "$m"; first=0
+    done
+    printf '],\n'
+    printf '  "artifacts": [\n'
+    first=1
+    for f in "$RELEASE_DIR"/appcast.xml "$RELEASE_DIR"/*.dmg; do
+      [ -f "$f" ] || continue
+      [ "$first" = 1 ] || printf ',\n'
+      printf '    { "path": "%s", "sha256": "%s", "bytes": %s }' \
+        "build/releases/$OPS_ENV/$MARKETING_VERSION-$BUILD_NUMBER/$(basename "$f")" \
+        "$(shasum -a 256 "$f" | awk '{print $1}')" \
+        "$(file_size "$f")"
+      first=0
+    done
+    printf '\n  ]\n}\n'
+  } > "$mf"
+  ops_note "release manifest：$mf"
+  cat "$mf"
+}
+
+case "$CMD" in
+  show-config)      cmd_show_config ;;
+  preflight)        cmd_preflight ;;
+  test)             cmd_test ;;
+  plan)             cmd_plan ;;
+  migrate-api)      cmd_migrate_api ;;
+  deploy-api)       cmd_deploy_api ;;
+  deploy-web)       cmd_deploy_web ;;
+  build-macos)      cmd_build_macos ;;
+  prepare-updates)  cmd_prepare_updates ;;
+  publish-updates)  cmd_publish_updates ;;
+  smoke)            cmd_smoke ;;
+  release-manifest) cmd_release_manifest ;;
+  *) echo "未知命令：$CMD" >&2; usage >&2; exit 2 ;;
+esac

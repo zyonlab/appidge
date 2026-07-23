@@ -2,13 +2,17 @@
 
 非秘密的 Cloudflare 部署配置与说明。**任何 token/secret 都不进这里**（走 `wrangler secret` / GitHub protected secrets）。
 
-## 线上拓扑（目标）
+## 线上拓扑（staging/production 双环境，全部 Workers + Static Assets，无 Pages/R2）
 
-| 域名 | 服务 | 用途 |
-|---|---|---|
-| `appidge.com` | Cloudflare Pages | 静态官网（apps/web 产物） |
-| `api.appidge.com` | Cloudflare Worker | license facade + Polar webhook（apps/api） |
-| `updates.appidge.com` | R2 自定义域名 | DMG / appcast.xml / release notes，直达不经 Worker |
+| 组件 | Staging | Production | 载体 |
+|---|---|---|---|
+| 官网（apps/web） | `staging.appidge.com` | `appidge.com` / `www.appidge.com` | Worker `appidge-web-*`，静态资源 |
+| API（apps/api） | `api-staging.appidge.com`（MOCK_MODE=false，Polar sandbox） | `api.appidge.com`（Polar live） | Worker `appidge-api-*` |
+| 更新（infra/updates） | `updates-staging.appidge.com` | `updates.appidge.com` | Worker `appidge-updates-*`，静态资源托管 DMG/appcast（DMG >25MiB 才迁 R2） |
+| D1 | `appidge-licensing-staging` | `appidge-licensing-production`（id 占位，待创建） | 各一库，migrations `0001`~`0003` |
+
+环境矩阵的单一真相源：`ops/environments/{staging,production}.conf`；
+部署/校验统一入口：`ops/bin/appidge-ops`（runbook 见 `ops/README.md`）。
 
 ## D1
 
@@ -17,17 +21,17 @@
 
 ## 部署 runbook（人工闸门 —— 需真实 Cloudflare 账号 + Polar sandbox/生产 secret）
 
-以下命令在 `apps/api/` 下执行。**真实部署需用户授权**；当前仓库只做 dry-run / preview。
+**统一入口是 `ops/bin/appidge-ops`（见 `ops/README.md`）**；它包含 preflight、三重生产保护和
+dry-run。下面只记录底层原语（供理解/排障），**真实部署需用户授权**。
 
-1. 创建 D1 并回填 `wrangler.toml` 的 `database_id`（占位为全 0）：
+1. 创建 production D1 并回填 `wrangler.toml` 的 `[[env.production.d1_databases]].database_id`（占位为全 0）：
    ```bash
-   wrangler d1 create appidge-licensing
-   # 把输出的 database_id 填进 wrangler.toml 的 [[d1_databases]] 与 [[env.production.d1_databases]]
+   wrangler d1 create appidge-licensing-production
    ```
-2. 应用 migrations（先本地后远端）：
+2. 应用 migrations（`0001_init.sql` / `0002_polar.sql` / `0003_refund_tombstones.sql`）：
    ```bash
-   wrangler d1 migrations apply appidge-licensing --local      # 本地校验
-   wrangler d1 migrations apply appidge-licensing --remote      # 生产（需授权）
+   ops/bin/appidge-ops migrate-api staging      # 无 --apply 只 list
+   ops/bin/appidge-ops migrate-api staging --apply
    ```
 3. 注入 secret（绝不写进 wrangler.toml / git）：
    ```bash
@@ -35,13 +39,13 @@
    wrangler secret put POLAR_WEBHOOK_SECRET    --env production   # whsec_...（Standard Webhooks）
    wrangler secret put LICENSE_HMAC_PEPPER     --env production   # 高熵随机串
    ```
-   （另需在 wrangler.toml [vars] 填非秘密的 `POLAR_ORGANIZATION_ID` / `POLAR_PRODUCT_ID` / `POLAR_BENEFIT_ID`。）
-4. dry-run 校验绑定，再部署：
+   （另需在 wrangler.toml `[env.production.vars]` 填非秘密的 `POLAR_ORGANIZATION_ID` / `POLAR_PRODUCT_ID` / `POLAR_BENEFIT_ID`。）
+4. 校验与部署（production 需三重保护：`--apply --confirm-production` + `APPIDGE_PRODUCTION_APPROVED=YES`）：
    ```bash
-   wrangler deploy --dry-run --outdir dist --env=""              # 顶层环境
-   wrangler deploy --env production                              # 生产（需授权）
+   ops/bin/appidge-ops preflight production
+   ops/bin/appidge-ops deploy-api staging --apply
    ```
-5. 在 Polar 面板（Settings → Webhooks）配置 Webhook 指向 `https://api.appidge.com/v1/webhooks/polar`，记下 secret 用于第 3 步。
+5. 在 Polar 面板（Settings → Webhooks）配置 Webhook 指向 `https://api.appidge.com/v1/webhooks/polar`（staging 用 `https://api-staging.appidge.com/...` + sandbox），记下 secret 用于第 3 步。
 
 ### 回滚
 
@@ -66,8 +70,8 @@ Account ID `020878119352f1d4380269a2a334e17f`；zone `appidge.com`(active) `77d3
 
 | 组件 | 资源 | URL |
 |---|---|---|
-| Worker（API） | `appidge-api-staging`（`[env.staging]`，MOCK_MODE=true） | **https://api-staging.appidge.com**（custom_domain，wrangler 自动建 DNS+证书） |
-| D1 | `appidge-licensing-staging` `2777a4a3-8e0f-4f39-af39-12aed0ceb63e`（APAC） | 迁移 `0001_init.sql` 已 apply --remote；**Polar 迁移 `0002_polar.sql` 待 apply --remote**（重建 entitlements） |
+| Worker（API） | `appidge-api-staging`（`[env.staging]`，**MOCK_MODE=false**，打 Polar sandbox） | **https://api-staging.appidge.com**（custom_domain，wrangler 自动建 DNS+证书） |
+| D1 | `appidge-licensing-staging` `2777a4a3-8e0f-4f39-af39-12aed0ceb63e`（APAC） | 迁移共三条：`0001_init.sql` / `0002_polar.sql` / `0003_refund_tombstones.sql`（远端状态用 `appidge-ops migrate-api staging` 只读确认） |
 | Worker secrets | `LICENSE_HMAC_PEPPER` / `POLAR_WEBHOOK_SECRET` / `POLAR_ACCESS_TOKEN` | 走 `wrangler secret put --env staging`，不入 git |
 | 官网（Workers 静态资源） | Worker `appidge-web`（`[env.staging]`，`assets=./dist`，无 main） | 自定义域 **https://staging.appidge.com**（custom_domain，同 API 机制） |
 
@@ -84,18 +88,17 @@ refund→revoked 验证已作废（验签模型与吊销路径均已改）。
 ### 重新部署 staging
 ```bash
 export CLOUDFLARE_ACCOUNT_ID=… CLOUDFLARE_API_TOKEN=…   # 不入 git
-# API
-cd apps/api && npx wrangler deploy --env staging
-# 官网（构建期公开配置 PUBLIC_API_BASE_URL=https://api-staging.appidge.com 等经 apps/web/.env 注入）
-cd apps/web && pnpm build && ../api/node_modules/.bin/wrangler deploy --env staging
+ops/bin/appidge-ops deploy-api staging --apply
+ops/bin/appidge-ops deploy-web staging --apply   # 公开构建配置显式来自 ops/environments/staging.conf，不依赖 apps/web/.env
 ```
 注意：`wrangler secret put` 后 secret 传播到运行实例有 ~10-15s 延迟，刚设完立刻打 webhook 可能 500，稍等即恢复。
 
-### 生产映射（待 main 上线时做）
-- Worker `[env.production]` route → `api.appidge.com`（custom_domain），MOCK_MODE=false + 真实 Polar secret。
-- Worker `appidge-web` `[env.production]` route → `appidge.com` + `www.appidge.com`（custom_domain；配置已在 `apps/web/wrangler.jsonc`）。
-- R2 `updates.appidge.com`（Sparkle 包/appcast，需 EdDSA 公钥就绪后接）。
-- ✅ 已统一为 `appidge.com`（prod: appidge.com / api.appidge.com / updates.appidge.com；staging 用 *-staging 子域）（含 App 内 `SUFeedURL` 与 license API base）。
+### 生产映射（人工闸门，流程见 `ops/README.md` 与 free-plan 文档 Phase 6）
+- Worker `appidge-api` `[env.production]` route → `api.appidge.com`（已入 `wrangler.toml`），MOCK_MODE=false + 真实 Polar live IDs/secret（当前占位，preflight fail closed）。
+- Worker `appidge-web` `[env.production]` route → `appidge.com` + `www.appidge.com`（配置已在 `apps/web/wrangler.jsonc`）。
+- Worker `appidge-updates` `[env.production]` route → `updates.appidge.com`（Workers 静态资源；staging 已分离到 `updates-staging.appidge.com`，二者可并存）。
+- production D1 `appidge-licensing-production`：待 `wrangler d1 create` + 回填 id + 三条 migration。
+- ✅ 域名已统一为 `appidge.com`（prod: appidge.com / api.appidge.com / updates.appidge.com；staging: staging / api-staging / updates-staging 子域）。
 
 ## 状态
 

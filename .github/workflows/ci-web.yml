@@ -9,6 +9,8 @@ on:
     paths:
       - "apps/**"
       - "contracts/**"
+      - "infra/**"
+      - "ops/**"
       - "package.json"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
@@ -45,6 +47,11 @@ jobs:
 
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
+
+      # 环境矩阵 + 部署安全保护（无网络、无 secret；production 占位被 preflight 正确拒绝
+      # 属于测试断言的一部分，不是红灯）。见 docs/claude-code-staging-production-free-plan.md §8.1。
+      - name: Ops config & guard tests
+        run: sh ops/tests/test-config.sh
 
       - name: Check
         run: pnpm check

@@ -26,17 +26,55 @@ set +a
 : "${TEAM_ID:?TEAM_ID missing in .env}"
 : "${APP_BUNDLE_ID:?APP_BUNDLE_ID missing in .env}"
 
-# 公开的 Release 授权配置。显式作为 xcodebuild setting 注入，避免本地 xcconfig 被 staging
-# 脚本或手工操作留空后仍产出一个无法激活/购买的强制 gate 包。可在 .env 中按环境覆盖。
+# 公开的 Release 授权/更新配置。显式作为 xcodebuild setting 注入，避免本地 xcconfig 被
+# 手工操作留空后仍产出一个无法激活/购买/升级的包。正常入口是 ops/bin/appidge-ops build-macos，
+# 它会从 ops/environments/<env>.conf 导出这三个 URL 与 APPIDGE_ENVIRONMENT。
 LICENSE_API_BASE_URL="${LICENSE_API_BASE_URL:-https://api.appidge.com}"
 LICENSE_CHECKOUT_URL="${LICENSE_CHECKOUT_URL:-https://appidge.com/pricing}"
-case "$LICENSE_API_BASE_URL" in
-  https://*) ;;
-  *) echo "LICENSE_API_BASE_URL 必须是 HTTPS URL：$LICENSE_API_BASE_URL" >&2; exit 1 ;;
+SPARKLE_FEED_URL="${SPARKLE_FEED_URL:-https://updates.appidge.com/appcast.xml}"
+APPIDGE_ENVIRONMENT="${APPIDGE_ENVIRONMENT:-production}"
+
+url_host() { printf '%s' "$1" | /usr/bin/sed -e 's|^[a-z]*://||' -e 's|[/:].*$||'; }
+for pair in "LICENSE_API_BASE_URL=$LICENSE_API_BASE_URL" \
+            "LICENSE_CHECKOUT_URL=$LICENSE_CHECKOUT_URL" \
+            "SPARKLE_FEED_URL=$SPARKLE_FEED_URL"; do
+  case "${pair#*=}" in
+    https://*) ;;
+    *) echo "${pair%%=*} 必须是 HTTPS URL：${pair#*=}" >&2; exit 1 ;;
+  esac
+done
+
+# 目标环境交叉校验：staging 包绝不指向 production 域，production 包绝不指向 staging/sandbox。
+case "$APPIDGE_ENVIRONMENT" in
+  staging)
+    [ "$(url_host "$LICENSE_API_BASE_URL")" = "api-staging.appidge.com" ] \
+      || { echo "staging 包 LICENSE_API_BASE_URL 应指向 api-staging.appidge.com：$LICENSE_API_BASE_URL" >&2; exit 1; }
+    [ "$(url_host "$SPARKLE_FEED_URL")" = "updates-staging.appidge.com" ] \
+      || { echo "staging 包 SPARKLE_FEED_URL 应指向 updates-staging.appidge.com：$SPARKLE_FEED_URL" >&2; exit 1; }
+    [ "$(url_host "$LICENSE_CHECKOUT_URL")" = "staging.appidge.com" ] \
+      || { echo "staging 包 LICENSE_CHECKOUT_URL 应指向 staging.appidge.com：$LICENSE_CHECKOUT_URL" >&2; exit 1; }
+    ;;
+  production)
+    for u in "$LICENSE_API_BASE_URL" "$LICENSE_CHECKOUT_URL" "$SPARKLE_FEED_URL"; do
+      case "$u" in
+        *staging*|*sandbox*|*localhost*|*.invalid*)
+          echo "production 包 URL 不得包含 staging/sandbox/localhost/.invalid：$u" >&2; exit 1 ;;
+      esac
+    done
+    [ "$(url_host "$LICENSE_API_BASE_URL")" = "api.appidge.com" ] \
+      || { echo "production 包 LICENSE_API_BASE_URL 应指向 api.appidge.com：$LICENSE_API_BASE_URL" >&2; exit 1; }
+    [ "$(url_host "$SPARKLE_FEED_URL")" = "updates.appidge.com" ] \
+      || { echo "production 包 SPARKLE_FEED_URL 应指向 updates.appidge.com：$SPARKLE_FEED_URL" >&2; exit 1; }
+    ;;
+  *) echo "APPIDGE_ENVIRONMENT 只支持 staging|production：$APPIDGE_ENVIRONMENT" >&2; exit 1 ;;
 esac
-case "$LICENSE_CHECKOUT_URL" in
-  https://*) ;;
-  *) echo "LICENSE_CHECKOUT_URL 必须是 HTTPS URL：$LICENSE_CHECKOUT_URL" >&2; exit 1 ;;
+
+# build 号必须由调用方显式提供（正整数）。本脚本不再自增、不再修改 tracked 工程文件；
+# staging/prod 共用一个全局单调递增序列，单调性由 appidge-ops build-macos 把关。
+case "${APPIDGE_BUILD_NUMBER:-}" in
+  ''|*[!0-9]*|0)
+    echo "缺 APPIDGE_BUILD_NUMBER（正整数 build 号）。请经 ops/bin/appidge-ops build-macos <env> --build-number N 调用" >&2
+    exit 1 ;;
 esac
 
 [ -f Config/Signing.xcconfig ] || {
@@ -45,19 +83,23 @@ esac
 }
 
 # ---------------------------------------------------------------------------
-# 0.5 自增 build 号(CURRENT_PROJECT_VERSION)——每次出包 +1。
-#   为什么必须自增:系统扩展按 (short/build) 元组判新旧。build 号不变 → macOS 认为扩展没升级、
-#   不把新包里的扩展换上去 → 新 app 的会话仍绑在旧扩展 / 旧 app 的 XPC 上,表现为「新包没有活动
-#   连接」;app 的版本握手(运行版本 vs 包内版本)也因两边相等而永不触发重绑。自增后:macOS 正常
-#   升级扩展(同团队升级无需重新批准)+ 版本握手触发重绑,活动连接恢复。
-#   工程四个 build 配置共用同一个数,统一 +1;pbxproj 的改动留在工作区,由人决定何时提交。
+# 0.5 build 号(CURRENT_PROJECT_VERSION)——由 APPIDGE_BUILD_NUMBER 经 xcodebuild 显式注入。
+#   为什么每次出包必须更高:系统扩展按 (short/build) 元组判新旧。build 号不变 → macOS 认为扩展
+#   没升级、不换新扩展 → 会话仍绑旧 provider;版本握手也因两边相等永不触发重绑。
+#   本脚本【不再】sed 修改 tracked project.pbxproj——构建产物的 build 号完全来自命令行参数,
+#   工程文件保持只读。构建前后校验两份 tracked 配置未被任何环节改写,变了即失败。
 # ---------------------------------------------------------------------------
 PBXPROJ="appidge.xcodeproj/project.pbxproj"
-CUR_BUILD="$(grep -m1 -oE 'CURRENT_PROJECT_VERSION = [0-9]+;' "$PBXPROJ" | grep -oE '[0-9]+' || true)"
-: "${CUR_BUILD:?无法从 $PBXPROJ 读出 CURRENT_PROJECT_VERSION}"
-NEXT_BUILD=$((CUR_BUILD + 1))
-/usr/bin/sed -i '' -E "s/CURRENT_PROJECT_VERSION = ${CUR_BUILD};/CURRENT_PROJECT_VERSION = ${NEXT_BUILD};/g" "$PBXPROJ"
-note "build 号 ${CUR_BUILD} → ${NEXT_BUILD}(每次出包自增,确保系统扩展被替换、版本握手触发重绑)"
+APPCONF="Config/AppConfig.xcconfig"
+cfg_hash() { /usr/bin/shasum -a 256 "$PBXPROJ" "$APPCONF" | /usr/bin/awk '{print $1}' | tr '\n' ' '; }
+CFG_HASH_BEFORE="$(cfg_hash)"
+assert_tracked_config_unchanged() {
+  if [ "$(cfg_hash)" != "$CFG_HASH_BEFORE" ]; then
+    echo "构建过程改写了 tracked 配置（$PBXPROJ / $APPCONF）——违反无副作用约定，失败退出" >&2
+    exit 1
+  fi
+}
+note "build 号 = ${APPIDGE_BUILD_NUMBER}（由调用方显式提供，不改 pbxproj）"
 
 # ---------------------------------------------------------------------------
 # 1. 公证凭证：xcrun notarytool 支持两种认证方式，这里都支持，任选其一。
@@ -172,10 +214,14 @@ cat > "$EXPORT_PLIST" <<PLIST
 </plist>
 PLIST
 
-note "2/5 xcodebuild archive（Release 配置，授权端点已校验，scheme App，同时归档 App + ProxyExtension）"
+note "2/5 xcodebuild archive（Release 配置，授权/更新端点已校验，scheme App，同时归档 App + ProxyExtension）"
 xcodebuild -scheme App -configuration Release archive -archivePath "$ARCHIVE_PATH" \
+  CURRENT_PROJECT_VERSION="$APPIDGE_BUILD_NUMBER" \
   LICENSE_API_BASE_URL="$LICENSE_API_BASE_URL" \
-  LICENSE_CHECKOUT_URL="$LICENSE_CHECKOUT_URL"
+  LICENSE_CHECKOUT_URL="$LICENSE_CHECKOUT_URL" \
+  SPARKLE_FEED_URL="$SPARKLE_FEED_URL"
+
+assert_tracked_config_unchanged
 
 note "3/5 xcodebuild -exportArchive（Developer ID 导出）"
 xcodebuild -exportArchive \
@@ -206,4 +252,5 @@ fi
 note "5/5 公证通过，staple 公证票据到 .app"
 xcrun stapler staple "$EXPORTED_APP"
 
-note "完成：$EXPORTED_APP 已归档、导出、公证并 staple，可以分发"
+assert_tracked_config_unchanged
+note "完成：$EXPORTED_APP 已归档、导出、公证并 staple，可以分发（tracked 配置未被改写）"

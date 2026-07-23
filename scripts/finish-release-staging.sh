@@ -1,73 +1,51 @@
 #!/bin/sh
-# scripts/finish-release-staging.sh
-# 续跑 staging 发布：app 已归档+公证+staple（build/export/appidge.app），本脚本只做
-# DMG 公证 → EdDSA appcast → 部署 updates.appidge.com → 验证 → 还原 AppConfig。
-# 全绝对路径。请在【自己的 Terminal】里跑（generate_appcast 会弹钥匙串授权，需你点“始终允许”）。
+# scripts/finish-release-staging.sh —— 兼容 wrapper（逻辑已迁移到 ops/bin/appidge-ops）。
 #
-# ★ 前置：必须【完全退出】appidge 和 Proxifier —— 它们在拦截 timestamp.apple.com，
-#   导致 codesign 报 "A timestamp was expected but was not found."。
-#   确认：`systemextensionsctl list` 里 appidge / Proxifier 都不再是 activated enabled。
+# 旧版本「续跑 staging 发布」（DMG 公证 → appcast → 部署 → 还原 AppConfig）已由
+# appidge-ops 的 prepare-updates / publish-updates 取代：不改写 tracked 配置、
+# staging feed 固定 updates-staging.appidge.com、发布前做 25MiB/host/签名一致性检查。
+#
+# 用法：
+#   scripts/finish-release-staging.sh --build-number <N>            # 只本地准备（prepare-updates）
+#   scripts/finish-release-staging.sh --build-number <N> --apply    # 准备 + 真实发布（publish-updates）
+# 远端发布必须显式 --apply；无参数运行只显示用法并退出非零。
 set -eu
 
-REPO="/Users/admin/appidge"
-WRANGLER="/Users/admin/appidge/apps/api/node_modules/.bin/wrangler"
-GEN_APPCAST="/Users/admin/Library/Developer/Xcode/DerivedData/appidge-afvulpcmatefggdpoawebmbxyles/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_appcast"
-[ -x "$GEN_APPCAST" ] || GEN_APPCAST="$(/usr/bin/find "$HOME/Library/Developer/Xcode/DerivedData" -name generate_appcast -type f 2>/dev/null | /usr/bin/head -1)"
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+OPS="$ROOT/ops/bin/appidge-ops"
 
-set -a; . "$REPO/.env"; set +a
+usage() {
+  cat >&2 <<'EOF'
+scripts/finish-release-staging.sh 已改为 ops/bin/appidge-ops 的兼容 wrapper。
 
-echo "===[0/5] 预检：真实做一次带时间戳的 codesign（比 curl 靠谱）==="
-PROBE_DIR="$(/usr/bin/mktemp -d)"; /bin/cp /bin/echo "$PROBE_DIR/probe"
-if ! /usr/bin/codesign --force --sign "$DEVELOPER_ID_APPLICATION" --timestamp "$PROBE_DIR/probe" 2>"$PROBE_DIR/err"; then
-  echo "❌ 安全时间戳签名失败 —— appidge / Proxifier 代理仍在拦截 timestamp.apple.com。" >&2
-  echo "   请【完全退出】两者（systemextensionsctl list 里都不再 activated enabled），再跑本脚本。" >&2
-  /bin/cat "$PROBE_DIR/err" >&2; exit 1
+  scripts/finish-release-staging.sh --build-number <N>            # prepare-updates staging（只本地）
+  scripts/finish-release-staging.sh --build-number <N> --apply    # + publish-updates staging --apply
+
+等价于：
+  ops/bin/appidge-ops prepare-updates staging --build-number <N>
+  ops/bin/appidge-ops publish-updates staging --apply --build-number <N>
+EOF
+}
+
+[ $# -gt 0 ] || { usage; exit 2; }
+[ -x "$OPS" ] || { echo "缺 $OPS" >&2; exit 1; }
+
+APPLY=0
+BUILD_NUMBER=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --apply) APPLY=1 ;;
+    --build-number) shift; BUILD_NUMBER="${1:-}" ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "未知参数：$1" >&2; usage; exit 2 ;;
+  esac
+  shift
+done
+[ -n "$BUILD_NUMBER" ] || { usage; exit 2; }
+
+"$OPS" prepare-updates staging --build-number "$BUILD_NUMBER"
+if [ "$APPLY" = 1 ]; then
+  exec "$OPS" publish-updates staging --apply --build-number "$BUILD_NUMBER"
+else
+  echo "[finish-release-staging] 已完成本地准备。真实发布需显式 --apply（将执行 publish-updates staging --apply）。"
 fi
-echo "✅ 安全时间戳可用"
-
-echo "===[1/5] 打包 + 公证 + staple DMG ==="
-/bin/sh "$REPO/scripts/make-dmg.sh"
-
-echo "===[2/5] 生成 EdDSA 签名 appcast —— 弹钥匙串授权时请点【始终允许 / Always Allow】==="
-/bin/rm -rf "$REPO/build/appcast"; /bin/mkdir -p "$REPO/build/appcast"
-/bin/cp "$REPO"/build/appidge-*.dmg "$REPO/build/appcast/"
-"$GEN_APPCAST" "$REPO/build/appcast" --download-url-prefix "https://updates.appidge.com/"
-
-echo "===[3/5] 部署 updates.appidge.com（Workers 静态资源）==="
-/bin/rm -rf "$REPO/infra/updates/public"; /bin/mkdir -p "$REPO/infra/updates/public"
-/bin/cp "$REPO"/build/appcast/appcast.xml "$REPO"/build/appcast/*.dmg "$REPO/infra/updates/public/"
-# 官网「下载 App」按钮指向稳定文件名，随每次发布刷新为最新 DMG。
-/bin/cp "$REPO"/build/appcast/*.dmg "$REPO/infra/updates/public/appidge-latest.dmg"
-( cd "$REPO/infra/updates" && "$WRANGLER" deploy --env staging )
-
-echo "===[4/5] 验证 ==="
-/usr/bin/curl -sI -m 15 https://updates.appidge.com/appcast.xml | /usr/bin/head -1
-/usr/bin/grep -oE 'sparkle:version="[^"]+"|url="[^"]+\.dmg"|length="[^"]+"' "$REPO/build/appcast/appcast.xml" || true
-
-echo "===[5/5] 还原 AppConfig 为 prod 默认 ==="
-cat > "$REPO/Config/AppConfig.xcconfig" <<'PRODEOF'
-// Config/AppConfig.xcconfig
-// 非秘密、已提交的应用运行期配置。可按环境覆盖:直接改本文件、用另一个 xcconfig include 覆盖,
-// 或构建期传 `xcodebuild LICENSE_API_BASE_URL=... build`。
-// 这里不放任何签名信息或密钥(那些在 git-ignore 的 Config/Signing.xcconfig)。
-//
-// License facade · Worker API base URL。
-// Release 默认直连生产 facade；本地/staging 可用另一个 xcconfig 或 xcodebuild 参数覆盖。
-// staging: https://api-staging.appidge.com
-// prod:    https://api.appidge.com
-LICENSE_API_BASE_URL = https:/$()/api.appidge.com
-
-// App 内稳定购买入口指向官网定价页；真实 Polar Checkout 由官网部署配置持有，
-// 日后更换 checkout 无需重新发布 macOS App。
-LICENSE_CHECKOUT_URL = https:/$()/appidge.com/pricing
-
-// Sparkle 自动升级 appcast feed 地址。
-// 默认 = prod,保持当前发布行为不变。
-// staging 覆盖: https://updates.appidge.com/appcast.xml
-// 注意:xcconfig 把 `//` 当行注释起点,URL 里的双斜杠会被吞掉;用空展开 $() 隔断两个斜杠,
-//       展开后仍是 https://updates.appidge.com/appcast.xml。命令行 xcodebuild VAR=... 覆盖不受此限。
-SPARKLE_FEED_URL = https:/$()/updates.appidge.com/appcast.xml
-// 让编译器把 SwiftUI 本地化字符串提取/合并进 catalog（IDE 构建自动同步；防新串回退成中文源）。
-SWIFT_EMIT_LOC_STRINGS = YES
-PRODEOF
-echo "=== DONE：updates.appidge.com 已上线 appcast + DMG，AppConfig 已还原 prod ==="

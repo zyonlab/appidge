@@ -56,7 +56,7 @@ load_environment() { # $1 = staging|production
   OPS_ENV=$1
   case "$OPS_ENV" in
     staging|production) ;;
-    *) ops_die "未知环境：$OPS_ENV（只支持 staging|production）" ;;
+    *) ops_die "未知环境：${OPS_ENV}（只支持 staging|production）" ;;
   esac
   OPS_CONF="${APPIDGE_OPS_CONFIG_DIR:-$OPS_ROOT/ops/environments}/$OPS_ENV.conf"
   [ -f "$OPS_CONF" ] || ops_die "缺环境配置：$OPS_CONF"
@@ -65,7 +65,7 @@ load_environment() { # $1 = staging|production
   for k in $(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$OPS_CONF" | cut -d= -f1); do
     case " $OPS_ALLOW_KEYS " in
       *" $k "*) ;;
-      *) ops_die "$OPS_CONF 含非 allowlist key：$k（契约见 free-plan 文档 §5.3）" ;;
+      *) ops_die "$OPS_CONF 含非 allowlist key：${k}（契约见 free-plan 文档 §5.3）" ;;
     esac
   done
 
@@ -152,7 +152,7 @@ validate_config_urls() { # 依赖 load_environment 已执行
   done
 
   [ "${API_D1_DATABASE_NAME:-}" = "appidge-licensing-$_env" ] \
-    || fail_add "API_D1_DATABASE_NAME 应为 appidge-licensing-$_env：${API_D1_DATABASE_NAME:-空}"
+    || fail_add "API_D1_DATABASE_NAME 应为 appidge-licensing-${_env}：${API_D1_DATABASE_NAME:-空}"
 }
 
 # ---------------------------------------------------------------------------
@@ -181,7 +181,7 @@ validate_wrangler_topology() {
   [ "$u_prd" = "updates.appidge.com" ] \
     || fail_add "infra/updates production route 应为 updates.appidge.com：${u_prd:-空}"
   [ -n "$u_stg" ] && [ "$u_stg" = "$u_prd" ] \
-    && fail_add "staging/production updates hostname 重复：$u_stg（一个自定义域只能挂一个 Worker）"
+    && fail_add "staging/production updates hostname 重复：${u_stg}（一个自定义域只能挂一个 Worker）"
 
   api_prod_section | grep -q 'pattern *= *"api\.appidge\.com"' \
     || fail_add "apps/api/wrangler.toml 缺 production route api.appidge.com"
@@ -261,7 +261,7 @@ assert_static_assets_within_limit() { # $1=目录
   for f in $(find "$_d" -type f 2>/dev/null); do
     _sz=$(file_size "$f")
     if [ "${_sz:-0}" -gt "$OPS_MAX_ASSET_BYTES" ]; then
-      echo "静态文件超过 Workers Free 单文件 25MiB 限制：$f（$_sz 字节）——请迁移 DMG 到 R2 后再发布" >&2
+      echo "静态文件超过 Workers Free 单文件 25MiB 限制：${f}（$_sz 字节）——请迁移 DMG 到 R2 后再发布" >&2
       _bad=1
     fi
   done

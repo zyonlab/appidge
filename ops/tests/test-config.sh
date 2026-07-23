@@ -160,14 +160,14 @@ for env in staging production; do
     esac
   done
   [ -z "$extra" ] && t_pass "$conf 只含 allowlist keys" \
-    || t_fail "$conf 只含 allowlist keys（多出：$extra）"
+    || t_fail "$conf 只含 allowlist keys（多出：${extra}）"
 
   missing=""
   for k in $ALLOW_KEYS; do
     grep -q "^$k=" "$conf" || missing="$missing $k"
   done
   [ -z "$missing" ] && t_pass "$conf 含全部 allowlist keys" \
-    || t_fail "$conf 含全部 allowlist keys（缺：$missing）"
+    || t_fail "$conf 含全部 allowlist keys（缺：${missing}）"
 
   [ "$(conf_get "$conf" APPIDGE_ENVIRONMENT)" = "$env" ] \
     && t_pass "$conf APPIDGE_ENVIRONMENT=$env" \
@@ -185,7 +185,7 @@ for env in staging production; do
     esac
   done
   [ -z "$bad_url" ] && t_pass "$conf 所有 URL 均为 HTTPS 或 REQUIRED_ 占位" \
-    || t_fail "$conf 所有 URL 均为 HTTPS 或 REQUIRED_ 占位（违规：$bad_url）"
+    || t_fail "$conf 所有 URL 均为 HTTPS 或 REQUIRED_ 占位（违规：${bad_url}）"
 done
 
 # staging conf 专项：appidge 域 URL 必须落在 staging hostname
@@ -220,7 +220,7 @@ if [ -f "$PC" ]; then
     esac
   done
   [ -z "$bad" ] && t_pass "production conf 无 staging/sandbox/localhost/.invalid/PLACEHOLDER" \
-    || t_fail "production conf 无 staging/sandbox/localhost/.invalid/PLACEHOLDER（违规：$bad）"
+    || t_fail "production conf 无 staging/sandbox/localhost/.invalid/PLACEHOLDER（违规：${bad}）"
   [ "$(conf_get "$PC" API_D1_DATABASE_NAME)" = "appidge-licensing-production" ] \
     && t_pass "production D1 名称 = appidge-licensing-production" \
     || t_fail "production D1 名称 = appidge-licensing-production"

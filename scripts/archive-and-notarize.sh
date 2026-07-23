@@ -95,7 +95,7 @@ cfg_hash() { /usr/bin/shasum -a 256 "$PBXPROJ" "$APPCONF" | /usr/bin/awk '{print
 CFG_HASH_BEFORE="$(cfg_hash)"
 assert_tracked_config_unchanged() {
   if [ "$(cfg_hash)" != "$CFG_HASH_BEFORE" ]; then
-    echo "构建过程改写了 tracked 配置（$PBXPROJ / $APPCONF）——违反无副作用约定，失败退出" >&2
+    echo "构建过程改写了 tracked 配置（$PBXPROJ / ${APPCONF}）——违反无副作用约定，失败退出" >&2
     exit 1
   fi
 }
@@ -129,7 +129,7 @@ if [ -n "${NOTARY_API_KEY_PATH:-}" ] || [ -n "${NOTARY_API_KEY_ID:-}" ] || [ -n 
   : "${NOTARY_API_KEY_ID:?NOTARY_API_KEY_ID missing in .env（App Store Connect API key 的 Key ID）}"
   : "${NOTARY_API_ISSUER_ID:?NOTARY_API_ISSUER_ID missing in .env（App Store Connect 的 Issuer ID）}"
   [ -f "$NOTARY_API_KEY_PATH" ] || {
-    echo "缺 API key 文件: $NOTARY_API_KEY_PATH（NOTARY_API_KEY_PATH 指向的路径不存在）" >&2
+    echo "缺 API key 文件: ${NOTARY_API_KEY_PATH}（NOTARY_API_KEY_PATH 指向的路径不存在）" >&2
     exit 1
   }
   USE_API_KEY=1

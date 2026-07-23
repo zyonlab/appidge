@@ -1,22 +1,27 @@
 # apps/api/.dev.vars.example —— 复制成 .dev.vars 填值；.dev.vars 已 git-ignore，绝不提交。
-# 本地/CI 自动测试默认 MOCK_MODE=true：用协议化 mock，不触真实 Creem，不需要真 key。
+# 本地/CI 自动测试默认 MOCK_MODE=true：用协议化 mock，不触真实 Polar，不需要真 token。
 # 上线时用 `wrangler secret put <NAME>` 注入生产 secret，绝不写进代码或 git。
 #
 # ── 开关 ──────────────────────────────────────────────────
-# true  = 用内置协议 mock（无网络、无真实 Creem），本地/CI 默认
-# false = 打真实 Creem test API（需要下面的真 test key）
+# true  = 用内置协议 mock（无网络、无真实 Polar），本地/CI 默认
+# false = 打真实 Polar sandbox/prod API（需要下面的真 token + 标识）
 MOCK_MODE=true
 
-# ── Creem license API（服务端密钥，仅 Worker secret binding 持有）──
-# 真值前缀 creem_test_（test 模式）/ 生产另发。绝不进客户端或前端。
-CREEM_API_KEY=creem_test_PLACEHOLDER_xxxxxxxxxxxxxxxx
-# 测试 base；生产为 https://api.creem.io
-CREEM_API_BASE=https://test-api.creem.io
-# 白名单校验用：只接受本产品的 webhook / checkout
-CREEM_PRODUCT_ID=prod_PLACEHOLDER_xxxxxxxx
+# ── Polar license-key API（服务端 access token，仅 Worker secret binding 持有）──
+# 真值前缀 polar_oat_（organization access token）。绝不进客户端或前端。
+POLAR_ACCESS_TOKEN=polar_oat_PLACEHOLDER_xxxxxxxxxxxxxxxx
+# sandbox：https://sandbox-api.polar.sh ；生产：https://api.polar.sh
+POLAR_API_BASE=https://sandbox-api.polar.sh
+# 每次 license API 调用必带的组织 id（非秘密，但仍集中配置）
+POLAR_ORGANIZATION_ID=org_PLACEHOLDER_xxxxxxxx
+# 白名单：只接受本产品的 order webhook
+POLAR_PRODUCT_ID=prod_PLACEHOLDER_xxxxxxxx
+# 白名单：只接受本 license-key benefit 的 grant webhook
+POLAR_BENEFIT_ID=ben_PLACEHOLDER_xxxxxxxx
 
-# ── Webhook 验签（HMAC-SHA256 over raw body，header creem-signature）──
-CREEM_WEBHOOK_SECRET=whsec_PLACEHOLDER_xxxxxxxxxxxxxxxx
+# ── Webhook 验签（Standard Webhooks，headers webhook-id/timestamp/signature）──
+# Polar 面板生成的 endpoint secret，通常前缀 whsec_（base64）。
+POLAR_WEBHOOK_SECRET=whsec_PLACEHOLDER_xxxxxxxxxxxxxxxx
 
 # ── 本地脱敏用 pepper：对 license key 做 HMAC fingerprint 存 D1，不存明文 key ──
 LICENSE_HMAC_PEPPER=dev_pepper_PLACEHOLDER_change_me

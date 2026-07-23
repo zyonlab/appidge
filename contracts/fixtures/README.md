@@ -5,13 +5,16 @@
 1. **facade/** —— 本仓库 Worker facade 的对外契约（`licensing.openapi.yaml` 的实例）。
    由我们定义，稳定，Swift/TS 双端契约测试都读它。**当前可用。**
 
-2. **creem/** —— Creem **上游**真实 webhook payload 的脱敏样本。
-   ✅ 已用 Creem test mode 实测捕获并脱敏（2026-07-21）：`checkout.completed.json` /
-   `refund.created.json` / `dispute.created.json`。结构：顶层 `id`+`eventType`+`object`，
-   业务字段在 `object.order.{id,customer,product}` 等。
-   ⚠️ 关键：**这些 webhook 都不含 license key**；且 license API 只回 product_id、不回 order_id，
-   两侧无公共 join key → 吊销走 validate 主路（Creem status），webhook 只做验签+幂等登记。见
-   `apps/api/src/creem/mapping.ts` 顶部注释与 `docs/creem-integration.md`。
+2. **polar/** —— Polar **上游** webhook payload 的脱敏样本。
+   信封为 `{ type, timestamp, data }`：`benefit_grant.created.json` / `benefit_grant.revoked.json` /
+   `order.refunded.json`。
+   ✅ 关键（相对 Creem 的改进）：license-key benefit 的 grant 事件在
+   `data.properties.license_key_id` 直接携带 **license_key_id**（+ `order_id`/`customer_id`），
+   这是 app 路径（validate 上游返回同一 id）与 webhook 路径共享的稳定 join key，
+   因此可做 per-license 精确吊销。见 `apps/api/src/polar/mapping.ts` 顶部注释与
+   `docs/polar-integration.md`。
+   ⚠️ 这些 fixture 目前据 Polar OpenAPI schema 构造（标注 `TODO(polar)`）；上线前用 sandbox test mode
+   真实捕获替换并核对字段。**这些 webhook 不含明文 license key**（只有 license_key_id）。
 
 ## 纪律
 

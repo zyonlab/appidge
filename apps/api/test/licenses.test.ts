@@ -3,7 +3,7 @@ import { env } from "cloudflare:test";
 import { handleRequest } from "../src/index";
 import { ctxWith, resetSchema, fixedClock, jsonPost } from "./helpers";
 import { licenseFingerprint } from "../src/crypto";
-import { revokeByFingerprint } from "../src/db";
+import { revokeByLicenseKeyId } from "../src/db";
 import { FixedWindowRateLimiter } from "../src/ratelimit";
 import activateSuccess from "../../../contracts/fixtures/facade/activate.success.json";
 import errorActivationLimit from "../../../contracts/fixtures/facade/error.activation_limit.json";
@@ -119,23 +119,29 @@ describe("POST /v1/licenses/validate", () => {
     expect((await res.json() as { status: string }).status).toBe("expired");
   });
 
-  it("LOCAL revoked overrides upstream active", async () => {
+  it("LOCAL revoked overrides upstream active (webhook revoke by license_key_id → validate local-first)", async () => {
     const licenseKey = "MOCK-LICENSE-0000-0000-0000"; // upstream would say active
+    const body = { licenseKey, instanceId: "inst_MOCK_0000000000", appVersion: "1.0.0" };
+    // 1) 首次 validate：上游 active，惰性登记 fingerprint↔license_key_id 映射。
+    const r1 = await call("/v1/licenses/validate", body);
+    expect((await r1.json() as { status: string }).status).toBe("active");
+    // 2) 取到该行 license_key_id，模拟 webhook 精确吊销（benefit_grant.revoked）。
     const fp = await licenseFingerprint(env.LICENSE_HMAC_PEPPER, licenseKey);
-    await revokeByFingerprint(env.DB, {
-      fingerprint: fp,
+    const row = await env.DB.prepare("SELECT license_key_id FROM entitlements WHERE license_fingerprint = ?")
+      .bind(fp)
+      .first<{ license_key_id: string }>();
+    expect(row?.license_key_id).toBeTruthy();
+    await revokeByLicenseKeyId(env.DB, {
+      licenseKeyId: row!.license_key_id,
       orderId: "ord_MOCK_0000",
       reason: "refund",
       sourceEventId: "evt_seed",
       now: CLOCK,
     });
-    const res = await call("/v1/licenses/validate", {
-      licenseKey,
-      instanceId: "inst_MOCK_0000000000",
-      appVersion: "1.0.0",
-    });
-    expect(res.status).toBe(200);
-    expect((await res.json() as { status: string }).status).toBe("revoked");
+    // 3) 再次 validate：本地 revoked 优先于上游 active。
+    const r2 = await call("/v1/licenses/validate", body);
+    expect(r2.status).toBe(200);
+    expect((await r2.json() as { status: string }).status).toBe("revoked");
   });
 });
 
@@ -194,7 +200,7 @@ describe("input validation & abuse guards", () => {
   });
 
   it("wrong content-type → invalid_request (400)", async () => {
-    const req = new Request("https://api.appidge.app/v1/licenses/activate", {
+    const req = new Request("https://api.appidge.com/v1/licenses/activate", {
       method: "POST",
       headers: { "content-type": "text/plain" },
       body: "{}",
@@ -205,7 +211,7 @@ describe("input validation & abuse guards", () => {
   });
 
   it("malformed JSON → invalid_request (400)", async () => {
-    const req = new Request("https://api.appidge.app/v1/licenses/activate", {
+    const req = new Request("https://api.appidge.com/v1/licenses/activate", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: "{ not json",
@@ -238,7 +244,7 @@ describe("input validation & abuse guards", () => {
   });
 
   it("unknown route → 404", async () => {
-    const res = await handleRequest(new Request("https://api.appidge.app/nope"), ctxWith());
+    const res = await handleRequest(new Request("https://api.appidge.com/nope"), ctxWith());
     expect(res.status).toBe(404);
   });
 });

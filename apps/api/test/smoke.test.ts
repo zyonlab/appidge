@@ -8,7 +8,7 @@ describe("smoke", () => {
   });
 
   it("healthz returns ok + mockMode", async () => {
-    const res = await handleRequest(new Request("https://api.appidge.app/healthz"), ctxWith());
+    const res = await handleRequest(new Request("https://api.appidge.com/healthz"), ctxWith());
     expect(res.status).toBe(200);
     const body = (await res.json()) as { status: string; mockMode: boolean };
     expect(body.status).toBe("ok");

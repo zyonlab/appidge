@@ -1,16 +1,16 @@
-// 应用上下文 —— 依赖注入边界。所有外部副作用（Creem、时钟、限速、日志）走这里，
+// 应用上下文 —— 依赖注入边界。所有外部副作用（Polar、时钟、限速、日志）走这里，
 // 便于测试注入 mock（Core reducer 之外的等价隔离）。
 import type { Env } from "./env";
 import { isMockMode, intVar } from "./env";
-import type { CreemClient } from "./creem/client";
-import { MockCreemClient } from "./creem/mock";
-import { HttpCreemClient } from "./creem/http";
+import type { LicenseClient } from "./polar/client";
+import { MockPolarClient } from "./polar/mock";
+import { HttpPolarClient } from "./polar/http";
 import { createLogger, type Logger } from "./log";
 import { FixedWindowRateLimiter, type RateLimiter } from "./ratelimit";
 
 export interface AppContext {
   env: Env;
-  creem: CreemClient;
+  license: LicenseClient;
   logger: Logger;
   rateLimiter: RateLimiter;
   now: () => Date;
@@ -21,8 +21,12 @@ const limiterCache = new Map<string, RateLimiter>();
 
 export function buildContext(env: Env, overrides?: Partial<AppContext>): AppContext {
   const mock = isMockMode(env);
-  const creem: CreemClient =
-    overrides?.creem ?? (mock ? new MockCreemClient() : new HttpCreemClient(env.CREEM_API_BASE, env.CREEM_API_KEY));
+  const now = overrides?.now ?? (() => new Date());
+  const license: LicenseClient =
+    overrides?.license ??
+    (mock
+      ? new MockPolarClient()
+      : new HttpPolarClient(env.POLAR_API_BASE, env.POLAR_ACCESS_TOKEN, env.POLAR_ORGANIZATION_ID, now));
 
   const max = intVar(env.RATE_LIMIT_MAX, 60);
   const windowMs = intVar(env.RATE_LIMIT_WINDOW_MS, 60000);
@@ -36,13 +40,13 @@ export function buildContext(env: Env, overrides?: Partial<AppContext>): AppCont
     }
   }
 
-  const secrets = [env.CREEM_API_KEY, env.CREEM_WEBHOOK_SECRET, env.LICENSE_HMAC_PEPPER].filter(Boolean);
+  const secrets = [env.POLAR_ACCESS_TOKEN, env.POLAR_WEBHOOK_SECRET, env.LICENSE_HMAC_PEPPER].filter(Boolean);
 
   return {
     env,
-    creem,
+    license,
     logger: overrides?.logger ?? createLogger(secrets),
     rateLimiter,
-    now: overrides?.now ?? (() => new Date()),
+    now,
   };
 }

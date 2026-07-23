@@ -1,5 +1,5 @@
 // 稳定错误模型 —— 与 contracts/licensing.openapi.yaml 的 Error.enum 完全一致。
-// 绝不透传 Creem 内部响应文本；message 只放脱敏的人类可读补充。
+// 绝不透传 Polar 内部响应文本；message 只放脱敏的人类可读补充。
 
 export type ErrorCode =
   | "invalid_request"

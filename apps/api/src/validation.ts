@@ -1,6 +1,6 @@
 // 输入校验：body 大小、Content-Type、字段白名单/长度、product ID 白名单。
 // 严格对齐 licensing.openapi.yaml 的 request schema（additionalProperties:false + 长度约束）。
-// 本 Worker 不是通用 Creem 代理，一切请求都必须显式白名单通过。
+// 本 Worker 不是通用 Polar 代理，一切请求都必须显式白名单通过。
 
 import { ApiError } from "./errors";
 

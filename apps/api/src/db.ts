@@ -1,12 +1,16 @@
 // D1 数据访问：webhook 幂等登记 + entitlement 状态。
+// entitlements 以 Polar license_key_id 为主键（webhook 与 app 路径共享的稳定 join key）；
+// license_fingerprint 为 app 路径惰性填充的索引列（validate 本地-优先吊销用）。
 // 纪律：只存 license 指纹，不存明文 key / 原始 payload / 非必要 PII。
 
 export type EntitlementStatus = "active" | "revoked";
 
 export interface EntitlementRow {
-  license_fingerprint: string;
+  license_key_id: string;
+  license_fingerprint: string | null;
   order_id: string | null;
   customer_id: string | null;
+  benefit_id: string | null;
   product_id: string | null;
   status: EntitlementStatus;
   reason: string | null;
@@ -54,13 +58,14 @@ export async function markWebhookProcessed(db: D1Database, eventId: string, now:
     .run();
 }
 
-// checkout.completed：置为 active，但**绝不把已 revoked 翻回 active**（退款/拒付优先）。
+// benefit_grant.created：置为 active，但**绝不把已 revoked 翻回 active**（退款/拒付优先）。
 export async function upsertActiveEntitlement(
   db: D1Database,
   e: {
-    fingerprint: string;
+    licenseKeyId: string;
     orderId?: string;
     customerId?: string;
+    benefitId?: string;
     productId?: string;
     sourceEventId: string;
     now: string;
@@ -69,20 +74,22 @@ export async function upsertActiveEntitlement(
   await db
     .prepare(
       `INSERT INTO entitlements
-         (license_fingerprint, order_id, customer_id, product_id, status, reason, source_event_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'active', 'checkout', ?, ?, ?)
-       ON CONFLICT(license_fingerprint) DO UPDATE SET
-         order_id        = COALESCE(excluded.order_id, entitlements.order_id),
-         customer_id     = COALESCE(excluded.customer_id, entitlements.customer_id),
-         product_id      = COALESCE(excluded.product_id, entitlements.product_id),
-         status          = CASE WHEN entitlements.status = 'revoked' THEN 'revoked' ELSE 'active' END,
-         reason          = CASE WHEN entitlements.status = 'revoked' THEN entitlements.reason ELSE 'checkout' END,
-         updated_at      = excluded.updated_at`,
+         (license_key_id, license_fingerprint, order_id, customer_id, benefit_id, product_id, status, reason, source_event_id, created_at, updated_at)
+       VALUES (?, NULL, ?, ?, ?, ?, 'active', 'grant', ?, ?, ?)
+       ON CONFLICT(license_key_id) DO UPDATE SET
+         order_id    = COALESCE(excluded.order_id, entitlements.order_id),
+         customer_id = COALESCE(excluded.customer_id, entitlements.customer_id),
+         benefit_id  = COALESCE(excluded.benefit_id, entitlements.benefit_id),
+         product_id  = COALESCE(excluded.product_id, entitlements.product_id),
+         status      = CASE WHEN entitlements.status = 'revoked' THEN 'revoked' ELSE 'active' END,
+         reason      = CASE WHEN entitlements.status = 'revoked' THEN entitlements.reason ELSE 'grant' END,
+         updated_at  = excluded.updated_at`,
     )
     .bind(
-      e.fingerprint,
+      e.licenseKeyId,
       e.orderId ?? null,
       e.customerId ?? null,
+      e.benefitId ?? null,
       e.productId ?? null,
       e.sourceEventId,
       e.now,
@@ -91,28 +98,28 @@ export async function upsertActiveEntitlement(
     .run();
 }
 
-// refund/dispute：置为 revoked。可能先于 checkout 到达（用指纹 upsert 建行）。
-export async function revokeByFingerprint(
+// benefit_grant.revoked：按 license_key_id 精确吊销。可能先于 grant 到达（用 id upsert 建行）。
+export async function revokeByLicenseKeyId(
   db: D1Database,
-  e: { fingerprint: string; orderId?: string; customerId?: string; reason: string; sourceEventId: string; now: string },
+  e: { licenseKeyId: string; orderId?: string; customerId?: string; reason: string; sourceEventId: string; now: string },
 ): Promise<void> {
   await db
     .prepare(
       `INSERT INTO entitlements
-         (license_fingerprint, order_id, customer_id, product_id, status, reason, source_event_id, created_at, updated_at)
-       VALUES (?, ?, ?, NULL, 'revoked', ?, ?, ?, ?)
-       ON CONFLICT(license_fingerprint) DO UPDATE SET
-         status       = 'revoked',
-         reason       = excluded.reason,
-         order_id     = COALESCE(excluded.order_id, entitlements.order_id),
-         customer_id  = COALESCE(excluded.customer_id, entitlements.customer_id),
-         updated_at   = excluded.updated_at`,
+         (license_key_id, license_fingerprint, order_id, customer_id, benefit_id, product_id, status, reason, source_event_id, created_at, updated_at)
+       VALUES (?, NULL, ?, ?, NULL, NULL, 'revoked', ?, ?, ?, ?)
+       ON CONFLICT(license_key_id) DO UPDATE SET
+         status      = 'revoked',
+         reason      = excluded.reason,
+         order_id    = COALESCE(excluded.order_id, entitlements.order_id),
+         customer_id = COALESCE(excluded.customer_id, entitlements.customer_id),
+         updated_at  = excluded.updated_at`,
     )
-    .bind(e.fingerprint, e.orderId ?? null, e.customerId ?? null, e.reason, e.sourceEventId, e.now, e.now)
+    .bind(e.licenseKeyId, e.orderId ?? null, e.customerId ?? null, e.reason, e.sourceEventId, e.now, e.now)
     .run();
 }
 
-// 无 license 指纹时按 order 吊销（refund 只带 order 的情形）。返回受影响行数。
+// 无 license_key_id 时按 order 吊销（order.refunded/refund.created 兜底）。返回受影响行数。
 export async function revokeByOrder(
   db: D1Database,
   e: { orderId: string; reason: string; now: string },
@@ -124,15 +131,40 @@ export async function revokeByOrder(
   return res.meta.changes ?? 0;
 }
 
-export async function getEntitlement(db: D1Database, fingerprint: string): Promise<EntitlementRow | null> {
+// app 路径（activate/validate 成功）惰性登记 fingerprint ↔ license_key_id 映射。
+// **绝不把已 revoked 翻回 active**；仅补全 fingerprint 供 validate 本地-优先命中。
+export async function upsertAppMapping(
+  db: D1Database,
+  e: { licenseKeyId: string; fingerprint: string; customerId?: string; now: string },
+): Promise<void> {
+  if (!e.licenseKeyId) return; // 上游未回 id（异常）→ 不写脏行
+  await db
+    .prepare(
+      `INSERT INTO entitlements
+         (license_key_id, license_fingerprint, order_id, customer_id, benefit_id, product_id, status, reason, source_event_id, created_at, updated_at)
+       VALUES (?, ?, NULL, ?, NULL, NULL, 'active', 'app', NULL, ?, ?)
+       ON CONFLICT(license_key_id) DO UPDATE SET
+         license_fingerprint = COALESCE(excluded.license_fingerprint, entitlements.license_fingerprint),
+         customer_id         = COALESCE(excluded.customer_id, entitlements.customer_id),
+         updated_at          = excluded.updated_at`,
+    )
+    .bind(e.licenseKeyId, e.fingerprint, e.customerId ?? null, e.now, e.now)
+    .run();
+}
+
+export async function getEntitlementByLicenseKeyId(db: D1Database, licenseKeyId: string): Promise<EntitlementRow | null> {
   return await db
-    .prepare("SELECT * FROM entitlements WHERE license_fingerprint = ?")
-    .bind(fingerprint)
+    .prepare("SELECT * FROM entitlements WHERE license_key_id = ?")
+    .bind(licenseKeyId)
     .first<EntitlementRow>();
 }
 
-// 本地是否已 revoke（refund/dispute）。用于 validate 时本地 deny 优先于上游 active。
-export async function isLocallyRevoked(db: D1Database, fingerprint: string): Promise<boolean> {
-  const row = await getEntitlement(db, fingerprint);
+// 本地是否已 revoke（退款/拒付）。validate 时本地 deny 优先于上游 active。
+// 按 fingerprint 查（app 只知道 licenseKey→fingerprint，不知道 license_key_id）。
+export async function isLocallyRevokedByFingerprint(db: D1Database, fingerprint: string): Promise<boolean> {
+  const row = await db
+    .prepare("SELECT status FROM entitlements WHERE license_fingerprint = ? AND status = 'revoked' LIMIT 1")
+    .bind(fingerprint)
+    .first<{ status: string }>();
   return row?.status === "revoked";
 }

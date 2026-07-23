@@ -4,15 +4,17 @@ export interface Env {
 
   // 开关 / 非秘密配置（wrangler.toml [vars]）
   MOCK_MODE: string; // "true" | "false"
-  CREEM_API_BASE: string;
-  CREEM_PRODUCT_ID: string;
+  POLAR_API_BASE: string; // sandbox: https://sandbox-api.polar.sh / prod: https://api.polar.sh
+  POLAR_ORGANIZATION_ID: string; // 每次 license API 调用必带（非秘密）
+  POLAR_PRODUCT_ID: string; // 白名单：只接受本产品的 order webhook
+  POLAR_BENEFIT_ID: string; // 白名单：只接受本 license-key benefit 的 grant webhook
   RATE_LIMIT_MAX: string;
   RATE_LIMIT_WINDOW_MS: string;
   MAX_BODY_BYTES: string;
 
   // secrets（本地 .dev.vars / 线上 wrangler secret）——绝不记录原值
-  CREEM_API_KEY: string;
-  CREEM_WEBHOOK_SECRET: string;
+  POLAR_ACCESS_TOKEN: string; // Authorization: Bearer <token>
+  POLAR_WEBHOOK_SECRET: string; // Standard Webhooks 签名密钥
   LICENSE_HMAC_PEPPER: string;
 }
 

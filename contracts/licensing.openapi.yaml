@@ -4,8 +4,8 @@ info:
   version: 1.0.0
   description: >-
     App ↔ Worker 之间的唯一契约。macOS 客户端只调用本 facade（api.appidge.app），
-    绝不直连带 x-api-key 的 Creem API。Worker 在服务端持有 Creem secret 并转译，
-    对客户端稳定化状态与错误，不透传 Creem 内部响应。
+    绝不直连带 Bearer token 的 Polar API。Worker 在服务端持有 Polar access token 并转译，
+    对客户端稳定化状态与错误，不透传 Polar 内部响应。
     本文件是语言边界真相：Swift DTO 与 TypeScript DTO 都以此为准，配合 contracts/fixtures 做契约测试。
 servers:
   - url: https://api.appidge.app
@@ -101,17 +101,27 @@ paths:
         "502": { $ref: "#/components/responses/Error" }
         "500": { $ref: "#/components/responses/Error" }
 
-  /v1/webhooks/creem:
+  /v1/webhooks/polar:
     post:
       tags: [webhooks]
-      summary: Creem webhook 接收端（HMAC over raw body 验签后处理）
-      operationId: creemWebhook
+      summary: Polar webhook 接收端（Standard Webhooks 验签后处理）
+      operationId: polarWebhook
       description: >-
-        用收到的原始请求字节计算 HMAC-SHA256，对 creem-signature 做恒定时间比较；
-        验签成功才解析 JSON。以事件 ID 幂等，重复投递返回 200 但不重复副作用。
+        Standard Webhooks 验签：signedContent = `{webhook-id}.{webhook-timestamp}.{rawBody}`，
+        expected = base64(HMAC-SHA256(secret, signedContent))，对 webhook-signature 的 `v1,<sig>`
+        做恒定时间比较，并校验时间戳漂移（±5min）防重放；验签成功才解析 JSON。
+        以 webhook-id 幂等，重复投递返回 200 但不重复副作用。
       parameters:
         - in: header
-          name: creem-signature
+          name: webhook-id
+          required: true
+          schema: { type: string }
+        - in: header
+          name: webhook-timestamp
+          required: true
+          schema: { type: string }
+        - in: header
+          name: webhook-signature
           required: true
           schema: { type: string }
       requestBody:
@@ -120,7 +130,7 @@ paths:
           application/json:
             schema:
               type: object
-              description: Creem 事件 payload（确切字段以 test mode 捕获的脱敏 fixture 为准）
+              description: Polar 事件信封 { type, timestamp, data }（确切字段以 sandbox 捕获的脱敏 fixture 为准）
       responses:
         "200":
           description: 已接收（含重复投递的幂等成功）
@@ -138,7 +148,7 @@ components:
   schemas:
     LicenseStatus:
       type: string
-      description: 稳定化后的授权状态（不透传 Creem 原始枚举）
+      description: 稳定化后的授权状态（不透传 Polar 原始枚举）
       enum: [active, expired, revoked]
 
     ActivateRequest:
@@ -150,7 +160,7 @@ components:
           type: string
           minLength: 8
           maxLength: 200
-          description: 用户从 Creem 邮件/门户复制的 license key
+          description: 用户从 Polar 邮件/客户门户复制的 license key
         instanceName:
           type: string
           minLength: 1
@@ -185,7 +195,7 @@ components:
         status: { $ref: "#/components/schemas/LicenseStatus" }
         instanceId:
           type: string
-          description: Creem instance.id，客户端必须本地存以供后续 validate/deactivate
+          description: Polar activation id，客户端必须本地存以供后续 validate/deactivate
         expiresAt:
           type: [string, "null"]
           format: date-time
@@ -217,7 +227,7 @@ components:
       properties:
         error:
           type: string
-          description: 稳定错误码，不透传 Creem 内部响应
+          description: 稳定错误码，不透传 Polar 内部响应
           enum:
             - invalid_request
             - invalid_license

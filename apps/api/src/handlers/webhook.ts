@@ -1,18 +1,19 @@
-// Creem webhook handler：
-//   1. 用原始请求字节计算 HMAC-SHA256，对 creem-signature 恒定时间比较；验签成功才解析 JSON。
-//   2. 以真实事件 ID 幂等（webhook_events 唯一约束），重复投递返回 200 但不重复副作用。
-//   3. checkout.completed → active（不翻回 revoked）；refund/dispute → 本地 revoked。
-//   4. 未知事件 / 未知 product / 无法可靠映射 → 安全忽略（登记 + 200，不吊销）。
+// Polar webhook handler：
+//   1. Standard Webhooks 验签（webhook-id/timestamp/signature，签名内容 id.timestamp.body，
+//      含时间戳漂移校验防重放）；验签成功才解析 JSON。
+//   2. 以 webhook-id 幂等（webhook_events 唯一约束），重复投递返回 200 但不重复副作用。
+//   3. benefit_grant.created → active（不翻回 revoked）；benefit_grant.revoked/refund → 本地 revoked。
+//   4. 未知事件 / 非本产品 benefit / 无法可靠映射 → 安全忽略（登记 + 200，不吊销）。
 import type { AppContext } from "../context";
 import { ApiError } from "../errors";
 import { json, errorResponse } from "../responses";
-import { verifyWebhookSignature, licenseFingerprint } from "../crypto";
-import { mapEvent, type CanonicalEvent } from "../creem/mapping";
+import { verifyStandardWebhook } from "../crypto";
+import { mapEvent, type CanonicalEvent } from "../polar/mapping";
 import {
   recordWebhookEvent,
   markWebhookProcessed,
   upsertActiveEntitlement,
-  revokeByFingerprint,
+  revokeByLicenseKeyId,
   revokeByOrder,
 } from "../db";
 import { intVar } from "../env";
@@ -26,8 +27,17 @@ export async function handleWebhook(ctx: AppContext, req: Request): Promise<Resp
     return errorResponse("invalid_request", 400, "Request body too large");
   }
 
-  const sig = req.headers.get("creem-signature");
-  const ok = await verifyWebhookSignature(ctx.env.CREEM_WEBHOOK_SECRET, raw, sig);
+  const webhookId = req.headers.get("webhook-id");
+  const ok = await verifyStandardWebhook(
+    ctx.env.POLAR_WEBHOOK_SECRET,
+    raw,
+    {
+      id: webhookId,
+      timestamp: req.headers.get("webhook-timestamp"),
+      signature: req.headers.get("webhook-signature"),
+    },
+    { nowMs: ctx.now().getTime() },
+  );
   if (!ok) {
     ctx.logger.warn("webhook.signature_invalid", {});
     return errorResponse("invalid_request", 401, "Signature verification failed");
@@ -41,21 +51,22 @@ export async function handleWebhook(ctx: AppContext, req: Request): Promise<Resp
     return errorResponse("invalid_request", 400, "Malformed JSON body");
   }
 
-  const event = mapEvent(payload);
+  const event = mapEvent(payload, webhookId);
   if (!event) {
-    return errorResponse("invalid_request", 400, "Unmappable event (missing event id)");
+    return errorResponse("invalid_request", 400, "Unmappable event (missing webhook id)");
   }
 
-  // product 白名单：非本产品事件安全忽略（登记幂等，不执行副作用）。
-  if (event.productId && event.productId !== ctx.env.CREEM_PRODUCT_ID) {
-    ctx.logger.warn("webhook.unknown_product", { eventId: event.eventId, eventType: event.eventType });
-    await recordWebhookEvent(ctx.env.DB, event.eventId, event.eventType, isoNow(ctx));
-    await markWebhookProcessed(ctx.env.DB, event.eventId, isoNow(ctx));
+  const now = isoNow(ctx);
+
+  // 白名单：非本 benefit / 非本 product 的事件安全忽略（登记幂等，不执行副作用）。
+  if (!isForOurProduct(ctx, event)) {
+    ctx.logger.warn("webhook.unknown_target", { eventId: event.eventId, eventType: event.eventType });
+    await recordWebhookEvent(ctx.env.DB, event.eventId, event.eventType, now);
+    await markWebhookProcessed(ctx.env.DB, event.eventId, now);
     return json({ received: true }, 200);
   }
 
   // 幂等登记
-  const now = isoNow(ctx);
   const reg = await recordWebhookEvent(ctx.env.DB, event.eventId, event.eventType, now);
   if (!reg.isNew && reg.alreadyProcessed) {
     ctx.logger.info("webhook.duplicate", { eventId: event.eventId, eventType: event.eventType });
@@ -67,7 +78,7 @@ export async function handleWebhook(ctx: AppContext, req: Request): Promise<Resp
     await dispatch(ctx, event, now);
     await markWebhookProcessed(ctx.env.DB, event.eventId, isoNow(ctx));
   } catch (err) {
-    // 副作用失败：保留 processed=0，返回 5xx 让 Creem 重投（下次安全重试）
+    // 副作用失败：保留 processed=0，返回 5xx 让 Polar 重投（下次安全重试）
     ctx.logger.error("webhook.dispatch_failed", {
       eventId: event.eventId,
       eventType: event.eventType,
@@ -80,51 +91,67 @@ export async function handleWebhook(ctx: AppContext, req: Request): Promise<Resp
   return json({ received: true }, 200);
 }
 
+// benefit → POLAR_BENEFIT_ID；order → POLAR_PRODUCT_ID。未配置（空/占位符）则不设限（放行）。
+function isConfigured(v: string | undefined): boolean {
+  return !!v && !v.includes("PLACEHOLDER");
+}
+function isForOurProduct(ctx: AppContext, event: CanonicalEvent): boolean {
+  const benefitId = ctx.env.POLAR_BENEFIT_ID;
+  const productId = ctx.env.POLAR_PRODUCT_ID;
+  if (event.benefitId && isConfigured(benefitId)) return event.benefitId === benefitId;
+  if (event.productId && isConfigured(productId)) return event.productId === productId;
+  return true; // 无可判定字段或白名单未配置 → 交由 dispatch 的可靠映射把关
+}
+
 async function dispatch(ctx: AppContext, event: CanonicalEvent, now: string): Promise<void> {
   switch (event.eventType) {
-    case "checkout.completed": {
-      if (!event.licenseKey) {
-        // checkout 没带 license → 无法建立指纹，安全跳过（登记但不建 entitlement）
-        ctx.logger.warn("webhook.checkout_no_license", { eventId: event.eventId });
+    case "benefit_grant.created": {
+      if (!event.licenseKeyId) {
+        // grant 未带 license_key_id → 无法建立 join key，安全跳过
+        ctx.logger.warn("webhook.grant_no_license_key", { eventId: event.eventId });
         return;
       }
-      const fingerprint = await licenseFingerprint(ctx.env.LICENSE_HMAC_PEPPER, event.licenseKey);
       await upsertActiveEntitlement(ctx.env.DB, {
-        fingerprint,
+        licenseKeyId: event.licenseKeyId,
         orderId: event.orderId,
         customerId: event.customerId,
+        benefitId: event.benefitId,
         productId: event.productId,
         sourceEventId: event.eventId,
         now,
       });
-      ctx.logger.info("webhook.checkout_completed", { eventId: event.eventId, fingerprint });
+      ctx.logger.info("webhook.grant_created", { eventId: event.eventId, licenseKeyId: event.licenseKeyId });
       return;
     }
-    case "refund.created":
-    case "dispute.created": {
-      const reason = event.eventType === "refund.created" ? "refund" : "dispute";
-      if (event.licenseKey) {
-        const fingerprint = await licenseFingerprint(ctx.env.LICENSE_HMAC_PEPPER, event.licenseKey);
-        await revokeByFingerprint(ctx.env.DB, {
-          fingerprint,
+    case "benefit_grant.revoked": {
+      if (event.licenseKeyId) {
+        await revokeByLicenseKeyId(ctx.env.DB, {
+          licenseKeyId: event.licenseKeyId,
           orderId: event.orderId,
           customerId: event.customerId,
-          reason,
+          reason: "revoked",
           sourceEventId: event.eventId,
           now,
         });
-        ctx.logger.info("webhook.revoked", { eventId: event.eventId, reason, fingerprint });
+        ctx.logger.info("webhook.revoked", { eventId: event.eventId, licenseKeyId: event.licenseKeyId });
         return;
       }
+      ctx.logger.warn("webhook.revoke_no_license_key", { eventId: event.eventId });
+      return;
+    }
+    case "order.refunded":
+    case "refund.created": {
+      // 兜底：Polar 通常也会发 benefit_grant.revoked 精确吊销；这里按 order 尽力吊销。
+      const reason = event.eventType === "order.refunded" ? "refund" : "refund";
       if (event.orderId) {
         const affected = await revokeByOrder(ctx.env.DB, { orderId: event.orderId, reason, now });
         if (affected === 0) {
-          // refund 先于 checkout 到达且无 license：无法可靠映射 → 报告阻塞，不凭模糊字段吊销
+          // 该 order 尚无本地 entitlement 行（refund 先于 grant，或用户从未激活）：
+          // 依赖随后到达的 benefit_grant.revoked 或上游 validate 自动 revoked，不凭模糊字段吊销。
           ctx.logger.warn("webhook.revoke_unmapped", { eventId: event.eventId, reason });
         }
         return;
       }
-      // 既无 license 又无 order → 无法可靠映射，安全忽略（不吊销）
       ctx.logger.warn("webhook.revoke_unmappable", { eventId: event.eventId, reason });
       return;
     }

@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { buildContext, type AppContext } from "../src/context";
-import { signWebhook } from "../src/crypto";
+import { signStandardWebhook } from "../src/crypto";
 
 // 建表（每个测试前调用；isolatedStorage 默认每测试隔离，需重建 schema）。
 export async function resetSchema(): Promise<void> {
@@ -21,19 +21,32 @@ export function ctxWith(overrides?: Partial<AppContext>): AppContext {
   return buildContext(env, overrides);
 }
 
-// 构造已正确 HMAC 签名的 webhook 请求。
-export async function signedWebhookRequest(bodyObj: unknown): Promise<Request> {
-  const raw = new TextEncoder().encode(JSON.stringify(bodyObj));
-  const sig = await signWebhook(env.CREEM_WEBHOOK_SECRET, raw);
-  return new Request("https://api.appidge.app/v1/webhooks/creem", {
+// 构造已正确签名的 Polar Standard Webhooks 请求。
+// webhookId 稳定（重放/幂等测试复用同一 id）；timestamp 默认取当前真实时间，
+// 以通过 handler 的 ±5min 漂移校验（默认 ctx 用真实时钟）。
+export async function signedWebhookRequest(
+  bodyObj: unknown,
+  opts?: { webhookId?: string; timestampMs?: number; secret?: string; rawOverride?: Uint8Array },
+): Promise<Request> {
+  const raw = opts?.rawOverride ?? new TextEncoder().encode(JSON.stringify(bodyObj));
+  const webhookId = opts?.webhookId ?? "msg_test_default";
+  const ts = Math.floor((opts?.timestampMs ?? Date.now()) / 1000).toString();
+  const secret = opts?.secret ?? env.POLAR_WEBHOOK_SECRET;
+  const sig = await signStandardWebhook(secret, webhookId, ts, raw);
+  return new Request("https://api.appidge.com/v1/webhooks/polar", {
     method: "POST",
-    headers: { "content-type": "application/json", "creem-signature": sig },
+    headers: {
+      "content-type": "application/json",
+      "webhook-id": webhookId,
+      "webhook-timestamp": ts,
+      "webhook-signature": sig,
+    },
     body: raw,
   });
 }
 
 export function jsonPost(path: string, bodyObj: unknown, headers?: Record<string, string>): Request {
-  return new Request(`https://api.appidge.app${path}`, {
+  return new Request(`https://api.appidge.com${path}`, {
     method: "POST",
     headers: { "content-type": "application/json", ...(headers ?? {}) },
     body: JSON.stringify(bodyObj),

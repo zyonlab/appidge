@@ -15,16 +15,15 @@ const { locale = 'zh', updated } = Astro.props;
     locale === 'zh' ? (
       <>
         <strong>草稿 · 待法务审核：</strong>
-        本页文本为草稿，需由运营方委托合格法律顾问按适用法律最终审定后再对外生效，不构成法律意见。
-        文中橙色虚线框为待填占位。
+        本页按独立开发者经营模式拟定，需由合格法律顾问按适用法律最终审定，不构成法律意见。
         {updated && <span> 最后更新：{updated}。</span>}
       </>
     ) : (
       <>
         <strong>Draft — pending legal review:</strong>
-        This page is a draft. It takes effect only after review by qualified counsel under
-        applicable law, and does not constitute legal advice. Dashed orange markers are
-        placeholders to be filled in.
+        This page is drafted for an independent solo-developer operation and is subject to
+        final review by qualified counsel under applicable law. It does not constitute legal
+        advice.
         {updated && <span> Last updated: {updated}.</span>}
       </>
     )

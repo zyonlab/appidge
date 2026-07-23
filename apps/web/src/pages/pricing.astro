@@ -1,9 +1,9 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { CREEM_CHECKOUT_URL, DOWNLOAD_URL, SITE_NAME } from '../config/site';
+import { POLAR_CHECKOUT_URL, DOWNLOAD_URL, SITE_NAME } from '../config/site';
 
 const description =
-  'Appidge 许可证定价。通过安全的 Creem Hosted Checkout 完成购买，购买后在邮件中获取许可证密钥并在 App 内激活。';
+  'Appidge 许可证定价。通过安全的 Polar Hosted Checkout 完成购买，购买后在邮件或客户门户中获取许可证密钥并在 App 内激活。';
 ---
 
 <BaseLayout title="定价" description={description} path="/pricing">
@@ -11,7 +11,7 @@ const description =
     <div class="container">
       <h1 class="text-center">定价</h1>
       <p class="lede text-center" style="margin-inline:auto">
-        先下载试用，确认合适再购买。购买通过安全的 Creem Hosted Checkout 完成。
+        先下载试用，确认合适再购买。购买通过安全的 Polar Hosted Checkout 完成。
       </p>
 
       <div class="card price-card">
@@ -26,14 +26,14 @@ const description =
           <li>应用内自动更新</li>
         </ul>
         <div class="cta-row" style="justify-content:center">
-          <a class="btn btn-primary" href={CREEM_CHECKOUT_URL} rel="noopener">购买许可证</a>
+          <a class="btn btn-primary" href={POLAR_CHECKOUT_URL} rel="noopener">购买许可证</a>
           <a class="btn btn-secondary" href={DOWNLOAD_URL} rel="noopener">先下载试用</a>
         </div>
         <p style="font-size:0.95rem;margin-bottom:0.25rem">
           ✓ <strong>14 天内无理由全额退款</strong> · 遇到任何问题先邮件我们，我们会尽快处理，<a href="/refund">查看退款政策</a>。
         </p>
         <p style="font-size:0.85rem;margin-bottom:0;color:var(--muted)">
-          实际价格、币种与税费以 Creem 结账页为准。
+          实际价格、币种与税费以 Polar 结账页为准。
         </p>
       </div>
     </div>
@@ -43,8 +43,8 @@ const description =
     <div class="container prose">
       <h2>购买后如何激活</h2>
       <ol>
-        <li>点击「购买许可证」，在 Creem Hosted Checkout 完成付款。</li>
-        <li>付款成功后，你会收到含许可证密钥的邮件。</li>
+        <li>点击「购买许可证」，在 Polar Hosted Checkout 完成付款。</li>
+        <li>付款成功后，你会收到含许可证密钥的邮件；也可在 Polar 客户门户中查看。</li>
         <li>打开 Appidge，粘贴许可证密钥完成激活。</li>
       </ol>
       <p>

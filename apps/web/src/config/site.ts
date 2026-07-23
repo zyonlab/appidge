@@ -9,12 +9,14 @@
  */
 
 type RequiredEnvKey =
-  | 'PUBLIC_CREEM_CHECKOUT_URL'
+  | 'PUBLIC_SITE_URL'
+  | 'PUBLIC_POLAR_CHECKOUT_URL'
   | 'PUBLIC_API_BASE_URL'
   | 'PUBLIC_DOWNLOAD_URL';
 
 const REQUIRED_KEYS: RequiredEnvKey[] = [
-  'PUBLIC_CREEM_CHECKOUT_URL',
+  'PUBLIC_SITE_URL',
+  'PUBLIC_POLAR_CHECKOUT_URL',
   'PUBLIC_API_BASE_URL',
   'PUBLIC_DOWNLOAD_URL',
 ];
@@ -48,11 +50,11 @@ const values = Object.fromEntries(
   REQUIRED_KEYS.map((k) => [k, assertHttpsUrl(k, readRequired(k))]),
 ) as Record<RequiredEnvKey, string>;
 
-/** Creem Hosted Checkout Link（购买）。公开链接，非 API key。 */
-export const CREEM_CHECKOUT_URL = values.PUBLIC_CREEM_CHECKOUT_URL;
+/** Polar Hosted Checkout Link（购买）。公开链接，非 API key。 */
+export const POLAR_CHECKOUT_URL = values.PUBLIC_POLAR_CHECKOUT_URL;
 
 /**
- * License Worker facade base（生产 https://api.appidge.app）。
+ * License Worker facade base（生产 https://api.appidge.com）。
  * 注意：本站为纯静态营销站，【不】把该地址渲染进任何页面——由 macOS App 使用。
  * 此处仅做「构建期存在性校验」，防止部署环境缺配置。leak 测试会断言它不出现在产物 HTML 中。
  */
@@ -61,8 +63,12 @@ export const API_BASE_URL = values.PUBLIC_API_BASE_URL;
 /** 下载：R2 自定义域名，直达更新产物（不经 Worker）。 */
 export const DOWNLOAD_URL = values.PUBLIC_DOWNLOAD_URL;
 
-/** 生产站点域名（canonical / OG / sitemap）。 */
-export const SITE_URL = 'https://appidge.com';
+/**
+ * 站点 canonical 域名（canonical / OG / sitemap）——构建期公开配置，非 secret。
+ * staging=https://staging.appidge.com，prod=https://appidge.com。
+ * 必须与 astro.config.mjs 的 `site:` 同源于 PUBLIC_SITE_URL，避免 sitemap 与 canonical 域名冲突。
+ */
+export const SITE_URL = values.PUBLIC_SITE_URL;
 
 /** 支持 / 退款联系邮箱（对外公开）。 */
 export const SUPPORT_EMAIL = 'support@appidge.com';

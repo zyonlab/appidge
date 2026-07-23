@@ -24,7 +24,8 @@ const dist = join(root, 'dist');
 
 // 生产式公开配置（非 secret，非 mock）。注入 process.env 使其优先于本地 .env。
 const BUILD_ENV = {
-  PUBLIC_CREEM_CHECKOUT_URL: 'https://www.creem.io/payment/appidge-license',
+  PUBLIC_SITE_URL: 'https://appidge.com',
+  PUBLIC_POLAR_CHECKOUT_URL: 'https://buy.polar.sh/appidge-license',
   PUBLIC_API_BASE_URL: 'https://api.appidge.app',
   PUBLIC_DOWNLOAD_URL: 'https://updates.appidge.app',
 };
@@ -104,7 +105,7 @@ for (const file of htmlFiles) {
 const home = readHtml('index.html');
 const pricing = readHtml('pricing/index.html');
 const download = readHtml('download/index.html');
-const CHECKOUT = BUILD_ENV.PUBLIC_CREEM_CHECKOUT_URL;
+const CHECKOUT = BUILD_ENV.PUBLIC_POLAR_CHECKOUT_URL;
 const DOWNLOAD = BUILD_ENV.PUBLIC_DOWNLOAD_URL;
 ok(home.includes(CHECKOUT), '首页缺少购买（checkout）链接');
 ok(pricing.includes(CHECKOUT), '定价页缺少购买（checkout）链接');

@@ -3,7 +3,7 @@
  * 轻量、确定性的项目 lint —— 面向本站的真实约束，而非通用风格：
  *  1. 每个页面（404 除外可选）都必须经 BaseLayout 渲染，保证 SEO/skip-link/结构一致。
  *  2. src 源码内不得出现疑似 secret 的模式（防御性）。
- *  3. .env.example 必须声明三个 PUBLIC_* 构建期变量。
+ *  3. .env.example 必须声明四个 PUBLIC_* 构建期变量。
  * 违规即以非零码退出，供 turbo lint 捕获。
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -38,7 +38,7 @@ const SECRET_PATTERNS = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
   /\bx-api-key\b/i,
   /\bsk_(live|test)_[A-Za-z0-9]/,
-  /\bcreem_sk_/i,
+  /\bpolar_[a-z]{2,5}_/i,
   /webhook[_-]?secret\s*[:=]\s*['"][^'"]+['"]/i,
 ];
 for (const file of walk(join(root, 'src'))) {
@@ -52,7 +52,8 @@ for (const file of walk(join(root, 'src'))) {
 // 3. .env.example 声明三个必需变量
 const example = readFileSync(join(root, '.env.example'), 'utf8');
 for (const key of [
-  'PUBLIC_CREEM_CHECKOUT_URL',
+  'PUBLIC_SITE_URL',
+  'PUBLIC_POLAR_CHECKOUT_URL',
   'PUBLIC_API_BASE_URL',
   'PUBLIC_DOWNLOAD_URL',
 ]) {

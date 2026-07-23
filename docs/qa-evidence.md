@@ -2,7 +2,17 @@
 
 > 本文件是 Agent F（Integration/QA）的验收证据与人工闸门 runbook。
 > `docs/commercialization-status.md` 的勾选状态由主 Agent 维护；本文件只提供可复现命令 + PASS/FAIL + 输出证据。
-> 全程 **MOCK_MODE**，不触真实 Creem / 生产 Cloudflare / 真实支付 / 真实 NE 流量。
+> 全程 **MOCK_MODE**，不触真实支付服务商 / 生产 Cloudflare / 真实支付 / 真实 NE 流量。
+
+> **支付服务商迁移中：Creem → Polar.sh（Merchant of Record）。**
+> 官网（`apps/web`）已切换到 Polar Hosted Checkout（`PUBLIC_POLAR_CHECKOUT_URL`）。
+> **本文以下的证据与 runbook 记录的是 `apps/api` 迁移前的 Creem-based MOCK 运行**——其中的环境变量名
+> （`CREEM_API_KEY` / `CREEM_WEBHOOK_SECRET` / `CREEM_API_BASE` / `CREEM_PRODUCT_ID`）、请求头
+> （`creem-signature`）、上游端点（`test-api.creem.io`）、webhook 路由（`/v1/webhooks/creem`）、
+> 事件名（`checkout.completed` / `refund.created`）、fixture 路径（`contracts/fixtures/creem/`）、
+> token 前缀（`creem_test_` / `whsec_`）等，均属 `apps/api` / `contracts` 技术契约，**由对应 owner 迁移**。
+> 迁移到 Polar 后，上述技术标识需按 Polar 实际 API 重新核实并复跑本文证据：`TODO(polar): 待核实`。
+> 为避免伪造 `apps/api` 尚未完成的迁移，本文不改写这些技术标识与已捕获的运行输出。
 
 - 分支：`feat/integration-qa`（基于 `feat/commercialization-monorepo` 尖端 `2061592`）
 - 日期：2026-07-21
@@ -99,8 +109,8 @@ refund/dispute 后本地 revoked 优先、日志脱敏无 key、body 超限/错�
 
 ## Task 3 · 官网构建 + 链接/CTA/脱敏检查 — PASS
 
-复用 `apps/web/scripts/check-site.mjs`（用生产式公开配置 `PUBLIC_API_BASE_URL=https://api.appidge.app`、
-`PUBLIC_CREEM_CHECKOUT_URL`、`PUBLIC_DOWNLOAD_URL=https://updates.appidge.app` 重建站点后断言）。
+复用 `apps/web/scripts/check-site.mjs`（用生产式公开配置 `PUBLIC_API_BASE_URL=https://api.appidge.com`、
+`PUBLIC_POLAR_CHECKOUT_URL`、`PUBLIC_DOWNLOAD_URL=https://updates.appidge.com` 重建站点后断言）。
 
 命令：
 ```bash
@@ -113,7 +123,7 @@ cd apps/web && pnpm test
 站点验收全部通过：8 路由、内部链接、CTA、无 JS、脱敏、法律草稿标记、可访问性结构。
 ```
 覆盖：7 路由 + 404 产物齐全；内部链接无死链；首页/定价含购买链接、定价/下载含下载链接、购买≠下载；
-无运行时 `<script>`（仅 JSON-LD），购买/下载为原生 `<a>`（无 JS 可用）；产物**不泄露** `api.appidge.app`
+无运行时 `<script>`（仅 JSON-LD），购买/下载为原生 `<a>`（无 JS 可用）；产物**不泄露** `api.appidge.com`
 / `mock` / `PLACEHOLDER` / `x-api-key` / `sk_*` / `.dev.vars` / 私钥头；退款/隐私/条款带「待法务审核」草稿标记；
 结构性可访问性（lang / viewport / skip-link / 单一 h1 / meta description / og:title）。
 
@@ -248,7 +258,7 @@ git ls-files | grep -E '\.dev\.vars$|\.env$' | grep -v '\.example'
    ./bin/generate_appcast <放着已签名包的目录>   # 生成 appcast.xml 的 EdDSA 签名/length/enclosure
    ```
    校验 codesign / notary / staple / appcast 签名齐全。
-2. 把 DMG / appcast.xml / release notes 上传到 R2（`updates.appidge.app`，不可变版本路径，
+2. 把 DMG / appcast.xml / release notes 上传到 R2（`updates.appidge.com`，不可变版本路径，
    `appcast.xml` **最后原子更新**，避免 feed 指向未上传文件；下载直达 R2 不经 Worker）。
 3. **在装有上一版生产 App 的真机**上做真实升级 smoke：
    - 打开旧版 App，确认透明代理接管、能正常上网（基线）。

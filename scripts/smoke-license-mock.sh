@@ -8,14 +8,15 @@
 #   1. GET  /healthz                         → 200 {status:ok, mockMode:true}
 #   2. POST /v1/licenses/activate            → 200 LicenseState(active)，取 instanceId
 #   3. POST /v1/licenses/validate (退款前)   → 200 status=active
-#   4. POST /v1/webhooks/creem  refund.created(已正确 HMAC 签名) → 200 {received:true}
+#   4. POST /v1/webhooks/polar  benefit_grant.revoked(Standard Webhooks 签名) → 200 {received:true}
 #   5. POST /v1/licenses/validate (退款后)   → 200 status=revoked（本地 deny 覆盖上游 active）
-#   6. POST /v1/webhooks/creem  篡改签名     → 401（拒绝）
-#   7. POST /v1/webhooks/creem  无签名头     → 401（拒绝）
+#   6. POST /v1/webhooks/polar  篡改签名     → 401（拒绝）
+#   7. POST /v1/webhooks/polar  无签名头     → 401（拒绝）
 #   8. POST /v1/licenses/deactivate          → 200 {status:deactivated}
 #
-# 无真实 secret：全程用 apps/api/.dev.vars 的 MOCK 值（webhook 用同一 CREEM_WEBHOOK_SECRET 签名）。
-# 不触真实 Creem / 生产 / 网络。可重复运行（每次用唯一 license，独立临时 D1 持久化目录）。
+# 无真实 secret：全程用 apps/api/.dev.vars 的 MOCK 值（webhook 用同一 POLAR_WEBHOOK_SECRET 签名，
+# 复刻 worker 的 Standard Webhooks 签名与 secret 解码逻辑）。
+# 不触真实 Polar / 生产 / 网络。可重复运行（每次用唯一 license，独立临时 D1 持久化目录）。
 # 若缺少 wrangler / node / jq / curl，则跳过（exit 0）并说明，不算失败。
 set -u
 
@@ -46,10 +47,10 @@ fi
 
 # 从 .dev.vars 解析 worker 运行时会用到的值（dev 时 .dev.vars 覆盖 wrangler.toml [vars]）。
 readvar() { grep -E "^$1=" "$API_DIR/.dev.vars" | head -1 | cut -d= -f2- | tr -d '"'; }
-SECRET="$(readvar CREEM_WEBHOOK_SECRET)"
-PRODUCT="$(readvar CREEM_PRODUCT_ID)"
-[ -n "$SECRET" ]  || die ".dev.vars 缺少 CREEM_WEBHOOK_SECRET"
-[ -n "$PRODUCT" ] || die ".dev.vars 缺少 CREEM_PRODUCT_ID"
+SECRET="$(readvar POLAR_WEBHOOK_SECRET)"
+BENEFIT="$(readvar POLAR_BENEFIT_ID)"
+[ -n "$SECRET" ]  || die ".dev.vars 缺少 POLAR_WEBHOOK_SECRET"
+[ -n "$BENEFIT" ] || die ".dev.vars 缺少 POLAR_BENEFIT_ID"
 
 # ── 运行期变量 ──────────────────────────────────────────────────────────────
 RUNID="$(date +%s)-$$"
@@ -80,14 +81,14 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 log "=== Appidge MOCK license 冒烟 ==="
-log "· license=$LICENSE  product=$PRODUCT  port=$PORT"
+log "· license=$LICENSE  benefit=$BENEFIT  port=$PORT"
 log "· persist=$PERSIST"
 
 # ── 建表（本地 D1 迁移到本次持久化目录）─────────────────────────────────────
 ( cd "$API_DIR" && "$WRANGLER" d1 migrations apply appidge-licensing --local --persist-to "$PERSIST" ) \
   < /dev/null > "$PERSIST/migrate.log" 2>&1 \
   || { tail -20 "$PERSIST/migrate.log"; die "D1 迁移失败"; }
-log "· D1 迁移完成（0001_init.sql）"
+log "· D1 迁移完成（0001_init.sql + 0002_polar.sql）"
 
 # ── 启动 wrangler dev（后台）────────────────────────────────────────────────
 ( cd "$API_DIR" && exec "$WRANGLER" dev --ip 127.0.0.1 --port "$PORT" --persist-to "$PERSIST" ) \
@@ -143,15 +144,34 @@ C="$(split_code "$R")"; B="$(split_body "$R")"
 assert_code  "validate(退款前) 状态码" "$C" 200
 assert_field "validate(退款前).status" "$B" '.status' 'active'
 
-# ── 4. refund.created webhook（正确签名）────────────────────────────────────
-REFUND_FILE="$PERSIST/refund.json"
-printf '{"id":"evt_smoke_%s","eventType":"refund.created","object":{"order":"ord_smoke_%s","customer":"cust_smoke","product":"%s","license":"%s"}}' \
-  "$RUNID" "$RUNID" "$PRODUCT" "$LICENSE" > "$REFUND_FILE"
-SIG="$(node -e 'const c=require("crypto"),fs=require("fs");const b=fs.readFileSync(process.argv[1]);process.stdout.write(c.createHmac("sha256",process.argv[2]).update(b).digest("hex"))' "$REFUND_FILE" "$SECRET")"
-R="$(curl -sS -X POST "$BASE/v1/webhooks/creem" -H 'content-type: application/json' -H "creem-signature: $SIG" --data-binary @"$REFUND_FILE" -w $'\n%{http_code}')"
+# ── 4. benefit_grant.revoked webhook（Standard Webhooks 正确签名）────────────
+# license_key_id 必须与 MOCK client 为该 license 计算的值一致，才能命中 activate 时
+# 惰性登记的 fingerprint↔license_key_id 映射行 → validate 本地-优先返回 revoked。
+LK_ID="$(node -e 'let h=0;const k=process.argv[1];for(let i=0;i<k.length;i++)h=(h*31+k.charCodeAt(i))>>>0;process.stdout.write("lk_MOCK_"+h.toString(16).padStart(8,"0"))' "$LICENSE")"
+REVOKE_FILE="$PERSIST/revoke.json"
+printf '{"type":"benefit_grant.revoked","timestamp":"2026-07-22T00:00:00Z","data":{"id":"bg_smoke_%s","order_id":"ord_smoke_%s","customer_id":"cust_smoke","benefit_id":"%s","is_revoked":true,"properties":{"license_key_id":"%s","display_key":"XXXX-1234"}}}' \
+  "$RUNID" "$RUNID" "$BENEFIT" "$LK_ID" > "$REVOKE_FILE"
+
+WID="msg_smoke_$RUNID"
+WTS="$(date +%s)"
+# 复刻 worker crypto.ts：decodeWebhookSecret(whsec_ 前缀→base64，失败退化 utf8) + Standard Webhooks 签名。
+sign_wh() { # file id ts secret → "v1,<base64sig>"
+  node -e '
+    const c=require("crypto"),fs=require("fs");
+    const [file,id,ts,secret]=process.argv.slice(1);
+    function decodeSecret(s){const raw=s.startsWith("whsec_")?s.slice(6):s;
+      try{const bin=atob(raw);const b=Buffer.alloc(bin.length);for(let i=0;i<bin.length;i++)b[i]=bin.charCodeAt(i);return b;}
+      catch{return Buffer.from(raw,"utf8");}}
+    const body=fs.readFileSync(file);
+    const signed=Buffer.concat([Buffer.from(id+"."+ts+".","utf8"),body]);
+    process.stdout.write("v1,"+c.createHmac("sha256",decodeSecret(secret)).update(signed).digest("base64"));
+  ' "$1" "$2" "$3" "$4"
+}
+SIG="$(sign_wh "$REVOKE_FILE" "$WID" "$WTS" "$SECRET")"
+R="$(curl -sS -X POST "$BASE/v1/webhooks/polar" -H 'content-type: application/json' -H "webhook-id: $WID" -H "webhook-timestamp: $WTS" -H "webhook-signature: $SIG" --data-binary @"$REVOKE_FILE" -w $'\n%{http_code}')"
 C="$(split_code "$R")"; B="$(split_body "$R")"
-assert_code  "refund webhook(签名) 状态码" "$C" 200
-assert_field "refund webhook.received" "$B" '.received' 'true'
+assert_code  "revoke webhook(签名) 状态码" "$C" 200
+assert_field "revoke webhook.received" "$B" '.received' 'true'
 
 # ── 5. validate（退款后，本地 revoked 覆盖上游 active）───────────────────────
 R="$(post_json /v1/licenses/validate "$(printf '{"licenseKey":"%s","instanceId":"%s","appVersion":"1.0.0"}' "$LICENSE" "$INSTANCE")")"
@@ -160,13 +180,12 @@ assert_code  "validate(退款后) 状态码" "$C" 200
 assert_field "validate(退款后).status[本地 revoked 优先]" "$B" '.status' 'revoked'
 
 # ── 6. 篡改签名 → 401 ───────────────────────────────────────────────────────
-first="${SIG:0:1}"; if [ "$first" = "a" ]; then rep="b"; else rep="a"; fi
-BADSIG="$rep${SIG:1}"
-C="$(curl -sS -o /dev/null -X POST "$BASE/v1/webhooks/creem" -H 'content-type: application/json' -H "creem-signature: $BADSIG" --data-binary @"$REFUND_FILE" -w '%{http_code}')"
+BADSIG="${SIG%?}$([ "${SIG: -1}" = "A" ] && echo B || echo A)"
+C="$(curl -sS -o /dev/null -X POST "$BASE/v1/webhooks/polar" -H 'content-type: application/json' -H "webhook-id: $WID" -H "webhook-timestamp: $WTS" -H "webhook-signature: $BADSIG" --data-binary @"$REVOKE_FILE" -w '%{http_code}')"
 assert_code "篡改签名 webhook 被拒" "$C" 401
 
 # ── 7. 无签名头 → 401 ───────────────────────────────────────────────────────
-C="$(curl -sS -o /dev/null -X POST "$BASE/v1/webhooks/creem" -H 'content-type: application/json' --data-binary @"$REFUND_FILE" -w '%{http_code}')"
+C="$(curl -sS -o /dev/null -X POST "$BASE/v1/webhooks/polar" -H 'content-type: application/json' --data-binary @"$REVOKE_FILE" -w '%{http_code}')"
 assert_code "无签名 webhook 被拒" "$C" 401
 
 # ── 8. deactivate ───────────────────────────────────────────────────────────

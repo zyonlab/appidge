@@ -1,0 +1,26 @@
+{
+  // Sparkle 更新服务：以「Workers 静态资源」直达托管 appcast.xml + DMG（与官网同机制，
+  // 不经 license Worker、不需 R2）。DMG 当前 ~7MiB，远低于 Workers 静态资源单文件 25MiB 限制；
+  // 将来包变大再切 R2、客户端 SUFeedURL 域名不变（CLAUDE.md §5.6）。
+  // 部署：把 build/appcast/（appcast.xml + *.dmg）复制到 ./public 后，从本目录
+  //   `wrangler deploy --env staging`（updates.appidge.com）。./public 是构建产物，git-ignored。
+  "name": "appidge-updates",
+  "compatibility_date": "2025-07-01",
+  "workers_dev": false,
+  "assets": { "directory": "./public" },
+  "env": {
+    "staging": {
+      "routes": [
+        { "pattern": "updates.appidge.com", "custom_domain": true }
+      ]
+    },
+    // ⚠️ 只有一个域名：staging 与 production 暂时同为 updates.appidge.com。一个自定义域只能挂一个
+    //    Worker，二者不能同时部署。上 prod 前：把 staging 迁到 updates-staging.appidge.com（改上面
+    //    staging.routes + 重出 staging 包让 SPARKLE_FEED_URL 指向它），把 updates.appidge.com 专留给 production。
+    "production": {
+      "routes": [
+        { "pattern": "updates.appidge.com", "custom_domain": true }
+      ]
+    }
+  }
+}

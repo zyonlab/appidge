@@ -39,6 +39,7 @@ EXT_PROFILE_NAME="$(extract_field "$PROFILE_EXT" Name)"
 mkdir -p Config
 
 cat > Config/Signing.xcconfig <<EOF
+#include "AppConfig.xcconfig"
 // 由 scripts/gen-signing-xcconfig.sh 从 .env 生成，勿手改，勿提交（见 .gitignore）
 DEVELOPMENT_TEAM = ${TEAM_ID}
 APP_BUNDLE_IDENTIFIER = ${APP_BUNDLE_ID}

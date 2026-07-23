@@ -1,5 +1,9 @@
 # Appidge 商业化 Monorepo · 状态与人工闸门
 
+> ⚠️ **历史证据存档**：本文的勾选与命令输出是记录当时（≤2026-07-21）的验证结果，不代表当前线上状态。
+> 当前双环境（staging/production）拓扑、发布入口与运维 runbook 以 `ops/README.md` 与
+> `docs/claude-code-staging-production-free-plan.md` 为准；不要把本文历史勾选当作未经验证的线上事实。
+
 > 只由主 Agent 更新勾选状态和证据。勾选前必须有可复现命令/输出证据，不凭主观标 pass。
 > 缺真实凭证时，代码与自动测试完成 ≠ 上线完成——对应项保持未勾选，并给一条最短解锁步骤。
 

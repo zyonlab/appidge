@@ -1,5 +1,8 @@
 # Appidge 商业化 · Integration/QA 证据（Agent F）
 
+> ⚠️ **历史证据存档**（2026-07-21，Creem 时期 MOCK 运行）：仅作历史记录，不代表当前线上状态。
+> 当前双环境发布/验证入口见 `ops/README.md`。
+
 > 本文件是 Agent F（Integration/QA）的验收证据与人工闸门 runbook。
 > `docs/commercialization-status.md` 的勾选状态由主 Agent 维护；本文件只提供可复现命令 + PASS/FAIL + 输出证据。
 > 全程 **MOCK_MODE**，不触真实支付服务商 / 生产 Cloudflare / 真实支付 / 真实 NE 流量。

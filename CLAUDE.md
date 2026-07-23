@@ -85,15 +85,21 @@ appidge/
 - 缓存：启用 pnpm 与 Turbo 本地/CI 缓存；有安全 token 和明确收益后再启远端缓存。签名、公证、DMG、appcast 不进入通用缓存。
 - CI affected detection：用 workflow path filters + Turbo filter。Web-only 改动不跑 macOS CI，Swift-only 改动不部署官网，但 main 的最终集成闸门必须能一次跑全。
 
-### 线上拓扑
+### 线上拓扑（staging/production 双环境，全部 Cloudflare Workers，免费层）
 
 ```text
-appidge.com                 Cloudflare Pages，静态官网
-api.appidge.com             Cloudflare Worker，license facade + Polar webhook
-updates.appidge.com         Cloudflare R2，自定义域名托管 DMG/appcast/release notes
-Polar Hosted Checkout       网站和 macOS App 直接打开
-D1                          webhook 幂等、entitlement/refund 状态与审计
+staging.appidge.com          appidge-web-staging      官网（Workers 静态资源）
+appidge.com / www             appidge-web-production   官网（Workers 静态资源）
+api-staging.appidge.com      appidge-api-staging      license facade + Polar sandbox webhook
+api.appidge.com              appidge-api-production   license facade + Polar live webhook
+updates-staging.appidge.com  appidge-updates-staging  DMG/appcast（Workers 静态资源；>25MiB 才迁 R2）
+updates.appidge.com          appidge-updates-production 同上，专属 production
+D1 ×2                        appidge-licensing-staging / appidge-licensing-production
+Polar Hosted Checkout        staging=sandbox，production=live；网站和 macOS App 直接打开
 ```
+
+环境矩阵单一真相源：`ops/environments/*.conf`；部署/发布统一入口：`ops/bin/appidge-ops`
+（preflight fail-closed + production 三重保护），runbook 见 `ops/README.md`。
 
 Cloudflare 免费层是 MVP 目标，不是可靠性假设。App 必须缓存最近一次有效授权并提供可测试的离线宽限，不能因为 Worker/Polar 临时不可用而立即锁死付费用户。
 

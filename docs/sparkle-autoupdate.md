@@ -12,7 +12,11 @@
   一构造即启动后台自动检查。菜单栏下拉「**检查更新…**」(`App/ContentView.swift` 的 `MenuBarView`)
   调用 `updater.checkForUpdates()` 手动触发一次检查。
 - **Info.plist**(`App/Info.plist`):
-  - `SUFeedURL` = `https://updates.appidge.com/appcast.xml`(CLAUDE.md §5.6 固定域名,R2 自定义域直达,不经 Worker)。
+  - `SUFeedURL` 默认 = `https://updates.appidge.com/appcast.xml`(production)。**当前托管是「Workers
+    静态资源」而非 R2**(DMG ~7MiB < 单文件 25MiB 限制;超过才迁 R2,域名不变)。双环境:
+    production=`updates.appidge.com`,staging=`updates-staging.appidge.com`;feed 由
+    `Config/AppConfig.xcconfig` 的 `SPARKLE_FEED_URL` 提供,发布时经 `ops/bin/appidge-ops
+    build-macos <env>` 按环境显式注入,不再手改 xcconfig。
   - `SUPublicEDKey` = `TODO-REPLACE-WITH-ED-PUBLIC-KEY`(**占位**,发布前替换成真实 base64 公钥)。
   - `SUEnableAutomaticChecks` = `true`。
 - app 非沙盒(Developer ID 分发),用 Sparkle 标准配置,无需 XPC 服务分离 / 额外 sandbox 桥接。
@@ -52,8 +56,9 @@ Sparkle 的 `generate_keys` 工具在解析后的包产物里(SPM 缓存 / Xcode
 
 ### 3. 托管 appcast.xml
 
-- 在 `SUFeedURL` 指向的地址(`https://updates.appidge.com/appcast.xml`,Cloudflare R2 自定义域)托管一个 `appcast.xml`(RSS)。
-  该域名已由 CLAUDE.md §5.6 固定,发布前只需把 R2 桶挂到该自定义域并上传 appcast/更新包,无需再改客户端。
+- 在 `SUFeedURL` 指向的地址托管一个 `appcast.xml`(RSS)。**当前实现:Cloudflare Workers 静态资源**
+  (`infra/updates/wrangler.jsonc`;staging=`updates-staging.appidge.com`,production=`updates.appidge.com`),
+  由 `ops/bin/appidge-ops prepare-updates / publish-updates` 生成+校验+部署;DMG 超过 25MiB 才迁 R2,域名不变。
 - 每次发版追加一个 `<item>`:`<sparkle:version>`(= `CFBundleVersion`)、
   `<sparkle:shortVersionString>`、`<enclosure url=... sparkle:edSignature=... length=...>`。
 - 更新包(zip/dmg)本身也托管在可 HTTPS 下载的地址,URL 写进 `<enclosure url>`。

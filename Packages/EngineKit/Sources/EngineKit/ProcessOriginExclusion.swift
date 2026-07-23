@@ -46,4 +46,26 @@ public enum ProcessOriginExclusion {
     public static func ownIdentifiers(appBundleID: String, extensionBundleID: String) -> Set<String> {
         [appBundleID, extensionBundleID]
     }
+
+    /// 来源可执行文件是否运行在**本 app bundle 目录内**（路径前缀匹配，带 `/` 边界，避免
+    /// `/A.app` 误配到 `/A.appX/...`）。
+    ///
+    /// 为什么需要它：``shouldBypass`` 按签名标识 / 精确路径整串相等只覆盖了主 app 与扩展本体，
+    /// 但 app bundle 内还有**辅助组件**——尤其 Sparkle 的 `Autoupdate` / `Updater.app` /
+    /// `Downloader.xpc` / `Installer.xpc`，它们签名标识是 `org.sparkle-project.*`（不在
+    /// ``ownIdentifiers``）、可执行文件也不是扩展本体那一个，于是它们发起的「取 appcast / 下载更新」
+    /// 流量既不匹配标识、也不匹配精确路径，就被自己当普通进程代理了，走到抖动的代理路径上取更新失败。
+    /// 用「凡落在本 app bundle 内的可执行文件都算我方」这一路正交信号兜住这类自更新流量：强制直连。
+    ///
+    /// - Parameters:
+    ///   - sourcePath: flow 来源进程的可执行文件路径（扩展侧即 `ProcessPathResolver.executablePath`
+    ///     从 audit token 解出的真实路径）。nil/空 → 拿不到路径，返回 `false`（不放行，交回后续判定）。
+    ///   - bundlePrefix: 本 app bundle 根路径（形如 `/…/appidge.app`）。nil/空 → 未配置，返回 `false`。
+    /// - Returns: `sourcePath` 以 `bundlePrefix` + `/` 为前缀时返回 `true`（应强制直连）；否则 `false`。
+    public static func isWithinBundle(sourcePath: String?, bundlePrefix: String?) -> Bool {
+        guard let sourcePath, !sourcePath.isEmpty,
+              let bundlePrefix, !bundlePrefix.isEmpty else { return false }
+        let root = bundlePrefix.hasSuffix("/") ? bundlePrefix : bundlePrefix + "/"
+        return sourcePath.hasPrefix(root)
+    }
 }

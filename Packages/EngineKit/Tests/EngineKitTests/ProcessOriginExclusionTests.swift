@@ -107,4 +107,57 @@ struct ProcessOriginExclusionTests {
         #expect(ProcessOriginExclusion.shouldBypass(sourceIdentifier: extID, ownIdentifiers: own))
         #expect(!ProcessOriginExclusion.shouldBypass(sourceIdentifier: "com.thirdparty.browser", ownIdentifiers: own))
     }
+
+    // MARK: - isWithinBundle：按可执行文件路径落在本 app bundle 内放行（覆盖 Sparkle 辅助组件）
+
+    private let bundle = "/Applications/appidge.app"
+
+    @Test("bundle 内的辅助组件（Sparkle Autoupdate）→ 放行")
+    func sparkleHelperWithinBundle() {
+        let p = "/Applications/appidge.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate"
+        #expect(ProcessOriginExclusion.isWithinBundle(sourcePath: p, bundlePrefix: bundle))
+    }
+
+    @Test("bundle 内的主 app 可执行文件 → 放行")
+    func mainAppWithinBundle() {
+        let p = "/Applications/appidge.app/Contents/MacOS/appidge"
+        #expect(ProcessOriginExclusion.isWithinBundle(sourcePath: p, bundlePrefix: bundle))
+    }
+
+    @Test("bundle 内的 Sparkle XPC 服务 → 放行")
+    func sparkleXPCWithinBundle() {
+        let p = "/Applications/appidge.app/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Downloader.xpc/Contents/MacOS/Downloader"
+        #expect(ProcessOriginExclusion.isWithinBundle(sourcePath: p, bundlePrefix: bundle))
+    }
+
+    @Test("边界：/appidge.appX 不因前缀被误命中（必须有 / 分隔）")
+    func siblingBundleNameNotMatched() {
+        let p = "/Applications/appidge.appX/Contents/MacOS/x"
+        #expect(!ProcessOriginExclusion.isWithinBundle(sourcePath: p, bundlePrefix: bundle))
+    }
+
+    @Test("bundle 外的第三方 app → 不放行")
+    func thirdPartyAppNotWithinBundle() {
+        let p = "/Applications/Other.app/Contents/MacOS/Other"
+        #expect(!ProcessOriginExclusion.isWithinBundle(sourcePath: p, bundlePrefix: bundle))
+    }
+
+    @Test("bundlePrefix 带尾斜杠也正确（归一化）")
+    func bundlePrefixWithTrailingSlash() {
+        let p = "/Applications/appidge.app/Contents/MacOS/appidge"
+        #expect(ProcessOriginExclusion.isWithinBundle(sourcePath: p, bundlePrefix: "/Applications/appidge.app/"))
+    }
+
+    @Test("sourcePath 恰等于 bundle 根（无尾内容）→ 不放行（不是可执行文件）")
+    func exactBundleRootNotMatched() {
+        #expect(!ProcessOriginExclusion.isWithinBundle(sourcePath: bundle, bundlePrefix: bundle))
+    }
+
+    @Test("sourcePath nil / 空，或 bundlePrefix nil / 空 → 不放行")
+    func nilOrEmptyInputs() {
+        #expect(!ProcessOriginExclusion.isWithinBundle(sourcePath: nil, bundlePrefix: bundle))
+        #expect(!ProcessOriginExclusion.isWithinBundle(sourcePath: "", bundlePrefix: bundle))
+        #expect(!ProcessOriginExclusion.isWithinBundle(sourcePath: "/Applications/appidge.app/Contents/MacOS/appidge", bundlePrefix: nil))
+        #expect(!ProcessOriginExclusion.isWithinBundle(sourcePath: "/Applications/appidge.app/Contents/MacOS/appidge", bundlePrefix: ""))
+    }
 }

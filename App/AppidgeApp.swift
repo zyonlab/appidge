@@ -66,11 +66,12 @@ struct AppidgeApp: App {
     @State private var profilesModel: ProfilesModel
     /// 主窗口分段选中态,菜单栏「打开入口」与主窗口 Picker 共享同一份(见 MainTabSelection)。
     @State private var tabSelection = MainTabSelection()
-    /// 版本握手:本进程内是否见过「扩展运行版本 ≠ 包内版本」(= 刚发生过升级)。升级窗口里 active 的
-    /// 还是旧 provider,不能急着绑(会绑回旧的);见过不匹配后,等新 provider 接管(版本变匹配)再重绑。
+    /// 本进程内是否见过「扩展运行版本 ≠ 包内版本」(= 刚升级过);见 maybeHealStaleBinding。
     @State private var sawExtensionMismatch = false
     /// 升级后是否已重绑过一次会话到新 provider(一次为限,避免反复)。
     @State private var reboundAfterUpgrade = false
+    /// 升级后卡在旧 provider(运行≠包内【持续】=死锁)时是否已做过【一次】有界重启;见 maybeHealStaleBinding。
+    @State private var mismatchHealAttempted = false
     // 界面语言不在这里做 locale 环境覆盖了——改由 `LanguageBootstrap` 在启动早期对齐 AppleLanguages
     // + 切换时重启生效(见 AppDelegate.applicationWillFinishLaunching / SettingsView 的语言 Picker)。
     @Environment(\.scenePhase) private var scenePhase
@@ -253,23 +254,22 @@ struct AppidgeApp: App {
         return (NSDictionary(contentsOf: info)?["CFBundleVersion"] as? String)
     }
 
-    /// 版本握手 —— 修「升级后会话绑死旧 provider = 黑洞」。
-    ///
-    /// 扩展升级(手动装新版 / 自动升级)时会有个窗口:app 起会话时 active 的还是**旧 provider**,
-    /// 会话就绑到它;等新 provider 接管、旧的终止,会话还绑在死掉的旧 provider 上 → 拦流量却转发不了
-    /// = 全系统黑洞。扩展经 XPC 如实回报**当前 active provider 的版本**(谁拥有 mach 监听器谁回报)。
-    ///
-    /// 策略:
-    /// - 运行版本 ≠ 包内版本(升级中,active 还是旧的)→ **别重绑**(会绑回旧的、且升级完又不再纠正,
-    ///   正是之前持续黑洞的根因)。只记一笔「见过不匹配」。
-    /// - 运行版本 == 包内版本(新 provider 已确认接管)→ 若此前见过不匹配(= 刚升级过),会话可能还绑在
-    ///   旧 provider 上 → **重绑一次**到当前 provider,黑洞消除。正常启动从没不匹配 → 不折腾会话。
+    /// 版本握手自愈「升级后会话绑死旧 provider=黑洞」:运行==包内且曾见不匹配→重绑一次;运行≠包内【持续】=死锁→延迟8s后做一次有界重启逼 NE 换到最新 provider(只一次防旧 bug 无限环,仍不行留手动「重启接管」兜底)。
     @MainActor
     private func maybeHealStaleBinding() {
         guard let running = store.state.runningExtensionVersion,
               let bundled = store.state.bundledExtensionVersion else { return }
         if running != bundled {
             sawExtensionMismatch = true
+            guard !mismatchHealAttempted else { return }
+            mismatchHealAttempted = true
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(8))
+                guard let r = store.state.runningExtensionVersion,
+                      let b = store.state.bundledExtensionVersion, r != b else { return }
+                reboundAfterUpgrade = true
+                await TransparentProxyController.restart()
+            }
             return
         }
         guard sawExtensionMismatch, !reboundAfterUpgrade else { return }

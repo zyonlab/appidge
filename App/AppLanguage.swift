@@ -17,8 +17,15 @@ enum AppLanguage: String, CaseIterable, Identifiable, Sendable {
     /// `@AppStorage` 的键名,App 与设置页共用同一份。
     static let storageKey = "appLanguage"
 
-    /// 无存储值时的默认语言——产品决策:默认英文(去掉了「跟随系统」)。
-    static let defaultLanguage: AppLanguage = .english
+    /// 无存储值时的默认语言——**跟随系统首选语言**:系统偏好中文 → 简中(源语言,最完整、零混排),
+    /// 否则英文。读全局域 `kCFPreferencesAnyApplication`(绕开本 app 自己写进 AppleLanguages 的覆盖,
+    /// 否则会自我循环读到旧的 en)。用户仍可在设置里手动覆盖成任一语言。
+    static var defaultLanguage: AppLanguage {
+        let systemFirst = (CFPreferencesCopyAppValue(
+            "AppleLanguages" as CFString, kCFPreferencesAnyApplication) as? [String])?.first
+            ?? Locale.preferredLanguages.first ?? "en"
+        return systemFirst.hasPrefix("zh") ? .zhHans : .english
+    }
 
     var id: String { rawValue }
 

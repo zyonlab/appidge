@@ -26,19 +26,23 @@ public struct LicenseEffectHandler: Sendable {
     private let clock: any LicenseClock
     private let config: LicenseClientConfig
     private let openCheckout: @Sendable (String) -> Void
+    /// 冗余试用锚点存储（Keychain + Application Support 文件两份）。多锚点：删一个不重置。
+    private let trialAnchorStores: [any TrialAnchorStore]
 
     public init(
         apiClient: any LicenseAPIClient,
         keychain: any LicenseKeychainStore,
         clock: any LicenseClock,
         config: LicenseClientConfig,
-        openCheckout: @escaping @Sendable (String) -> Void
+        openCheckout: @escaping @Sendable (String) -> Void,
+        trialAnchorStores: [any TrialAnchorStore] = []
     ) {
         self.apiClient = apiClient
         self.keychain = keychain
         self.clock = clock
         self.config = config
         self.openCheckout = openCheckout
+        self.trialAnchorStores = trialAnchorStores
     }
 
     /// 处理 license 相关 effect；非 license effect 返回 nil。
@@ -59,8 +63,34 @@ public struct LicenseEffectHandler: Sendable {
         case .openCheckout(let url):
             openCheckout(url)
             return nil
+        case .loadTrialAnchors:
+            return await loadTrialAnchors()
+        case .persistTrialAnchors(let info):
+            await persistTrialAnchors(info)
+            return nil
         default:
             return nil
+        }
+    }
+
+    // MARK: 试用锚点（多冗余：读全部合并、写全部；单份失败不致命）
+
+    /// 读取**全部**锚点，跳过读失败/缺失的那份，把存在的都交给 reducer 合并（取较早/最高水位）。
+    private func loadTrialAnchors() async -> Core.Action {
+        var anchors: [TrialInfo] = []
+        for store in trialAnchorStores {
+            if let anchor = (try? await store.readAnchor()) ?? nil {
+                anchors.append(anchor)
+            }
+        }
+        return .trialResolved(anchors: anchors, now: clock.now)
+    }
+
+    /// 写回**全部**锚点（首启记名 / 抬高水位 / 自愈补写被删的那份）。单份写失败不致命——
+    /// 只要有一份落地就守住了防篡改，下次 resolve 再自愈。故不回灌失败 Action。
+    private func persistTrialAnchors(_ info: TrialInfo) async {
+        for store in trialAnchorStores {
+            try? await store.writeAnchor(info)
         }
     }
 

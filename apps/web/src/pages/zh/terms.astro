@@ -1,0 +1,166 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import LegalNav from '../../components/LegalNav.astro';
+import DraftNotice from '../../components/DraftNotice.astro';
+import { SUPPORT_EMAIL } from '../../config/site';
+
+const description =
+  'Appidge 服务条款：许可授予与试用、产品性质（非 VPN、不含节点）、购买与收款方 Polar、可接受使用、免责声明与责任限制。';
+---
+
+<BaseLayout title="服务条款" description={description} path="/terms" locale="zh">
+  <div class="doc">
+    <div class="container doc-layout">
+      <LegalNav locale="zh" current="terms" />
+      <article class="prose doc-main">
+      <h1>服务条款</h1>
+      <div class="doc-meta">
+        <span><b>生效日期</b> 2026-07-24</span>
+        <span><b>最后更新</b> 2026-07-24</span>
+        <span><b>适用产品</b> Appidge macOS 应用及相关服务</span>
+      </div>
+      <DraftNotice locale="zh" updated="2026-07-24" />
+
+      <p class="lede">
+        使用或购买 Appidge，即表示你同意本条款。请重点阅读第 2 条（产品性质）、
+        第 4 条（收款方）与第 6 条（可接受使用）。
+      </p>
+
+      <h2><span class="num">1</span>定义</h2>
+      <ul>
+        <li><strong>「软件」</strong>指 Appidge macOS 应用程序及其组件与更新。</li>
+        <li>
+          <strong>「运营方」「我们」</strong>指以个人身份开发并运营 Appidge 的独立开发者
+          （联系方式见第 11 条）。
+        </li>
+        <li><strong>「许可证」</strong>指通过购买获得的、按本条款使用软件付费功能的授权凭证。</li>
+        <li>
+          <strong>「Polar」</strong>指 Polar（polar.sh）——本产品的收款方（Merchant of Record）；
+          其法律主体名称以 Polar 官网条款为准。
+        </li>
+      </ul>
+
+      <h2><span class="num">2</span>产品性质：这是什么，不是什么</h2>
+      <p>
+        软件是一款<strong>在你的 Mac 本地运行的进程级网络流量转发工具</strong>：按你设定的规则，
+        把各进程的网络连接转发给你自己配置的代理服务，或直连。
+      </p>
+      <div class="callout">
+        <h3>软件不是 VPN，也不含任何网络服务</h3>
+        <ul>
+          <li>我们<strong>不提供、不销售、不代售</strong>任何 VPN、代理节点、服务器或流量中转服务。</li>
+          <li>
+            你的网络流量<strong>不经过我们的服务器</strong>；转发目标是你自行选择并配置的代理，
+            其可用性、合法性与安全性由你与相应服务提供方负责。
+          </li>
+          <li>购买许可证解锁的是<strong>软件功能</strong>，不包含任何网络接入或节点服务。</li>
+        </ul>
+      </div>
+
+      <h2><span class="num">3</span>许可授予与试用</h2>
+      <ul>
+        <li>软件可免费下载试用；试用范围与期限以应用内说明为准。</li>
+        <li>
+          购买后，你获得<strong>非独占、不可转让</strong>的许可，可在许可条款允许的设备数量内激活使用；
+          具体激活上限以结账页与产品说明为准。
+        </li>
+        <li>许可证密钥仅供你本人（或购买时指定的主体）使用，<strong>不得转售、共享或公开发布</strong>。</li>
+        <li>不得对软件进行反向工程、去除技术保护措施或绕过许可校验，法律强制允许的情形除外。</li>
+      </ul>
+
+      <h2><span class="num">4</span>购买与收款方（Polar）</h2>
+      <ul>
+        <li>
+          购买通过 Polar 的托管结账完成。<strong>Polar 是交易的收款方（Merchant of Record）</strong>：
+          订单、发票、税费与支付处理由 Polar 依其
+          <a href="https://polar.sh/legal/terms" rel="noopener">条款</a>执行，
+          你的付款对象与账单显示方为 Polar。
+        </li>
+        <li>价格、币种与税费以结账页显示为准。</li>
+        <li>软件许可由运营方按本条款授予；支付环节的争议解决可同时涉及 Polar 的相应政策。</li>
+      </ul>
+
+      <h2><span class="num">5</span>退款</h2>
+      <p>
+        购买后 14 天内可无理由全额退款，细则见<a href="/zh/refund">退款政策</a>。
+        退款完成后对应许可证停用。
+      </p>
+
+      <h2><span class="num">6</span>可接受使用</h2>
+      <ul>
+        <li>你须在<strong>遵守你所在法域适用法律</strong>的前提下使用软件。</li>
+        <li>
+          网络规则由你设定，转发目标（代理）由你选择：<strong>你对自己的规则配置、
+          所接入的代理服务及由此产生的网络行为承担全部责任</strong>。
+        </li>
+        <li>
+          不得将软件用于任何违法用途，包括但不限于未经授权访问他人系统、传播恶意软件或
+          从事法律禁止的网络活动。
+        </li>
+        <li>违反本条的，我们可依第 10 条终止许可。</li>
+      </ul>
+
+      <h2><span class="num">7</span>更新与服务可用性</h2>
+      <ul>
+        <li>我们可能不时发布软件更新（含功能调整与安全修复）；重大变化会在发布说明中注明。</li>
+        <li>
+          许可证校验服务按<strong>合理商业努力</strong>提供。服务临时不可用时，软件提供离线宽限机制，
+          不会立即锁定已付费功能。
+        </li>
+        <li>
+          我们不承诺软件与所有第三方代理软件、macOS 未来版本永久兼容，
+          但会尽合理努力维护主流环境下的可用性。
+        </li>
+      </ul>
+
+      <h2><span class="num">8</span>知识产权与第三方商标</h2>
+      <p>
+        软件及本网站内容的知识产权归运营方所有。文中提及的 Proxifier、Clash、Surge、Docker
+        及其他名称，均为其各自所有者的商标，仅用于说明兼容性或产品类别，
+        <strong>与本产品无关联，亦未获其背书</strong>。
+      </p>
+
+      <h2><span class="num">9</span>免责声明与责任限制</h2>
+      <ul>
+        <li>
+          软件按<strong>「现状」</strong>提供。在适用法律允许的最大范围内，
+          不附带任何明示或默示担保（包括适销性、特定用途适用性）。
+        </li>
+        <li>
+          在适用法律允许的最大范围内，运营方对间接损失、数据丢失、业务中断等不承担责任；
+          累计责任总额以<strong>你为该许可证实际支付的金额</strong>为限。
+        </li>
+        <li>本条不排除依强制性法律不可排除的责任，也不减损你作为消费者的法定权利。</li>
+      </ul>
+
+      <h2><span class="num">10</span>终止</h2>
+      <ul>
+        <li>你可以随时停止使用软件并停用许可证。</li>
+        <li>
+          你严重违反本条款（尤其第 3、6 条）时，我们可在通知后终止你的许可；
+          因滥用被终止的许可不予退款，法律另有规定的除外。
+        </li>
+        <li>退款完成后，许可自动终止。</li>
+      </ul>
+
+      <h2><span class="num">11</span>变更、转让、管辖与联系</h2>
+      <ul>
+        <li>本条款如有重大变更，将在本页更新并标注新的生效日期；变更后继续使用即视为接受。</li>
+        <li>
+          运营方日后设立公司或其他主体承接 Appidge 业务的，可将本条款项下的权利义务整体转让给该主体；
+          转让不减损你在本条款下已享有的任何权利，并将在本页公告。
+        </li>
+        <li>
+          本条款适用<strong>运营方经常居住地</strong>的法律。因本条款产生的争议，双方应先通过邮件
+          友好协商；协商不成的，提交运营方经常居住地有管辖权的法院解决。
+          你所在法域消费者保护的强制性规定始终优先。
+        </li>
+        <li>
+          联系方式：<a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>（可直接联系到开发者本人）；
+          运营方：Appidge 独立开发者（个人经营）。
+        </li>
+      </ul>
+      </article>
+    </div>
+  </div>
+</BaseLayout>

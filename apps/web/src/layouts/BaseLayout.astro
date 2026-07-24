@@ -10,13 +10,13 @@ interface Props {
   description: string;
   /** locale 无关的逻辑路径，如 "/pricing"。canonical 与 hreflang 由 locale 推导。 */
   path?: string;
-  /** 页面语言。默认中文（保持原有路径不变）。 */
+  /** 页面语言。默认英文（根路径）。 */
   locale?: Locale;
   /** 页面级 JSON-LD（对象）。默认注入 WebSite。 */
   jsonld?: Record<string, unknown>;
 }
 
-const { title, description, path = '/', locale = 'zh', jsonld } = Astro.props;
+const { title, description, path = '/', locale = 'en', jsonld } = Astro.props;
 
 const t = ui[locale];
 const canonical = new URL(localePath(locale, path), SITE_URL).href;
@@ -45,7 +45,7 @@ const structuredData = jsonld ?? defaultJsonld;
     <meta name="color-scheme" content="light" />
     <meta name="robots" content="index, follow" />
 
-    {/* 双语互指 + x-default（默认指中文，与路径策略一致） */}
+    {/* 双语互指 + x-default（默认指英文，与路径策略一致） */}
     {
       LOCALES.map((l) => (
         <link
@@ -58,7 +58,7 @@ const structuredData = jsonld ?? defaultJsonld;
     <link
       rel="alternate"
       hreflang="x-default"
-      href={new URL(localePath('zh', path), SITE_URL).href}
+      href={new URL(localePath('en', path), SITE_URL).href}
     />
 
     <!-- Open Graph -->

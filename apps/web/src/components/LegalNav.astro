@@ -1,0 +1,36 @@
+---
+/** 法务页左侧二级导航（refund / privacy / terms 互链，当前页高亮）。 */
+import { localePath, ui, type Locale } from '../i18n';
+
+interface Props {
+  locale: Locale;
+  current: 'refund' | 'privacy' | 'terms';
+}
+
+const { locale, current } = Astro.props;
+const t = ui[locale].legal;
+
+const items = [
+  { key: 'refund', path: '/refund', label: t.refund },
+  { key: 'privacy', path: '/privacy', label: t.privacy },
+  { key: 'terms', path: '/terms', label: t.terms },
+] as const;
+---
+
+<aside class="legal-nav" aria-label={t.heading}>
+  <h4>{t.heading}</h4>
+  <ul>
+    {
+      items.map((item) => (
+        <li>
+          <a
+            href={localePath(locale, item.path)}
+            aria-current={item.key === current ? 'page' : undefined}
+          >
+            {item.label}
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</aside>

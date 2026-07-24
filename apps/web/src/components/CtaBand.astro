@@ -1,0 +1,25 @@
+---
+/** 首页收尾 CTA（放在全部锚点 section 之后）。 */
+import { DOWNLOAD_URL } from '../config/site';
+import { localePath, type Locale } from '../i18n';
+import type { HomeCopy } from '../i18n/home';
+
+interface Props {
+  locale: Locale;
+  t: HomeCopy['cta'];
+}
+
+const { locale, t } = Astro.props;
+---
+
+<section class="final">
+  <div class="container">
+    <p class="sec-eyebrow">{t.eyebrow}</p>
+    <h2>{t.h2}</h2>
+    <p class="sec-sub">{t.sub}</p>
+    <div class="cta-row center">
+      <a class="btn btn-primary" href={DOWNLOAD_URL} rel="noopener">{t.ctaDownload}</a>
+      <a class="btn btn-secondary" href={localePath(locale, '/#pricing')}>{t.ctaBuy}</a>
+    </div>
+  </div>
+</section>

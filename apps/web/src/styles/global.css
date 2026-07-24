@@ -325,9 +325,21 @@ h2 {
   margin: 0 auto 18px;
 }
 
+/* 信息层级：痛点行是小字引导，主张一句才是视觉主角 */
+.hero h1 .pain {
+  display: block;
+  font-size: 0.52em;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--muted);
+  margin-bottom: 12px;
+  text-wrap: balance;
+}
+
 .hero h1 em {
   font-style: normal;
   color: var(--primary);
+  display: block;
 }
 
 .hero-sub {
@@ -353,14 +365,23 @@ h2 {
   font-weight: 500;
 }
 
-/* ── 活动进程面板（纯静态展示）────────────── */
+/* ── 产品截图（真实 Activity 视图）─────────── */
 .stage {
   padding: 8px 0 40px;
 }
 
 .stage-inner {
-  max-width: 860px;
+  max-width: 900px;
   margin: 0 auto;
+}
+
+.stage-shot {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-strong);
 }
 
 .panel {
@@ -1067,6 +1088,81 @@ h2 {
 
 .doc .container {
   max-width: 880px;
+}
+
+/* 法务页双栏：左侧二级导航 + 正文 */
+.doc .container.doc-layout {
+  max-width: 1080px;
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 56px;
+  align-items: start;
+}
+
+.legal-nav {
+  position: sticky;
+  top: 86px;
+}
+
+.legal-nav h4 {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+.legal-nav ul {
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  border-left: 1px solid var(--border-soft);
+}
+
+.legal-nav a {
+  display: block;
+  font-size: 14px;
+  color: var(--muted);
+  padding: 6px 14px;
+  border-left: 2px solid transparent;
+  margin-left: -1px;
+}
+
+.legal-nav a:hover {
+  color: var(--ink);
+}
+
+.legal-nav a[aria-current="page"] {
+  color: var(--ink);
+  font-weight: 600;
+  border-left-color: var(--primary);
+}
+
+@media (max-width: 800px) {
+  .doc .container.doc-layout {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .legal-nav {
+    position: static;
+  }
+  .legal-nav ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    border-left: none;
+  }
+  .legal-nav a {
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    padding: 5px 14px;
+    margin-left: 0;
+  }
+  .legal-nav a[aria-current="page"] {
+    border-color: var(--primary);
+  }
 }
 
 .doc-meta {

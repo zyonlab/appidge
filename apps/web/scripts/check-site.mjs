@@ -66,14 +66,17 @@ const htmlFiles = files.filter((f) => f.endsWith('.html'));
 const readHtml = (rel) => readFileSync(join(dist, rel), 'utf8');
 
 // ---- 2. 路由产物齐全 ----
+// 根路径 = 英文（默认语言），/zh/ 前缀 = 中文。
+// 单页信息架构：下载/定价/FAQ 是首页锚点 section（见下方锚点断言），法务三页独立。
 const routes = {
   '/': 'index.html',
-  '/download': 'download/index.html',
-  '/pricing': 'pricing/index.html',
-  '/faq': 'faq/index.html',
   '/refund': 'refund/index.html',
   '/privacy': 'privacy/index.html',
   '/terms': 'terms/index.html',
+  '/zh/': 'zh/index.html',
+  '/zh/refund': 'zh/refund/index.html',
+  '/zh/privacy': 'zh/privacy/index.html',
+  '/zh/terms': 'zh/terms/index.html',
 };
 for (const [route, file] of Object.entries(routes)) {
   ok(existsSync(join(dist, file)), `缺少路由产物 ${route} (${file})`);
@@ -104,16 +107,18 @@ for (const file of htmlFiles) {
   }
 }
 
-// ---- 4. 关键 CTA URL ----
+// ---- 4. 关键 CTA URL 与锚点 section（下载/定价/FAQ 收敛进首页）----
 const home = readHtml('index.html');
-const pricing = readHtml('pricing/index.html');
-const download = readHtml('download/index.html');
+const zhHome = readHtml('zh/index.html');
 const CHECKOUT = BUILD_ENV.PUBLIC_POLAR_CHECKOUT_URL;
 const DOWNLOAD = BUILD_ENV.PUBLIC_DOWNLOAD_URL;
-ok(home.includes(CHECKOUT), '首页缺少购买（checkout）链接');
-ok(pricing.includes(CHECKOUT), '定价页缺少购买（checkout）链接');
-ok(pricing.includes(DOWNLOAD), '定价页缺少下载链接');
-ok(download.includes(DOWNLOAD), '下载页缺少下载链接');
+for (const [name, html] of [['首页', home], ['中文首页', zhHome]]) {
+  ok(html.includes(CHECKOUT), `${name}缺少购买（checkout）链接`);
+  ok(html.includes(DOWNLOAD), `${name}缺少下载链接`);
+  for (const anchor of ['id="download"', 'id="pricing"', 'id="faq"']) {
+    ok(html.includes(anchor), `${name}缺少锚点 section ${anchor}`);
+  }
+}
 ok(CHECKOUT !== DOWNLOAD, '购买与下载 URL 不得相同（必须是两个独立动作）');
 
 // ---- 5. 无 JS 亦可用 ----
@@ -133,8 +138,8 @@ ok(
   '首页购买链接不是原生 <a>（无 JS 不可用）',
 );
 ok(
-  new RegExp(`<a[^>]+href="${DOWNLOAD.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`).test(download),
-  '下载页下载链接不是原生 <a>（无 JS 不可用）',
+  new RegExp(`<a[^>]+href="${DOWNLOAD.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`).test(home),
+  '首页下载链接不是原生 <a>（无 JS 不可用）',
 );
 
 // ---- 6. 不泄露 ----
@@ -158,15 +163,19 @@ for (const file of files) {
   }
 }
 
-// ---- 7. 法律页草稿标记 ----
+// ---- 7. 法律页草稿标记（英文根路径用英文标记，/zh 用中文标记）----
 for (const legal of ['refund/index.html', 'privacy/index.html', 'terms/index.html']) {
+  ok(readHtml(legal).includes('pending legal review'), `${legal} 缺少草稿/待法务审核标记`);
+}
+for (const legal of ['zh/refund/index.html', 'zh/privacy/index.html', 'zh/terms/index.html']) {
   ok(readHtml(legal).includes('待法务审核'), `${legal} 缺少草稿/待法务审核标记`);
 }
 
 // ---- 8. 可访问性结构断言 ----
 for (const [route, file] of Object.entries(routes)) {
   const html = readHtml(file);
-  ok(/lang="zh-Hans"/.test(html), `${route} 缺少 <html lang>`);
+  const wantLang = route.startsWith('/zh') ? 'zh-Hans' : 'en';
+  ok(new RegExp(`lang="${wantLang}"`).test(html), `${route} 缺少 <html lang="${wantLang}">`);
   ok(/name="viewport"/.test(html), `${route} 缺少 viewport`);
   ok(/class="skip-link"/.test(html), `${route} 缺少跳转主内容的 skip-link`);
   const h1Count = (html.match(/<h1\b/g) ?? []).length;

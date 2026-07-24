@@ -45,7 +45,7 @@ export const faq: Record<'zh' | 'en', FaqCopy> = {
       {
         q: '要先买才能用吗？',
         aHtml:
-          '不用。<a href="/download">先下载试用</a>，确认解决了你的问题再买。下载和购买是两回事，结账不会自动装 App。',
+          '不用。<a href="/zh/#download">先下载试用</a>，确认解决了你的问题再买。下载和购买是两回事，结账不会自动装 App。',
       },
       {
         q: '买了之后怎么激活？',
@@ -60,7 +60,7 @@ export const faq: Record<'zh' | 'en', FaqCopy> = {
       {
         q: '怎么申请退款？',
         aHtml:
-          '购买后 14 天内无理由全额退款。发邮件到 <a href="mailto:support@appidge.com">support@appidge.com</a> 带上订单信息就行，我们会尽快处理。详见<a href="/refund">退款政策</a>。',
+          '购买后 14 天内无理由全额退款。发邮件到 <a href="mailto:support@appidge.com">support@appidge.com</a> 带上订单信息就行，我们会尽快处理。详见<a href="/zh/refund">退款政策</a>。',
       },
     ],
   },
@@ -99,7 +99,7 @@ export const faq: Record<'zh' | 'en', FaqCopy> = {
       {
         q: 'Do I have to pay before trying it?',
         aHtml:
-          'No. <a href="/en/download">Download the trial</a>, confirm it solves your problem, then buy. Download and purchase are separate steps — checkout doesn’t install anything.',
+          'No. <a href="/#download">Download the trial</a>, confirm it solves your problem, then buy. Download and purchase are separate steps — checkout doesn’t install anything.',
       },
       {
         q: 'How do I activate after buying?',
@@ -114,7 +114,7 @@ export const faq: Record<'zh' | 'en', FaqCopy> = {
       {
         q: 'How do refunds work?',
         aHtml:
-          'Full refund within 14 days of purchase, no questions asked. Email <a href="mailto:support@appidge.com">support@appidge.com</a> with your order details and we’ll take care of it. See the <a href="/en/refund">refund policy</a>.',
+          'Full refund within 14 days of purchase, no questions asked. Email <a href="mailto:support@appidge.com">support@appidge.com</a> with your order details and we’ll take care of it. See the <a href="/refund">refund policy</a>.',
       },
     ],
   },

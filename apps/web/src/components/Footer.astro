@@ -10,11 +10,12 @@ const { locale } = Astro.props;
 const t = ui[locale];
 const year = new Date().getFullYear();
 
+// 下载/定价/FAQ 为首页锚点；法务三页是独立页面，唯一入口在本 Legal 列表。
 const productLinks = [
-  { path: '/download', label: t.nav.download },
-  { path: '/pricing', label: t.nav.pricing },
+  { path: '/#download', label: t.nav.download },
+  { path: '/#pricing', label: t.nav.pricing },
 ];
-const supportLinks = [{ path: '/faq', label: t.nav.faq }];
+const supportLinks = [{ path: '/#faq', label: t.nav.faq }];
 const legalLinks = [
   { path: '/refund', label: t.nav.refund },
   { path: '/privacy', label: t.footer.privacy },

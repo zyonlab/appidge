@@ -1,10 +1,10 @@
 ---
 /**
  * 首页正文（不含 BaseLayout）——由 zh / en 两个页面以不同文案字典渲染。
- * 活动进程面板为纯静态展示（check-site.mjs 契约：产物零运行时 JS），
- * 规则栈的「已覆盖 / 最新生效」状态直接烘焙在标记里，动效仅用 CSS。
+ * 产品展示图为真实 Activity 截图（activity.webp，敏感目的地已打码），
+ * 下载/定价/FAQ 由页面级组合的锚点 section 承载（见 pages/index.astro）。
  */
-import { POLAR_CHECKOUT_URL, DOWNLOAD_URL } from '../config/site';
+import { POLAR_CHECKOUT_URL } from '../config/site';
 import { localePath, type Locale } from '../i18n';
 import type { HomeCopy } from '../i18n/home';
 
@@ -14,111 +14,33 @@ interface Props {
 }
 
 const { locale, t } = Astro.props;
-
-// 静态演示数据 —— 目标用户日常可见的真实域名；流量数字为示意快照。
-const procs = [
-  { name: 'Claude Desktop', abbr: 'Ai', dest: 'api.anthropic.com:443', proxied: true, traffic: '412 KB/s' },
-  { name: 'Docker', abbr: 'Dk', dest: 'registry-1.docker.io:443', proxied: true, traffic: '3.1 MB/s' },
-  { name: 'pip', abbr: 'Py', dest: 'pypi.org:443', proxied: true, traffic: '986 KB/s' },
-  { name: 'huggingface-cli', abbr: 'HF', dest: 'cdn-lfs.huggingface.co:443', proxied: true, traffic: '8.2 MB/s' },
-  { name: 'git', abbr: '$', dest: 'github.com:443', proxied: false, traffic: '96 KB/s' },
-];
-
-const rules = [
-  { time: '14:32:05', host: 'api.anthropic.com', proxied: true, state: 'latest' },
-  { time: '14:31:48', host: 'registry-1.docker.io', proxied: true, state: '' },
-  { time: '14:30:12', host: 'github.com', proxied: false, state: '' },
-  { time: '14:28:56', host: 'api.anthropic.com', proxied: false, state: 'overridden' },
-];
 ---
 
 <!-- Hero -->
 <section class="hero">
   <div class="container">
     <p class="hero-chip">{t.hero.chip}</p>
-    <h1>{t.hero.h1Pain}<br /><em>{t.hero.h1Em}</em></h1>
+    <h1><span class="pain">{t.hero.h1Pain}</span><em>{t.hero.h1Em}</em></h1>
     <p class="hero-sub" set:html={t.hero.subHtml} />
     <div class="cta-row">
-      <a class="btn btn-primary" href={localePath(locale, '/download')}>{t.hero.ctaDownload}</a>
+      <a class="btn btn-primary" href={localePath(locale, '/#download')}>{t.hero.ctaDownload}</a>
       <a class="btn btn-secondary" href={POLAR_CHECKOUT_URL} rel="noopener">{t.hero.ctaBuy}</a>
     </div>
     <p class="hero-note" set:html={t.hero.noteHtml} />
   </div>
 </section>
 
-<!-- 活动进程面板（静态展示） -->
+<!-- 产品截图（真实 Activity 视图，敏感目的地已打码） -->
 <div class="stage">
   <div class="container stage-inner">
-    <figure class="panel" aria-label={t.panel.title}>
-      <div class="panel-head">
-        <span class="panel-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-        {t.panel.title}
-        <span class="panel-live">{t.panel.live}</span>
-      </div>
-      <div class="proc-table-scroll">
-        <table class="proc-table">
-          <thead>
-            <tr>
-              <th>{t.panel.thProcess}</th>
-              <th>{t.panel.thDest}</th>
-              <th>{t.panel.thRoute}</th>
-              <th class="num">{t.panel.thTraffic}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {
-              procs.map((p) => (
-                <tr>
-                  <td>
-                    <span class="proc-name">
-                      <span class="proc-icon">{p.abbr}</span>
-                      {p.name}
-                    </span>
-                  </td>
-                  <td class="proc-dest">{p.dest}</td>
-                  <td>
-                    <span class={`badge ${p.proxied ? 'badge-proxy' : 'badge-direct'}`}>
-                      {p.proxied ? t.panel.badgeProxy : t.panel.badgeDirect}
-                    </span>
-                  </td>
-                  <td class="proc-traffic">{p.traffic}</td>
-                </tr>
-              ))
-            }
-            <tr class="proc-row-loop">
-              <td>
-                <span class="proc-name"><span class="proc-icon">Px</span>{t.panel.loopName}</span>
-              </td>
-              <td class="proc-dest">{t.panel.loopDest}</td>
-              <td><span class="badge badge-loop">{t.panel.badgeLoop}</span></td>
-              <td class="proc-traffic">5.4 MB/s</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="rule-stack">
-        <div class="rule-stack-head">{t.panel.rulesHead}</div>
-        <ul class="rule-list">
-          {
-            rules.map((r) => (
-              <li class={r.state}>
-                <span class="t">{r.time}</span>
-                <span class="rule-body">
-                  {r.host} →
-                  <span class={r.proxied ? 'r-proxy' : 'r-direct'}>
-                    {r.proxied ? t.panel.ruleProxy : t.panel.ruleDirect}
-                  </span>
-                </span>
-                {r.state === 'latest' && <span class="rule-state">{t.panel.stateLatest}</span>}
-                {r.state === 'overridden' && (
-                  <span class="rule-state">{t.panel.stateOverridden}</span>
-                )}
-              </li>
-            ))
-          }
-        </ul>
-      </div>
-    </figure>
+    <img
+      class="stage-shot"
+      src="/activity.webp"
+      alt={t.panel.title}
+      width="994"
+      height="714"
+      loading="eager"
+    />
     <p class="stage-caption" set:html={t.panel.captionHtml} />
   </div>
 </div>
@@ -243,15 +165,3 @@ const rules = [
   </div>
 </section>
 
-<!-- 收尾 CTA -->
-<section class="final band">
-  <div class="container">
-    <p class="sec-eyebrow">{t.cta.eyebrow}</p>
-    <h2>{t.cta.h2}</h2>
-    <p class="sec-sub">{t.cta.sub}</p>
-    <div class="cta-row center">
-      <a class="btn btn-primary" href={DOWNLOAD_URL} rel="noopener">{t.cta.ctaDownload}</a>
-      <a class="btn btn-secondary" href={localePath(locale, '/pricing')}>{t.cta.ctaBuy}</a>
-    </div>
-  </div>
-</section>

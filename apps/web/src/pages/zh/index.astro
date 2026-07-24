@@ -1,0 +1,46 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import HomeBody from '../../components/HomeBody.astro';
+import DownloadBody from '../../components/DownloadBody.astro';
+import PricingBody from '../../components/PricingBody.astro';
+import FaqBody from '../../components/FaqBody.astro';
+import CtaBand from '../../components/CtaBand.astro';
+import { SITE_NAME, SITE_URL } from '../../config/site';
+import { home } from '../../i18n/home';
+import { download } from '../../i18n/download';
+import { pricing } from '../../i18n/pricing';
+import { faq } from '../../i18n/faq';
+
+const t = home.zh;
+
+const stripTags = (html: string) => html.replace(/<[^>]+>/g, '');
+const jsonld = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'SoftwareApplication',
+      name: SITE_NAME,
+      applicationCategory: 'UtilitiesApplication',
+      operatingSystem: 'macOS',
+      url: `${SITE_URL}/zh/`,
+      description: t.metaDescription,
+    },
+    {
+      '@type': 'FAQPage',
+      mainEntity: faq.zh.items.map((i) => ({
+        '@type': 'Question',
+        name: i.q,
+        acceptedAnswer: { '@type': 'Answer', text: stripTags(i.aHtml) },
+      })),
+    },
+  ],
+};
+---
+
+<BaseLayout title="首页" description={t.metaDescription} path="/" locale="zh" jsonld={jsonld}>
+  <HomeBody locale="zh" t={t} />
+  <DownloadBody t={download.zh} />
+  <PricingBody locale="zh" t={pricing.zh} />
+  <FaqBody t={faq.zh} />
+  <CtaBand locale="zh" t={t.cta} />
+</BaseLayout>

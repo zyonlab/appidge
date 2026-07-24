@@ -1,5 +1,5 @@
 ---
-/** 定价页正文（不含 BaseLayout）。 */
+/** 定价 —— 首页锚点 section（#pricing）。 */
 import { POLAR_CHECKOUT_URL, DOWNLOAD_URL } from '../config/site';
 import { localePath, type Locale } from '../i18n';
 import type { PricingCopy } from '../i18n/pricing';
@@ -12,11 +12,11 @@ interface Props {
 const { locale, t } = Astro.props;
 ---
 
-<section class="section">
+<section class="section" id="pricing">
   <div class="container">
     <div class="sec-head">
       <p class="sec-eyebrow">{t.eyebrow}</p>
-      <h1>{t.h2}</h1>
+      <h2>{t.h2}</h2>
       <p class="sec-sub">{t.sub}</p>
     </div>
 

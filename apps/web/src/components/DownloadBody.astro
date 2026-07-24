@@ -1,5 +1,5 @@
 ---
-/** 下载页正文（不含 BaseLayout）。 */
+/** 下载 —— 首页锚点 section（#download）。 */
 import { POLAR_CHECKOUT_URL, DOWNLOAD_URL } from '../config/site';
 import type { DownloadCopy } from '../i18n/download';
 
@@ -10,28 +10,35 @@ interface Props {
 const { t } = Astro.props;
 ---
 
-<section class="doc">
-  <div class="container prose">
-    <p class="sec-eyebrow">{t.eyebrow}</p>
-    <h1>{t.h1}</h1>
-    <p class="lede">{t.intro}</p>
-
-    <div class="cta-row">
-      <a class="btn btn-primary" href={DOWNLOAD_URL} rel="noopener">{t.ctaDownload}</a>
-      <a class="btn btn-secondary" href={POLAR_CHECKOUT_URL} rel="noopener">{t.ctaBuy}</a>
+<section class="section band" id="download">
+  <div class="container">
+    <div class="sec-head">
+      <p class="sec-eyebrow">{t.eyebrow}</p>
+      <h2>{t.h1}</h2>
+      <p class="sec-sub">{t.intro}</p>
+      <div class="cta-row center" style="margin-top: 26px;">
+        <a class="btn btn-primary" href={DOWNLOAD_URL} rel="noopener">{t.ctaDownload}</a>
+        <a class="btn btn-secondary" href={POLAR_CHECKOUT_URL} rel="noopener">{t.ctaBuy}</a>
+      </div>
     </div>
 
-    <h2>{t.requirementsTitle}</h2>
-    <ul>
-      {t.requirements.map((r) => <li>{r}</li>)}
-    </ul>
-
-    <h2>{t.installTitle}</h2>
-    <ol class="steps-inline">
-      {t.installSteps.map((s) => <li>{s}</li>)}
-    </ol>
-
-    <h2>{t.updatesTitle}</h2>
-    <p>{t.updatesBody}</p>
+    <div class="steps">
+      <div class="step">
+        <span class="n">{t.requirementsTitle}</span>
+        <ul class="step-list">
+          {t.requirements.map((r) => <li>{r}</li>)}
+        </ul>
+      </div>
+      <div class="step">
+        <span class="n">{t.installTitle}</span>
+        <ol class="steps-inline">
+          {t.installSteps.map((s) => <li>{s}</li>)}
+        </ol>
+      </div>
+      <div class="step">
+        <span class="n">{t.updatesTitle}</span>
+        <p>{t.updatesBody}</p>
+      </div>
+    </div>
   </div>
 </section>

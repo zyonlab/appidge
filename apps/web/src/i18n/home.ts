@@ -243,15 +243,15 @@ export const home: Record<'zh' | 'en', HomeCopy> = {
     metaDescription:
       "Proxy's on system-wide, yet Claude, Docker, and pip still won't connect? Appidge intercepts traffic per process on macOS and forces apps that ignore proxy settings through your own proxy — transparent proxies and proxy chains included. Not a VPN, no bundled nodes. Free trial.",
     hero: {
-      chip: 'Per-process proxy tool for macOS · Works with any proxy you run · Transparent proxies & chains supported',
-      h1Pain: "Proxy's on, and Claude, Docker, and pip still won't connect?",
-      h1Em: 'Force any process through your proxy',
+      chip: 'Per-process proxy control for macOS · Works with any proxy you run',
+      h1Pain: "Proxy's on — and Claude, Docker, pip still won't connect?",
+      h1Em: 'Force any process through your proxy.',
       subHtml:
-        'Plenty of software <strong>simply ignores macOS proxy settings</strong>. Appidge intercepts traffic per process at the system network layer and hands it to <strong>the proxy you already run</strong> — Clash, Surge, or anything else, including transparent proxies, anonymous proxies, and proxy chains. Want something to connect directly? One rule, applied on the spot.',
+        'A lot of software <strong>never reads macOS proxy settings</strong>. Appidge intercepts traffic per process at the system layer and routes it through <strong>the proxy you already run</strong> — transparent proxies and proxy chains included.',
       ctaDownload: 'Download free trial',
       ctaBuy: 'Buy a license',
       noteHtml:
-        '<b>Try first, buy when it earns its keep</b> · 14-day refund, no questions asked · No bundled nodes — traffic exits through your own setup',
+        '<b>Free trial</b> · 14-day money-back guarantee · No bundled nodes — traffic exits through your own setup',
     },
     panel: {
       title: 'Appidge — Active Processes',
@@ -275,63 +275,63 @@ export const home: Record<'zh' | 'en', HomeCopy> = {
     },
     scenes: {
       eyebrow: 'Sound familiar?',
-      h2: 'To a lot of software, system proxy settings are just a suggestion',
-      sub: "macOS proxy settings are honored on a strictly voluntary basis. Apps with their own network stacks, language toolchains, and background daemons route around them whenever they like. Appidge intercepts at the system network layer — there's no way around it.",
+      h2: 'To a lot of software, proxy settings are just a suggestion',
+      sub: 'Apps with their own network stacks, dev toolchains, and background daemons route around macOS proxy settings whenever they like. Appidge intercepts at the system layer — nothing gets around it.',
       hotTag: 'worst offenders',
       cards: [
         {
           title: 'AI clients & editors',
           hot: true,
-          body: 'These clients ship their own networking, so your proxy settings might as well not exist. Stuck logins and failed requests come with the territory.',
+          body: 'They ship their own networking — your proxy settings might as well not exist. Stuck logins, failed requests.',
           tools: ['Claude Desktop', 'ChatGPT App', 'Cursor'],
         },
         {
           title: 'Model & dataset downloads',
           hot: true,
-          body: 'Model weights run tens of gigabytes, and a dropped direct connection means starting over. Forced through your proxy, downloads saturate your bandwidth and finish in one go.',
+          body: 'A dropped direct connection at 30 GB means starting over. Proxied, downloads saturate your bandwidth and finish in one go.',
           tools: ['Hugging Face', 'Ollama', 'conda'],
         },
         {
           title: 'Docker & containers',
-          body: "The daemon doesn't inherit the proxy variables from your shell. Pulling an image shouldn't take all afternoon.",
+          body: "The daemon ignores your shell's proxy variables. Pulling an image shouldn't take all afternoon.",
           tools: ['Docker Desktop', 'OrbStack', 'Colima'],
         },
         {
           title: 'Package managers',
-          body: 'One proxy config for pip, another for npm, another for Cargo — and half of them quietly stop working. Now one rule covers everything.',
+          body: 'One proxy config for pip, another for npm, another for Cargo — half of them quietly break. One rule now covers all of it.',
           tools: ['pip', 'npm', 'Cargo', 'Go', 'Homebrew'],
         },
         {
           title: 'Terminal & CLI',
-          body: 'git clone hangs, and you remember you never exported the proxy variables. You won’t need them again.',
+          body: 'git clone hangs — right, you never exported the proxy variables. Forget them for good.',
           tools: ['git', 'curl', 'ssh', 'gh'],
         },
         {
           title: 'Research tools',
-          body: 'Reference managers that won’t sync, datasets that won’t download. Point each process where it should go and move on.',
+          body: "Reference managers that won't sync, datasets that won't download. Point each process where it should go.",
           tools: ['Zotero', 'EndNote', 'dataset sync'],
         },
       ],
     },
     how: {
       eyebrow: 'How it works',
-      h2: 'Intercept, decide, forward — all in one place',
-      sub: "Built on the system's Network Extension framework, every process's connections pass through Appidge's rule engine — whether or not the app respects proxy settings.",
+      h2: 'Intercept, decide, forward — in one place',
+      sub: "Built on macOS Network Extension. Every connection passes through Appidge's rule engine, whether or not the app respects proxy settings.",
       steps: [
         {
           n: '01 · Intercept',
           title: 'Take over traffic per process',
-          body: "Connections are intercepted at the system network layer. With a proxy configured, traffic goes through it by default — no per-app setup. Your proxy's own traffic is recognized and passed through, so nothing loops back on itself.",
+          body: 'Intercepted at the system network layer. With a proxy configured, traffic goes through it by default — no per-app setup. Your proxy client is auto-excluded, so nothing loops back.',
         },
         {
           n: '02 · Decide',
           title: 'Write rules by destination',
-          body: 'Rules target destinations: send these domains through the proxy, keep the intranet and registry mirrors direct. Upstream is whatever you run — transparent proxies, anonymous proxies, and proxy chains included.',
+          body: 'Send these domains through the proxy; keep intranet and registry mirrors direct. Upstream is whatever you run — transparent proxies, anonymous proxies, and chains included.',
         },
         {
           n: '03 · Forward',
-          title: 'Click a process, change its route',
-          body: 'The activity view shows every intercepted process. Click one to change where it goes, effective immediately. New rules override old ones automatically — no cleanup required.',
+          title: 'Click a process to reroute it',
+          body: 'The activity view lists every intercepted process. Click one, change its route, done — new rules override old ones automatically.',
         },
       ],
     },
@@ -370,34 +370,34 @@ export const home: Record<'zh' | 'en', HomeCopy> = {
         },
       ],
       noteHtml:
-        'Coming from Proxifier? Appidge does the same kind of job — per-process proxy forwarding — rebuilt for modern macOS: driven by Network Extension, with live process visibility, one-click rule changes, and automatic loopback handling. Download it and run them side by side.',
+        '<strong>Coming from Proxifier?</strong> Same job — per-process forwarding — rebuilt for modern macOS. Download it and run them side by side.',
     },
     notvpn: {
       eyebrow: "Let's be clear",
       h2: 'Appidge is not a VPN',
-      sub: 'It is a local utility that forwards process traffic to a proxy you already run. Your network exit is always your own.',
+      sub: 'A local utility that forwards process traffic to a proxy you already run. Your network exit is always your own.',
       points: [
         {
           sign: 'no',
-          title: 'No nodes — included or sold',
+          title: 'No nodes, none for sale',
           body: 'No servers, no endpoints, no traffic subscriptions of any kind.',
         },
         {
           sign: 'no',
           title: 'Your traffic never touches us',
-          body: 'Forwarding happens entirely on your Mac — to the proxy you configured, or directly.',
+          body: 'Forwarding happens entirely on your Mac — to your proxy, or straight out.',
         },
         {
           sign: 'yes',
           title: 'Process-level forwarding, nothing more',
-          body: "Without a proxy configured, Appidge can't conjure a network path out of thin air.",
+          body: "No proxy configured? Appidge can't conjure a network path out of thin air.",
         },
       ],
     },
     cta: {
       eyebrow: 'Get started',
       h2: 'Put every process under your rules',
-      sub: "Install it and see whether the apps that never connect finally do. If it earns its keep, buy a license.",
+      sub: 'Install it, watch the stubborn apps connect, then decide.',
       ctaDownload: 'Download free trial',
       ctaBuy: 'See pricing',
     },

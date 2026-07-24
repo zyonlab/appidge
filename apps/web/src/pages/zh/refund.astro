@@ -1,0 +1,90 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import LegalNav from '../../components/LegalNav.astro';
+import DraftNotice from '../../components/DraftNotice.astro';
+import { SUPPORT_EMAIL, DOWNLOAD_URL } from '../../config/site';
+
+const description =
+  'Appidge 退款政策：购买后 14 天内无理由全额退款，发一封邮件即可。退款由收款方 Polar 按原支付渠道退回，退款完成后许可证停用。';
+---
+
+<BaseLayout title="退款政策" description={description} path="/refund" locale="zh">
+  <div class="doc">
+    <div class="container doc-layout">
+      <LegalNav locale="zh" current="refund" />
+      <article class="prose doc-main">
+      <h1>退款政策</h1>
+      <div class="doc-meta">
+        <span><b>生效日期</b> 2026-07-24</span>
+        <span><b>最后更新</b> 2026-07-24</span>
+        <span><b>适用产品</b> Appidge macOS 软件许可证</span>
+      </div>
+      <DraftNotice locale="zh" updated="2026-07-24" />
+
+      <p class="lede">
+        我们希望你买得放心：<strong>购买后 14 天内，无理由全额退款</strong>。
+        发一封邮件就行，不需要说明理由，也不必走银行争议流程。
+      </p>
+
+      <h2><span class="num">1</span>怎么申请</h2>
+      <ol class="steps-inline">
+        <li>
+          发邮件到 <a href={`mailto:${SUPPORT_EMAIL}?subject=退款申请`}>{SUPPORT_EMAIL}</a>，
+          标题写「退款申请」。
+        </li>
+        <li>附上<strong>购买时填写的邮箱</strong>，以及<strong>订单号或许可证密钥</strong>（都在购买确认邮件里）。</li>
+        <li>愿意的话，简单说一句遇到了什么问题——不是必需的，但能帮我们把产品做得更好。</li>
+      </ol>
+      <p>
+        你也可以在 <strong>Polar 客户门户</strong>（购买确认邮件中的链接）里查看订单并联系支持。
+        无论哪种方式，都由开发者本人处理，通常在 2 个工作日内回复。
+      </p>
+
+      <h2><span class="num">2</span>退款如何执行</h2>
+      <ul>
+        <li>
+          本产品的收款方（Merchant of Record）为 <strong>Polar</strong>。退款核对通过后，
+          由我们在 Polar 侧发起，款项<strong>按原支付渠道退回</strong>。
+        </li>
+        <li>到账时间取决于支付渠道与发卡机构，通常为数个工作日。</li>
+        <li>退款完成后，对应<strong>许可证将被停用</strong>，已激活设备上的付费功能随之失效。</li>
+        <li>Polar 作为收款方，依其条款也可能在符合条件时直接处理退款；以保障消费者为准。</li>
+      </ul>
+
+      <h2><span class="num">3</span>14 天从哪天算</h2>
+      <p>自 Polar 结账页显示<strong>付款成功之日</strong>起算 14 个自然日。在此窗口内提出的申请均适用无理由全额退款。</p>
+
+      <div class="callout good">
+        <h3>建议：先试用，再购买</h3>
+        <p>
+          下载和购买是两个独立步骤。Appidge 可以先<a href={DOWNLOAD_URL} rel="noopener">免费下载试用</a>，
+          确认它解决了你的问题再买——这是避免退款最好的方式。
+        </p>
+      </div>
+
+      <h2><span class="num">4</span>窗口外与例外情形</h2>
+      <ul>
+        <li>超过 14 天的申请：请仍然先联系我们。是否退款及退款比例，由运营方结合具体情况、适用法律与 Polar 条款裁量处理。</li>
+        <li>明显滥用（例如反复购买—退款以规避付费）：我们保留拒绝退款与停用相关许可证的权利。</li>
+        <li>
+          本政策不减损你所在法域法律赋予的任何<strong>不可放弃的消费者权利</strong>。
+          若强制性法律规定了更有利于你的条件，以该法律为准。
+        </li>
+      </ul>
+
+      <h2><span class="num">5</span>发起拒付（chargeback）之前，请先联系我们</h2>
+      <p>
+        银行拒付流程慢、且会产生额外成本。任何订单问题——重复扣款、误购、功能不符合预期——
+        直接邮件给我们，几乎总能更快解决。
+      </p>
+
+      <h2><span class="num">6</span>联系方式</h2>
+      <p>
+        退款与订单问题：<a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a><br />
+        运营方：Appidge 独立开发者（个人经营）。交易的收款方与发票开具方为 Polar（Merchant of
+        Record）。
+      </p>
+      </article>
+    </div>
+  </div>
+</BaseLayout>

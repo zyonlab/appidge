@@ -1,28 +1,47 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import HomeBody from '../components/HomeBody.astro';
+import DownloadBody from '../components/DownloadBody.astro';
+import PricingBody from '../components/PricingBody.astro';
+import FaqBody from '../components/FaqBody.astro';
+import CtaBand from '../components/CtaBand.astro';
 import { SITE_NAME, SITE_URL } from '../config/site';
 import { home } from '../i18n/home';
+import { download } from '../i18n/download';
+import { pricing } from '../i18n/pricing';
+import { faq } from '../i18n/faq';
 
-const t = home.zh;
+const t = home.en;
 
+// 单页结构：下载/定价/FAQ 为首页锚点 section，结构化数据合并为 @graph。
+const stripTags = (html: string) => html.replace(/<[^>]+>/g, '');
 const jsonld = {
   '@context': 'https://schema.org',
-  '@type': 'SoftwareApplication',
-  name: SITE_NAME,
-  applicationCategory: 'UtilitiesApplication',
-  operatingSystem: 'macOS',
-  url: SITE_URL,
-  description: t.metaDescription,
+  '@graph': [
+    {
+      '@type': 'SoftwareApplication',
+      name: SITE_NAME,
+      applicationCategory: 'UtilitiesApplication',
+      operatingSystem: 'macOS',
+      url: SITE_URL,
+      description: t.metaDescription,
+    },
+    {
+      '@type': 'FAQPage',
+      mainEntity: faq.en.items.map((i) => ({
+        '@type': 'Question',
+        name: i.q,
+        acceptedAnswer: { '@type': 'Answer', text: stripTags(i.aHtml) },
+      })),
+    },
+  ],
 };
 ---
 
-<BaseLayout
-  title="首页"
-  description={t.metaDescription}
-  path="/"
-  locale="zh"
-  jsonld={jsonld}
->
-  <HomeBody locale="zh" t={t} />
+<BaseLayout title="Home" description={t.metaDescription} path="/" locale="en" jsonld={jsonld}>
+  <HomeBody locale="en" t={t} />
+  <DownloadBody t={download.en} />
+  <PricingBody locale="en" t={pricing.en} />
+  <FaqBody t={faq.en} />
+  <CtaBand locale="en" t={t.cta} />
 </BaseLayout>

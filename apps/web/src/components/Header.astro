@@ -4,23 +4,22 @@ import { localePath, ui, type Locale } from '../i18n';
 
 interface Props {
   locale: Locale;
-  /** locale 无关的逻辑路径（用于高亮当前项与语言切换互指）。 */
+  /** locale 无关的逻辑路径（用于语言切换互指）。 */
   path: string;
 }
 
 const { locale, path } = Astro.props;
 const t = ui[locale];
 
+// 单页信息架构：下载/定价/FAQ 是首页锚点；法务页仅从 footer Legal 进入。
 const nav = [
-  { path: '/', label: t.nav.home },
-  { path: '/download', label: t.nav.download },
-  { path: '/pricing', label: t.nav.pricing },
-  { path: '/faq', label: t.nav.faq },
-  { path: '/refund', label: t.nav.refund },
+  { href: '/#download', label: t.nav.download },
+  { href: '/#pricing', label: t.nav.pricing },
+  { href: '/#faq', label: t.nav.faq },
 ];
 
 const otherLocale: Locale = locale === 'zh' ? 'en' : 'zh';
-// 404 为全站共用单页（无 /en/404 产物），语言切换退回对应语言首页。
+// 404 为全站共用单页（无 /zh/404 产物），语言切换退回对应语言首页。
 const switchPath = path === '/404' ? '/' : path;
 ---
 
@@ -34,12 +33,7 @@ const switchPath = path === '/404' ? '/' : path;
         {
           nav.map((item) => (
             <li>
-              <a
-                href={localePath(locale, item.path)}
-                aria-current={item.path === path ? 'page' : undefined}
-              >
-                {item.label}
-              </a>
+              <a href={localePath(locale, item.href)}>{item.label}</a>
             </li>
           ))
         }
@@ -52,7 +46,7 @@ const switchPath = path === '/404' ? '/' : path;
         title={t.langSwitch.title}
         hreflang={otherLocale === 'zh' ? 'zh-Hans' : 'en'}>{t.langSwitch.label}</a
       >
-      <a class="nav-cta" href={localePath(locale, '/download')}>{t.navCta}</a>
+      <a class="nav-cta" href={localePath(locale, '/#download')}>{t.navCta}</a>
     </div>
   </div>
 </header>

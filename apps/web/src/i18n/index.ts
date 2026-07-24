@@ -1,7 +1,7 @@
 /**
  * i18n 基础设施 —— 纯静态双语：
- *  - 中文（默认）：保持原有路径不变（/、/pricing、/faq …）
- *  - 英文：/en/ 前缀（/en/、/en/pricing …）
+ *  - 英文（默认）：根路径（/、/pricing、/faq …），x-default 指向英文
+ *  - 中文：/zh/ 前缀（/zh/、/zh/pricing …）
  * 每页文案字典放 src/i18n/<page>.ts，UI 公共字符串在本文件。
  */
 
@@ -29,13 +29,13 @@ export const HREFLANG: Record<Locale, string> = {
 
 /**
  * 由「locale 无关的逻辑路径」得到该 locale 的真实路径。
- * localePath('zh', '/pricing') === '/pricing'
- * localePath('en', '/pricing') === '/en/pricing'
- * localePath('en', '/') === '/en/'
+ * localePath('en', '/pricing') === '/pricing'
+ * localePath('zh', '/pricing') === '/zh/pricing'
+ * localePath('zh', '/') === '/zh/'
  */
 export function localePath(locale: Locale, path: string): string {
-  if (locale === 'zh') return path;
-  return path === '/' ? '/en/' : `/en${path}`;
+  if (locale === 'en') return path;
+  return path === '/' ? '/zh/' : `/zh${path}`;
 }
 
 /** 站点级 UI 字符串（Header / Footer / 布局）。 */
@@ -51,6 +51,12 @@ export const ui = {
     },
     navCta: '下载 App',
     langSwitch: { label: 'English', title: 'Switch to English' },
+    legal: {
+      heading: '法律条款',
+      refund: '退款政策',
+      privacy: '隐私政策',
+      terms: '服务条款',
+    },
     footer: {
       blurb:
         'macOS 按进程代理转发工具：接管进程网络，按你的规则决定每个连接转给你自己的代理还是直连。支持透明代理、匿名代理与代理链。非 VPN，不提供任何节点或网络服务。',
@@ -76,6 +82,12 @@ export const ui = {
     },
     navCta: 'Download',
     langSwitch: { label: '中文', title: '切换到中文' },
+    legal: {
+      heading: 'Legal',
+      refund: 'Refund Policy',
+      privacy: 'Privacy Policy',
+      terms: 'Terms of Service',
+    },
     footer: {
       blurb:
         'Per-process proxy forwarding for macOS: intercept each process’s traffic and route it to your own proxy — or directly — by your rules. Transparent proxies, anonymous proxies, and proxy chains supported. Not a VPN; no nodes or network services included.',

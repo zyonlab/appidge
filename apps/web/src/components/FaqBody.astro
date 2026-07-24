@@ -1,5 +1,5 @@
 ---
-/** FAQ 页正文（不含 BaseLayout）。 */
+/** FAQ —— 首页锚点 section（#faq）。 */
 import type { FaqCopy } from '../i18n/faq';
 
 interface Props {
@@ -9,11 +9,11 @@ interface Props {
 const { t } = Astro.props;
 ---
 
-<section class="section">
+<section class="section band" id="faq">
   <div class="container">
     <div class="sec-head">
       <p class="sec-eyebrow">{t.eyebrow}</p>
-      <h1>{t.h2}</h1>
+      <h2>{t.h2}</h2>
     </div>
     <div class="faq-list">
       {

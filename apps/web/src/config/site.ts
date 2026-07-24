@@ -50,7 +50,11 @@ const values = Object.fromEntries(
   REQUIRED_KEYS.map((k) => [k, assertHttpsUrl(k, readRequired(k))]),
 ) as Record<RequiredEnvKey, string>;
 
-/** Polar Hosted Checkout Link（购买）。公开链接，非 API key。 */
+/**
+ * Creem 支付链接（购买）。公开链接，非 API key。
+ * 注：常量/环境变量名沿用 POLAR_*（历史命名）——改名会牵动 components 与 check-site
+ * （另一 agent 所有权），列为后续债务，见 docs/creem-integration.md。
+ */
 export const POLAR_CHECKOUT_URL = values.PUBLIC_POLAR_CHECKOUT_URL;
 
 /**

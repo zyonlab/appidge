@@ -1,9 +1,10 @@
 ---
 /**
  * 首页正文（不含 BaseLayout）——由 zh / en 两个页面以不同文案字典渲染。
- * 产品展示图为真实 Activity 截图（activity.webp，敏感目的地已打码），
+ * 产品展示为 Activity 界面的纯 HTML/CSS 1:1 复刻（ActivityMock，内联 JS 本地模拟运行态），
  * 下载/定价/FAQ 由页面级组合的锚点 section 承载（见 pages/index.astro）。
  */
+import ActivityMock from './ActivityMock.astro';
 import { POLAR_CHECKOUT_URL } from '../config/site';
 import { localePath, type Locale } from '../i18n';
 import type { HomeCopy } from '../i18n/home';
@@ -40,17 +41,10 @@ const { locale, t } = Astro.props;
   </div>
 </section>
 
-<!-- 产品截图（真实 Activity 视图，敏感目的地已打码） -->
+<!-- 产品展示：Activity 界面 1:1 复刻（SSR 静态完整可见，内联 JS 仅做本地模拟增强） -->
 <div class="stage">
   <div class="container stage-inner">
-    <img
-      class="stage-shot"
-      src="/activity.webp"
-      alt={t.panel.title}
-      width="1478"
-      height="1064"
-      loading="eager"
-    />
+    <ActivityMock title={t.panel.title} />
     <p class="stage-caption" set:html={t.panel.captionHtml} />
   </div>
 </div>

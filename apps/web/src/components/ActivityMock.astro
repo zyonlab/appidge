@@ -1,0 +1,423 @@
+---
+/**
+ * 首页产品展示：Activity 界面的纯 HTML/CSS 1:1 复刻（对照已删除的 activity.webp 截图布局）。
+ *
+ * 硬约束（check-site.mjs 契约）：
+ *  - 初始 13 行连接 + 日志 + 状态栏全部服务端渲染 —— 无 JS 也完整可看（渐进增强）。
+ *  - 内联 vanilla JS 只做本地模拟（新连接/计时/字节增长/日志滚动），零网络请求。
+ *  - prefers-reduced-motion 时不启动任何定时器。
+ *
+ * 体积纪律：重复出现的图标（✓ 圈、徽章图标、进程图标配色）全部收进 global.css
+ * 一次定义（伪元素 / data URI / .amock-i-* 类），行内只留必要文本。
+ *
+ * 演示数据可信且无敏感信息：知名真实工具 + 真实公共域名，
+ * 其余目的地用文档保留 IP（192.0.2.x / 198.51.100.x / 203.0.113.x）。
+ * UI 文本固定英文 —— 复刻的是 App 界面语言，中英官网共用本组件。
+ */
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+
+type Rule = 'proxy' | 'direct' | 'block';
+
+/** c: global.css 里的图标配色类；L: 图标字母（空 = 无图标的普通可执行文件，白底描边方块） */
+interface Proc {
+  n: string;
+  id: string;
+  c: string;
+  L: string;
+}
+
+const P: Record<string, Proc> = {
+  wechat: { n: 'WeChat', id: 'com.tencent.xinWeChat', c: 'amock-i-wc', L: 'W' },
+  claude: { n: '2.1.214', id: 'com.anthropic.claude-code', c: '', L: '' },
+  docker: { n: 'Docker', id: 'com.docker.docker', c: 'amock-i-dk', L: 'D' },
+  pip: { n: 'pip', id: 'python3.13', c: 'amock-i-py', L: 'P' },
+  git: { n: 'git', id: '/usr/bin/git', c: 'amock-i-git', L: 'G' },
+  tg: { n: 'Telegram', id: 'ru.keepcoder.Telegram', c: 'amock-i-tg', L: 'T' },
+  node: { n: 'node', id: '/usr/local/bin/node', c: 'amock-i-nd', L: 'N' },
+};
+
+/* —— HTML 片段构造（与内联脚本里的同名构造保持一致：改这里必须同步改 <script>）—— */
+const appHtml = (p: Proc): string =>
+  `<span class="amock-proc"><i class="amock-picon ${p.c || 'amock-picon-plain'}">${p.L}</i><b>${p.n}</b><span class="amock-bid">(${p.id})</span></span>`;
+
+const BADGE: Record<Rule, string> = {
+  proxy: '<span class="amock-badge amock-badge-proxy">Proxy · SOCKS5</span>',
+  direct: '<span class="amock-badge amock-badge-direct">Direct</span>',
+  block: '<span class="amock-badge amock-badge-block">Block</span>',
+};
+
+const ST_CLOSED = '<span class="amock-st">Closed</span>';
+
+/** 匹配规则说明（日志尾部）：Direct 是默认规则(*)，Proxy/Block 是 per-app 规则 */
+const scopeOf = (p: Proc, dest: string, rule: Rule): string =>
+  rule === 'direct'
+    ? '* · * · Any port'
+    : rule === 'block'
+      ? `${p.id} · ${dest.split(':')[0]} · ${dest.split(':')[1]}`
+      : `${p.id} · * · Any port`;
+
+/* —— 初始 13 行（服务端渲染；分布对照截图：多数 Direct，WeChat 走 Proxy，claude-code 遥测 Block）—— */
+interface Row {
+  p: Proc;
+  dest: string;
+  rule: Rule;
+  live?: number; // 已持续秒数（Active 行）
+  sent: string;
+  recv: string;
+  sentB?: number;
+  recvB?: number;
+}
+
+const ROWS: Row[] = [
+  { p: P.wechat, dest: '198.51.100.24:80', rule: 'proxy', sent: '723 bytes', recv: '379 bytes' },
+  { p: P.docker, dest: 'registry-1.docker.io:443', rule: 'direct', sent: '396 bytes', recv: '232 bytes' },
+  { p: P.tg, dest: '203.0.113.44:443', rule: 'direct', sent: '600 bytes', recv: '410 bytes' },
+  { p: P.git, dest: 'github.com:443', rule: 'direct', sent: '119 bytes', recv: '151 bytes' },
+  { p: P.wechat, dest: '198.51.100.24:80', rule: 'proxy', sent: '721 bytes', recv: '347 bytes' },
+  { p: P.claude, dest: 'http-intake.logs.us5.datadoghq.com:443', rule: 'block', sent: '0 KB', recv: '0 KB' },
+  { p: P.claude, dest: 'http-intake.logs.us5.datadoghq.com:443', rule: 'block', sent: '0 KB', recv: '0 KB' },
+  { p: P.pip, dest: 'pypi.org:443', rule: 'direct', sent: '396 bytes', recv: '232 bytes' },
+  { p: P.docker, dest: '192.0.2.15:58999', rule: 'direct', sent: '592 bytes', recv: '410 bytes' },
+  { p: P.git, dest: 'codeload.github.com:443', rule: 'direct', sent: '119 bytes', recv: '151 bytes' },
+  {
+    p: P.claude,
+    dest: 'api.anthropic.com:443',
+    rule: 'proxy',
+    live: 55,
+    sentB: 12700,
+    recvB: 88300,
+    sent: '12.4 KB',
+    recv: '86.2 KB',
+  },
+  { p: P.wechat, dest: '198.51.100.24:80', rule: 'proxy', sent: '723 bytes', recv: '379 bytes' },
+  { p: P.tg, dest: '203.0.113.44:443', rule: 'direct', sent: '394 bytes', recv: '232 bytes' },
+];
+
+/* —— 初始日志。DOM 序新→旧：容器是 column-reverse（首个子元素渲染在底部），
+ * 视觉上最新一条钉在可视底部，JS 用 afterbegin 追加即自动跟随滚动。 —— */
+const LOGRULE: Record<Rule, string> = {
+  proxy: '<span class="amock-lblue">Proxy · SOCKS5</span>',
+  direct: '<span class="amock-lok">Direct</span>',
+  block: '<span class="amock-lbad">Block</span>',
+};
+
+const logHtml = (t: string, p: Proc, dest: string, rule: Rule, state: string): string =>
+  `<div class="amock-ll"><span class="amock-lt">${t}</span> <span>${p.n}</span> <span class="amock-lmu">→</span> <span>${dest}</span> ${LOGRULE[rule]} ${
+    state === 'Active'
+      ? `<span class="amock-lmu">·</span> <span class="amock-lok">Active</span> <span class="amock-lmu">· Matched ${scopeOf(p, dest, rule)}</span>`
+      : `<span class="amock-lmu">· Closed · Matched ${scopeOf(p, dest, rule)}</span>`
+  }</div>`;
+
+const LOGS: string[] = [
+  logHtml('12:19:32', P.wechat, '198.51.100.24:80', 'proxy', 'Closed'),
+  logHtml('12:19:18', P.docker, 'registry-1.docker.io:443', 'direct', 'Closed'),
+  logHtml('12:19:18', P.tg, '203.0.113.44:443', 'direct', 'Closed'),
+  logHtml('12:19:15', P.wechat, '198.51.100.24:80', 'proxy', 'Closed'),
+  logHtml('12:19:12', P.claude, 'http-intake.logs.us5.datadoghq.com:443', 'block', 'Closed'),
+  logHtml('12:18:48', P.pip, 'pypi.org:443', 'direct', 'Closed'),
+  logHtml('12:18:48', P.docker, '192.0.2.15:58999', 'direct', 'Closed'),
+  logHtml('12:18:48', P.git, 'codeload.github.com:443', 'direct', 'Closed'),
+  logHtml('12:18:41', P.claude, 'api.anthropic.com:443', 'proxy', 'Active'),
+  logHtml('12:18:31', P.wechat, '198.51.100.24:80', 'proxy', 'Closed'),
+];
+
+/* —— 动态模拟候选池（紧凑字段直接进内联脚本；权重靠重复条目：多数 Direct）—— */
+const pi = (p: Proc, dest: string, rule: Rule) => ({ ...p, dest, rule });
+const POOL = [
+  pi(P.docker, 'registry-1.docker.io:443', 'direct'),
+  pi(P.pip, 'pypi.org:443', 'direct'),
+  pi(P.pip, 'files.pythonhosted.org:443', 'direct'),
+  pi(P.git, 'github.com:443', 'direct'),
+  pi(P.node, 'registry.npmjs.org:443', 'direct'),
+  pi(P.tg, '203.0.113.44:443', 'direct'),
+  pi(P.wechat, '198.51.100.24:80', 'proxy'),
+  pi(P.wechat, '203.0.113.9:443', 'proxy'),
+  pi(P.claude, 'api.anthropic.com:443', 'proxy'),
+  pi(P.claude, 'http-intake.logs.us5.datadoghq.com:443', 'block'),
+];
+
+/* 状态栏初始值（与 SSR 文本一致，供 JS 接续爬升）；12:19:32 是虚拟时钟起点 */
+const UP0 = Math.round(502.3 * 1048576);
+const DOWN0 = Math.round(394.9 * 1048576);
+const T0 = 12 * 3600 + 19 * 60 + 32;
+const SORT_SVG =
+  '<svg viewBox="0 0 10 10" width="9" height="9" aria-hidden="true"><path d="M2.2 4 5 6.8 7.8 4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+---
+
+<div class="amock-viewport">
+  <div class="amock" role="img" aria-label={title}>
+    <!-- 标题栏 -->
+    <div class="amock-titlebar">
+      <span class="amock-lights"><i></i><i></i><i></i></span>
+      <span class="amock-title">Activity</span>
+      <span class="amock-segwrap">
+        <span class="amock-seg">
+          <span class="amock-seg-on">Activity</span><span>Apps</span><span>Rules</span><span>Proxy</span>
+        </span>
+      </span>
+      <span class="amock-winbtns">
+        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"
+          ><path
+            d="M8 2 14 5 8 8 2 5Zm-6 6 6 3 6-3M2 11l6 3 6-3"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.2"
+            stroke-linejoin="round"></path></svg
+        >
+        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"
+          ><circle cx="8" cy="8" r="4.2" fill="none" stroke="currentColor" stroke-width="1.3"
+          ></circle><circle cx="8" cy="8" r="1.5" fill="currentColor"></circle><path
+            d="M8 1.6v2.2M8 12.2v2.2M1.6 8h2.2M12.2 8h2.2M3.5 3.5l1.6 1.6M10.9 10.9l1.6 1.6M12.5 3.5l-1.6 1.6M5.1 10.9l-1.6 1.6"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.3"
+            stroke-linecap="round"></path></svg
+        >
+      </span>
+    </div>
+
+    <!-- 过滤行 -->
+    <div class="amock-filter">
+      <span class="amock-searchbox">
+        <svg viewBox="0 0 14 14" width="13" height="13" aria-hidden="true"
+          ><circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" stroke-width="1.3"
+          ></circle><path d="m9.2 9.2 3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"
+          ></path></svg
+        >
+        Filter connections (process / host)
+      </span>
+      <span class="amock-pill">Active only</span>
+      <span class="amock-trash">
+        <svg viewBox="0 0 14 14" width="13" height="13" aria-hidden="true"
+          ><path
+            d="M2.5 4h9M5.5 4V2.8h3V4M3.5 4l.6 8h5.8l.6-8M5.8 6.2v3.6M8.2 6.2v3.6"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.1"
+            stroke-linecap="round"></path></svg
+        >
+      </span>
+    </div>
+
+    <!-- 连接表（初始 13 行 SSR；JS 只做增强） -->
+    <div class="amock-scroll">
+      <table class="amock-table">
+        <thead>
+          <tr>
+            <th>Apps</th>
+            <th>Destination</th>
+            <th>Duration / Stat… <Fragment set:html={SORT_SVG} /></th>
+            <th>Rule - Proxy</th>
+            <th>Sent</th>
+            <th>Received</th>
+          </tr>
+        </thead>
+        <tbody id="amock-rows">
+          {
+            ROWS.map((r) => (
+              <tr
+                data-sec={r.live !== undefined ? String(r.live) : undefined}
+                data-sent={r.live !== undefined ? String(r.sentB) : undefined}
+                data-recv={r.live !== undefined ? String(r.recvB) : undefined}
+                data-n={r.live !== undefined ? r.p.n : undefined}
+                data-rule={r.live !== undefined ? r.rule : undefined}
+                data-scope={r.live !== undefined ? scopeOf(r.p, r.dest, r.rule) : undefined}
+              >
+                <td set:html={appHtml(r.p)} />
+                <td>{r.dest}</td>
+                <td
+                  set:html={
+                    r.live !== undefined
+                      ? `<span class="amock-st amock-st-live"><i></i><span class="amock-dur">00:${String(r.live).padStart(2, '0')}</span></span>`
+                      : ST_CLOSED
+                  }
+                />
+                <td set:html={BADGE[r.rule]} />
+                <td>{r.sent}</td>
+                <td>{r.recv}</td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="amock-split" aria-hidden="true"></div>
+
+    <!-- Log 面板 -->
+    <div class="amock-loghead">
+      <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"
+        ><path
+          d="M2.5 4.5 6 8l3.5-3.5"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.4"
+          stroke-linecap="round"
+          stroke-linejoin="round"></path></svg
+      >
+      <b>Log</b>
+      <span class="amock-count" id="amock-count">500</span>
+      <span class="amock-logact">
+        <span>
+          <svg viewBox="0 0 14 14" width="13" height="13" aria-hidden="true"
+            ><path
+              d="M1.8 3.2c0-.5.4-.9.9-.9h2.6l1.2 1.4h4.8c.5 0 .9.4.9.9v6.2c0 .5-.4.9-.9.9H2.7c-.5 0-.9-.4-.9-.9Z"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.1"
+              stroke-linejoin="round"></path></svg
+          >
+          Reveal in Finder
+        </span>
+        <span>
+          <svg viewBox="0 0 14 14" width="13" height="13" aria-hidden="true"
+            ><path
+              d="M2.5 4h9M5.5 4V2.8h3V4M3.5 4l.6 8h5.8l.6-8"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.1"
+              stroke-linecap="round"></path></svg
+          >
+          Clear
+        </span>
+      </span>
+    </div>
+    <div class="amock-log" id="amock-log">
+      {LOGS.map((l) => <Fragment set:html={l} />)}
+    </div>
+
+    <!-- 状态栏 -->
+    <div class="amock-statusbar">
+      <span class="amock-okdot"></span>
+      Engine OK
+      <span class="amock-sep">|</span>
+      <span>Active connections <span id="amock-conns">4</span></span>
+      <span class="amock-totals">
+        <span id="amock-up">↑ 502.3 MB</span>
+        <span id="amock-down">↓ 394.9 MB</span>
+      </span>
+    </div>
+  </div>
+</div>
+
+{/* 渐进增强：本地模拟数据滚动，纯本地、零网络请求（check-site.mjs 契约）；
+    prefers-reduced-motion 时不启动。无 JS 时上方 SSR 内容即完整视图。
+    片段模板（amock-proc/amock-badge/amock-ll）与 frontmatter 构造保持一致，改动需同步。
+    维护说明（脚本随 HTML 内联进产物，为控制体积不带注释，逻辑速览）：
+    - live[]：活跃行登记（含 SSR 里带 data-sec 的行）；封顶 5 行，新增前先收掉最老的。
+    - 每 1s：计时递增 + 字节缓慢增长；每 1.5~3s 随机事件：
+      新连接（Block 即刻关闭、0 字节，与截图一致）/ 关闭活跃行 / 某行流量突增。
+    - hidden=3：状态栏 Active connections 初值 4 = 3（视口外）+ 表内 1 行 Active。
+    - 日志追加于底部并自动滚动；"500" 计数随之递增；时钟是 12:19:32 起步的虚拟时钟。 */}
+<script is:inline define:vars={{ POOL, UP0, DOWN0, T0 }}>
+  // @ts-nocheck — POOL/UP0/DOWN0/T0 由 Astro define:vars 注入
+  (() => {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const $ = (id) => document.getElementById(id);
+    const body = $('amock-rows'), log = $('amock-log');
+    if (!body || !log) return;
+    const cnt = $('amock-count'), conns = $('amock-conns'), upEl = $('amock-up'), dnEl = $('amock-down');
+    let up = UP0, dn = DOWN0, logN = 500;
+    const hidden = 3, t0 = Date.now();
+    const pad = (n) => String(n).padStart(2, '0');
+    const clock = () => {
+      const s = T0 + Math.round((Date.now() - t0) / 1000);
+      return pad(Math.floor(s / 3600) % 24) + ':' + pad(Math.floor(s / 60) % 60) + ':' + pad(s % 60);
+    };
+    const dur = (s) => pad(Math.floor(s / 60)) + ':' + pad(s % 60);
+    const fb = (n) => (n < 1024 ? n + ' bytes' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(1) + ' MB');
+    const fmb = (n) => (n / 1048576).toFixed(1) + ' MB';
+    const rnd = (n) => Math.floor(Math.random() * n);
+    const CLOSED = '<span class="amock-st">Closed</span>';
+    const LIVE = '<span class="amock-st amock-st-live"><i></i><span class="amock-dur">00:00</span></span>';
+    const badge = (r) => '<span class="amock-badge amock-badge-' + r + '">' + (r === 'proxy' ? 'Proxy · SOCKS5' : r === 'direct' ? 'Direct' : 'Block') + '</span>';
+    const lr = (r) => '<span class="amock-l' + (r === 'proxy' ? 'blue">Proxy · SOCKS5' : r === 'direct' ? 'ok">Direct' : 'bad">Block') + '</span>';
+    const appHtml = (p) => '<span class="amock-proc"><i class="amock-picon ' + (p.c || 'amock-picon-plain') + '">' + p.L + '</i><b>' + p.n + '</b><span class="amock-bid">(' + p.id + ')</span></span>';
+    const scopeOf = (p) => (p.rule === 'direct' ? '* · * · Any port' : p.rule === 'block' ? p.id + ' · ' + p.dest.split(':')[0] + ' · ' + p.dest.split(':')[1] : p.id + ' · * · Any port');
+    const live = [];
+    for (const tr of body.querySelectorAll('tr[data-sec]'))
+      live.push({ tr, sec: +tr.dataset.sec, sent: +tr.dataset.sent, recv: +tr.dataset.recv, n: tr.dataset.n, dest: tr.cells[1].textContent, rule: tr.dataset.rule, scope: tr.dataset.scope });
+    const addLog = (o, active) => {
+      const tail = active
+        ? '<span class="amock-lmu">·</span> <span class="amock-lok">Active</span> <span class="amock-lmu">· Matched ' + o.scope + '</span>'
+        : '<span class="amock-lmu">· Closed · Matched ' + o.scope + '</span>';
+      log.insertAdjacentHTML('afterbegin', '<div class="amock-ll"><span class="amock-lt">' + clock() + '</span> <span>' + o.n + '</span> <span class="amock-lmu">→</span> <span>' + o.dest + '</span> ' + lr(o.rule) + ' ' + tail + '</div>');
+      while (log.children.length > 50) log.lastElementChild.remove();
+      logN += 1;
+      if (cnt) cnt.textContent = String(logN);
+    };
+    const setNum = (o) => {
+      o.tr.cells[4].textContent = fb(o.sent);
+      o.tr.cells[5].textContent = fb(o.recv);
+    };
+    const status = () => {
+      if (conns) conns.textContent = String(hidden + live.length);
+      if (upEl) upEl.textContent = '↑ ' + fmb(up);
+      if (dnEl) dnEl.textContent = '↓ ' + fmb(dn);
+    };
+    const closeAt = (i) => {
+      const o = live[i];
+      o.tr.cells[2].innerHTML = CLOSED;
+      o.tr.removeAttribute('data-sec');
+      addLog(o, false);
+      live.splice(i, 1);
+    };
+    const spawn = (p) => {
+      const on = p.rule !== 'block';
+      if (on && live.length >= 5) closeAt(0);
+      const sent = on ? 60 + rnd(700) : 0, recv = on ? 80 + rnd(900) : 0;
+      body.insertAdjacentHTML('afterbegin', '<tr' + (on ? ' data-sec="0"' : '') + '><td>' + appHtml(p) + '</td><td>' + p.dest + '</td><td>' + (on ? LIVE : CLOSED) + '</td><td>' + badge(p.rule) + '</td><td>' + (on ? fb(sent) : '0 KB') + '</td><td>' + (on ? fb(recv) : '0 KB') + '</td></tr>');
+      const o = { tr: body.firstElementChild, sec: 0, sent, recv, n: p.n, dest: p.dest, rule: p.rule, scope: scopeOf(p) };
+      if (on) {
+        live.unshift(o);
+        up += sent;
+        dn += recv;
+      }
+      while (body.children.length > 13) {
+        const last = body.lastElementChild;
+        const j = live.findIndex((x) => x.tr === last);
+        if (j >= 0) live.splice(j, 1);
+        last.remove();
+      }
+      addLog(o, on);
+    };
+    setInterval(() => {
+      for (const o of live) {
+        o.sec += 1;
+        const d = o.tr.querySelector('.amock-dur');
+        if (d) d.textContent = dur(o.sec);
+        const ds = 40 + rnd(1800), dr = 80 + rnd(6500);
+        o.sent += ds;
+        o.recv += dr;
+        up += ds;
+        dn += dr;
+        setNum(o);
+      }
+      status();
+    }, 1000);
+    const schedule = () => {
+      setTimeout(() => {
+        const r = Math.random();
+        if (r < 0.3) spawn(POOL[rnd(POOL.length)]);
+        else if (r < 0.6 && live.length > 1) closeAt(rnd(live.length));
+        else if (live.length) {
+          const o = live[rnd(live.length)];
+          const ds = 2048 + rnd(18000), dr = 8192 + rnd(110000);
+          o.sent += ds;
+          o.recv += dr;
+          up += ds;
+          dn += dr;
+          setNum(o);
+        }
+        status();
+        schedule();
+      }, 1500 + rnd(1500));
+    };
+    schedule();
+  })();
+</script>

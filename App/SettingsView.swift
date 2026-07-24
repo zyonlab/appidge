@@ -203,10 +203,22 @@ struct LicenseSettingsView: View {
             switch store.state.licensePhase {
             case .licensed, .validating, .gracePeriod, .deactivating:
                 activeDetails
+            case .trial, .trialExpired:
+                trialDetails
             case .unlicensed, .activating, .revoked, .expired, .recoverableError:
                 activationControls
             }
         }
+    }
+
+    /// 试用态（试用中/已到期）：一句说明 + 复用未激活时的凭证输入/购买控件。剩余天数在 `statusRow`
+    /// 经 `display(_:)` 展示，这里不重复列。`.trial`/`.trialExpired` 是 Core 新增相位（待集成后编译）。
+    @ViewBuilder
+    private var trialDetails: some View {
+        Text("试用期内可使用全部功能；购买许可证解除限制并支持后续更新。")
+            .font(.caption).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        activationControls
     }
 
     private var statusRow: some View {
@@ -294,6 +306,9 @@ struct LicenseSettingsView: View {
         case .revoked: ("已吊销", .red)
         case .expired: ("已过期", .red)
         case .recoverableError: ("激活未完成", .orange)
+        // Core 新增试用相位（待集成后编译）：试用中显示剩余天数，到期显示已结束。
+        case .trial(let days): ("试用 · 剩 \(days) 天", .blue)
+        case .trialExpired: ("试用已结束", .red)
         }
     }
 
@@ -378,12 +393,16 @@ struct LicenseGateView: View {
         case .recoverableError: "激活未完成，请检查密钥或网络后重试。"
         case .validating: "正在重新校验许可证…"
         case .licensed, .gracePeriod, .deactivating: "许可证已激活。"
+        // Core 新增试用相位（待集成后编译）。`.trial` 期 isLicenseActive 为真、不会走到本门；
+        // `.trialExpired` 期落到此门，提示试用结束并引导购买/输入凭证。
+        case .trial: "试用中，可使用全部功能。"
+        case .trialExpired: "试用期已结束。购买许可证后可继续使用全部功能，或粘贴已购买的许可证密钥。"
         }
     }
 
     private var statusColor: Color {
         switch store.state.licensePhase {
-        case .revoked, .expired: .red
+        case .revoked, .expired, .trialExpired: .red
         case .recoverableError: .orange
         default: .secondary
         }

@@ -100,15 +100,6 @@ struct MenuBarView: View {
 
             Divider()
 
-            // 1b. 接管层短状态:一眼看清"我们在管哪一层"(详解在设置里)。
-            let coverage = ProxyCoverage.shortStatus(store.state.proxyEnvironment)
-            Label(coverage.text, systemImage: coverage.symbol)
-                .font(.caption)
-                .foregroundStyle(coverage.tint)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Divider()
-
             // 2 + 3. 全局吞吐总量 + 活动连接数(标签左、值右对齐)。
             statRow("总流量", upDown(totals.up, totals.down))
             statRow("活动连接", "\(activeConnectionCount)")

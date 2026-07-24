@@ -1,19 +1,22 @@
-// Polar webhook handler：
-//   1. Standard Webhooks 验签（webhook-id/timestamp/signature，签名内容 id.timestamp.body，
-//      含时间戳漂移校验防重放）；验签成功才解析 JSON。
-//   2. 以 webhook-id 幂等（webhook_events 唯一约束），重复投递返回 200 但不重复副作用。
-//   3. benefit_grant.created → active（不翻回 revoked）；benefit_grant.revoked/refund → 本地 revoked。
-//   4. 未知事件 / 非本产品 benefit / 无法可靠映射 → 安全忽略（登记 + 200，不吊销）。
+// Creem webhook handler：
+//   1. 用原始请求字节计算 HMAC-SHA256(hex)，对 `creem-signature` 恒定时间比较；
+//      验签成功才解析 JSON。Creem 签名不含时间戳 → 重放防御依赖事件 ID 幂等。
+//   2. 以 payload 顶层事件 ID（evt_...）幂等（webhook_events 唯一约束），
+//      重复投递返回 200 但不重复副作用。
+//   3. checkout.completed → 审计登记（payload 不含 license key，无法建 entitlement；
+//      吊销主路 = app validate 命中上游 disabled，见 docs/creem-integration.md）。
+//   4. refund.created / dispute.created → 按 order 落永久 tombstone + 尽力吊销
+//      已知 order 的 entitlement；无法可靠映射就只登记，不凭模糊字段吊销。
+//   5. 未知事件 / 未知 product → 安全忽略（登记 + 200）。
 import type { AppContext } from "../context";
 import { ApiError } from "../errors";
 import { json, errorResponse } from "../responses";
-import { verifyStandardWebhook } from "../crypto";
-import { mapEvent, type CanonicalEvent } from "../polar/mapping";
+import { verifyCreemWebhook, licenseFingerprint } from "../crypto";
+import { mapEvent, type CanonicalEvent } from "../creem/mapping";
 import {
   recordWebhookEvent,
   markWebhookProcessed,
-  upsertActiveEntitlement,
-  revokeByLicenseKeyId,
+  revokeByFingerprint,
   revokeByOrder,
   recordRefundTombstone,
 } from "../db";
@@ -27,17 +30,7 @@ export async function handleWebhook(ctx: AppContext, req: Request): Promise<Resp
   const body = await readJsonBody(req, maxBytes);
   const raw = body.bytes;
 
-  const webhookId = req.headers.get("webhook-id");
-  const ok = await verifyStandardWebhook(
-    ctx.env.POLAR_WEBHOOK_SECRET,
-    raw,
-    {
-      id: webhookId,
-      timestamp: req.headers.get("webhook-timestamp"),
-      signature: req.headers.get("webhook-signature"),
-    },
-    { nowMs: ctx.now().getTime() },
-  );
+  const ok = await verifyCreemWebhook(ctx.env.CREEM_WEBHOOK_SECRET, raw, req.headers.get("creem-signature"));
   if (!ok) {
     ctx.logger.warn("webhook.signature_invalid", {});
     return errorResponse("invalid_request", 401, "Signature verification failed");
@@ -51,16 +44,16 @@ export async function handleWebhook(ctx: AppContext, req: Request): Promise<Resp
     return errorResponse("invalid_request", 400, "Malformed JSON body");
   }
 
-  const event = mapEvent(payload, webhookId);
+  const event = mapEvent(payload);
   if (!event) {
-    return errorResponse("invalid_request", 400, "Unmappable event (missing webhook id)");
+    return errorResponse("invalid_request", 400, "Unmappable event (missing event id)");
   }
 
   const now = isoNow(ctx);
 
-  // 白名单：非本 benefit / 非本 product 的事件安全忽略（登记幂等，不执行副作用）。
+  // product 白名单：非本产品事件安全忽略（登记幂等，不执行副作用）。
   if (!isForOurProduct(ctx, event)) {
-    ctx.logger.warn("webhook.unknown_target", { eventId: event.eventId, eventType: event.eventType });
+    ctx.logger.warn("webhook.unknown_product", { eventId: event.eventId, eventType: event.eventType });
     await recordWebhookEvent(ctx.env.DB, event.eventId, event.eventType, now);
     await markWebhookProcessed(ctx.env.DB, event.eventId, now);
     return json({ received: true }, 200);
@@ -78,7 +71,7 @@ export async function handleWebhook(ctx: AppContext, req: Request): Promise<Resp
     await dispatch(ctx, event, now);
     await markWebhookProcessed(ctx.env.DB, event.eventId, isoNow(ctx));
   } catch (err) {
-    // 副作用失败：保留 processed=0，返回 5xx 让 Polar 重投（下次安全重试）
+    // 副作用失败：保留 processed=0，返回 5xx 让 Creem 重投（下次安全重试）
     ctx.logger.error("webhook.dispatch_failed", {
       eventId: event.eventId,
       eventType: event.eventType,
@@ -91,61 +84,41 @@ export async function handleWebhook(ctx: AppContext, req: Request): Promise<Resp
   return json({ received: true }, 200);
 }
 
-// benefit → POLAR_BENEFIT_ID；order → POLAR_PRODUCT_ID。未配置（空/占位符）则不设限（放行）。
+// 未配置（空/占位符）则不设限（放行，交由 dispatch 的可靠映射把关）。
 function isConfigured(v: string | undefined): boolean {
   return !!v && !v.includes("PLACEHOLDER");
 }
 function isForOurProduct(ctx: AppContext, event: CanonicalEvent): boolean {
-  const benefitId = ctx.env.POLAR_BENEFIT_ID;
-  const productId = ctx.env.POLAR_PRODUCT_ID;
-  if (event.benefitId && isConfigured(benefitId)) return event.benefitId === benefitId;
+  const productId = ctx.env.CREEM_PRODUCT_ID;
   if (event.productId && isConfigured(productId)) return event.productId === productId;
-  return true; // 无可判定字段或白名单未配置 → 交由 dispatch 的可靠映射把关
+  return true;
 }
 
 async function dispatch(ctx: AppContext, event: CanonicalEvent, now: string): Promise<void> {
   switch (event.eventType) {
-    case "benefit_grant.created": {
-      if (!event.licenseKeyId) {
-        // grant 未带 license_key_id → 无法建立 join key，安全跳过
-        ctx.logger.warn("webhook.grant_no_license_key", { eventId: event.eventId });
-        return;
-      }
-      await upsertActiveEntitlement(ctx.env.DB, {
-        licenseKeyId: event.licenseKeyId,
-        orderId: event.orderId,
-        customerId: event.customerId,
-        benefitId: event.benefitId,
-        productId: event.productId,
-        sourceEventId: event.eventId,
-        now,
+    case "checkout.completed": {
+      // 实测：payload 不含 license key → 无法建立 license↔order 映射，审计登记即完成。
+      // entitlement 行由 app 路径（activate/validate 成功）惰性登记（db.upsertAppMapping）。
+      ctx.logger.info("webhook.checkout_completed", {
+        eventId: event.eventId,
+        // 只记 order id（非 PII、非 secret），供退款审计对账。
+        orderId: event.orderId ?? "(none)",
       });
-      ctx.logger.info("webhook.grant_created", { eventId: event.eventId, licenseKeyId: event.licenseKeyId });
       return;
     }
-    case "benefit_grant.revoked": {
-      if (event.licenseKeyId) {
-        await revokeByLicenseKeyId(ctx.env.DB, {
-          licenseKeyId: event.licenseKeyId,
-          orderId: event.orderId,
-          customerId: event.customerId,
-          reason: "revoked",
-          sourceEventId: event.eventId,
-          now,
-        });
-        ctx.logger.info("webhook.revoked", { eventId: event.eventId, licenseKeyId: event.licenseKeyId });
-        return;
+    case "refund.created":
+    case "dispute.created": {
+      const reason = event.eventType === "refund.created" ? "refund" : "dispute";
+      // 将来 Creem 若在 payload 补 license 字段 → 直接按指纹精确吊销（当前实测不存在）。
+      if (event.licenseKey) {
+        const fingerprint = await licenseFingerprint(ctx.env.LICENSE_HMAC_PEPPER, event.licenseKey);
+        const hit = await revokeByFingerprint(ctx.env.DB, { fingerprint, reason, now });
+        ctx.logger.info("webhook.revoked_by_fingerprint", { eventId: event.eventId, reason, affected: hit });
       }
-      ctx.logger.warn("webhook.revoke_no_license_key", { eventId: event.eventId });
-      return;
-    }
-    case "order.refunded":
-    case "refund.created": {
-      // 兜底：Polar 通常也会发 benefit_grant.revoked 精确吊销；这里按 order 尽力吊销。
-      const reason = event.eventType === "order.refunded" ? "refund" : "refund";
       if (event.orderId) {
-        // 先保存退款事实，再更新已有 entitlement。若 grant 尚未来，后续 grant 的原子 upsert
-        // 会命中 tombstone 并直接创建 revoked；不能把 0 行 UPDATE 当成已完成后丢掉退款。
+        // 先永久保存退款事实（tombstone），再更新已知 order 的 entitlement。
+        // Creem 流程里 app 路径拿不到 order id → 命中 0 行是常态；tombstone 保证
+        // 未来任何补上 order↔license 映射的授予路径都不会把退款订单翻回 active。
         await recordRefundTombstone(ctx.env.DB, {
           orderId: event.orderId,
           reason,
@@ -158,6 +131,7 @@ async function dispatch(ctx: AppContext, event: CanonicalEvent, now: string): Pr
         }
         return;
       }
+      // 既无 license 又无 order → 无法可靠映射，安全忽略（不吊销）
       ctx.logger.warn("webhook.revoke_unmappable", { eventId: event.eventId, reason });
       return;
     }

@@ -1,8 +1,8 @@
 // license facade handlers：activate / validate / deactivate。
-// 把 Polar 中间态翻译成契约 LicenseState；本地 revoked 优先于上游 active。
+// 把 Creem 中间态翻译成契约 LicenseState；本地 revoked 优先于上游 active。
 import type { AppContext } from "../context";
 import { ApiError } from "../errors";
-import type { UpstreamLicenseResult } from "../polar/client";
+import type { UpstreamLicenseResult } from "../creem/client";
 import { json } from "../responses";
 import { parseActivate, parseValidate, parseDeactivate } from "../validation";
 import { licenseFingerprint } from "../crypto";
@@ -36,7 +36,7 @@ function normalizeIso(s: string | null): string | null {
 function statusFromUpstream(r: UpstreamLicenseResult): LicenseStatus {
   if (r.status === "active") return "active";
   if (r.status === "expired") return "expired";
-  return "revoked"; // inactive（Polar revoked/disabled）
+  return "revoked"; // inactive（Creem inactive/disabled）
 }
 
 function toState(r: UpstreamLicenseResult, status: LicenseStatus, validatedAt: string): LicenseState {
@@ -56,10 +56,10 @@ export async function handleActivate(ctx: AppContext, body: unknown): Promise<Re
   const validatedAt = isoNoMillis(ctx.now());
   let status = statusFromUpstream(result);
   const fingerprint = await licenseFingerprint(ctx.env.LICENSE_HMAC_PEPPER, input.licenseKey);
-  // 惰性登记 fingerprint ↔ license_key_id，供 webhook 精确吊销后 validate 本地-优先命中。
+  // 惰性登记 fingerprint ↔ license id，供本地 deny（运营吊销杠杆）后 validate 本地-优先命中。
   if (status === "active") {
     await upsertAppMapping(ctx.env.DB, { licenseKeyId: result.licenseKeyId, fingerprint, now: validatedAt });
-    // revoke webhook 可能先于首次 activate 到达，当时本地只有 license_key_id、没有 fingerprint。
+    // 本地 deny 可能先于首次 activate 写入（当时本地只有 license id、没有 fingerprint）。
     // 映射写回后必须按上游刚返回的 id 再查一次，不能把一致性窗口内的上游 active 回给客户端。
     if (await isLocallyRevokedByLicenseKeyId(ctx.env.DB, result.licenseKeyId)) {
       status = "revoked";
@@ -92,7 +92,7 @@ export async function handleValidate(ctx: AppContext, body: unknown): Promise<Re
 
   const result = await ctx.license.validate(input.licenseKey, input.instanceId);
   let status = statusFromUpstream(result);
-  // 惰性登记映射（仅上游 active 时），让后续 webhook 吊销能被本地-优先捕获。
+  // 惰性登记映射（仅上游 active 时），让后续本地吊销能被本地-优先捕获。
   if (status === "active") {
     await upsertAppMapping(ctx.env.DB, { licenseKeyId: result.licenseKeyId, fingerprint, now: validatedAt });
     if (await isLocallyRevokedByLicenseKeyId(ctx.env.DB, result.licenseKeyId)) {

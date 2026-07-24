@@ -1,4 +1,4 @@
-// MockPolarClient —— 无网络、确定性。让全套自动测试无需真实 secret 即可跑通。
+// MockCreemClient —— 无网络、确定性。让全套自动测试无需真实 secret 即可跑通。
 // 行为由 license key 前缀决定，便于在测试里精确覆盖各分支与上游 4xx/5xx/timeout 映射。
 //
 //   MOCK-LICENSE...      → active，limit 3，activations 1，买断（expiresAt null）
@@ -26,7 +26,7 @@ function kindOf(key: string): string {
   return "active";
 }
 
-// 确定性 license_key_id：同一 key 恒定映射到同一 id（webhook join 测试需要稳定值）。
+// 确定性 license id：同一 key 恒定映射到同一 id（本地 join / 吊销测试需要稳定值）。
 function mockLicenseKeyId(key: string): string {
   let h = 0;
   for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
@@ -39,7 +39,7 @@ function throwForTransport(kind: string): void {
   if (kind === "timeout") throw new ApiError("upstream_unavailable", "Upstream timed out");
 }
 
-export class MockPolarClient implements LicenseClient {
+export class MockCreemClient implements LicenseClient {
   async activate(licenseKey: string, _instanceName: string): Promise<UpstreamLicenseResult> {
     const kind = kindOf(licenseKey);
     throwForTransport(kind);

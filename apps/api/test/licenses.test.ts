@@ -5,7 +5,7 @@ import { ctxWith, resetSchema, fixedClock, jsonPost } from "./helpers";
 import { licenseFingerprint } from "../src/crypto";
 import { revokeByLicenseKeyId } from "../src/db";
 import { FixedWindowRateLimiter } from "../src/ratelimit";
-import { MockPolarClient } from "../src/polar/mock";
+import { MockCreemClient } from "../src/creem/mock";
 import activateSuccess from "../../../contracts/fixtures/facade/activate.success.json";
 import errorActivationLimit from "../../../contracts/fixtures/facade/error.activation_limit.json";
 
@@ -84,9 +84,9 @@ describe("POST /v1/licenses/activate", () => {
     expect(await res.json()).toMatchObject({ error: "upstream_unavailable" });
   });
 
-  it("revoke webhook BEFORE first activate still overrides an upstream active result", async () => {
+  it("local revoke recorded BEFORE first activate still overrides an upstream active result", async () => {
     const licenseKey = "MOCK-LICENSE-0000-0000-0000";
-    const upstream = await new MockPolarClient().validate(licenseKey, "inst_probe");
+    const upstream = await new MockCreemClient().validate(licenseKey, "inst_probe");
     await revokeByLicenseKeyId(env.DB, {
       licenseKeyId: upstream.licenseKeyId,
       orderId: "ord_before_activate",
@@ -140,13 +140,13 @@ describe("POST /v1/licenses/validate", () => {
     expect((await res.json() as { status: string }).status).toBe("expired");
   });
 
-  it("LOCAL revoked overrides upstream active (webhook revoke by license_key_id → validate local-first)", async () => {
+  it("LOCAL revoked overrides upstream active (local deny by license id → validate local-first)", async () => {
     const licenseKey = "MOCK-LICENSE-0000-0000-0000"; // upstream would say active
     const body = { licenseKey, instanceId: "inst_MOCK_0000000000", appVersion: "1.0.0" };
-    // 1) 首次 validate：上游 active，惰性登记 fingerprint↔license_key_id 映射。
+    // 1) 首次 validate：上游 active，惰性登记 fingerprint↔license id 映射。
     const r1 = await call("/v1/licenses/validate", body);
     expect((await r1.json() as { status: string }).status).toBe("active");
-    // 2) 取到该行 license_key_id，模拟 webhook 精确吊销（benefit_grant.revoked）。
+    // 2) 取到该行 license id，模拟运营侧本地吊销（Creem webhook 不带 license，本地 deny 由 D1 运营杠杆写入）。
     const fp = await licenseFingerprint(env.LICENSE_HMAC_PEPPER, licenseKey);
     const row = await env.DB.prepare("SELECT license_key_id FROM entitlements WHERE license_fingerprint = ?")
       .bind(fp)
@@ -165,10 +165,10 @@ describe("POST /v1/licenses/validate", () => {
     expect((await r2.json() as { status: string }).status).toBe("revoked");
   });
 
-  it("revoke webhook BEFORE first validate is rechecked after license_key_id mapping", async () => {
+  it("local revoke recorded BEFORE first validate is rechecked after license id mapping", async () => {
     const licenseKey = "MOCK-LICENSE-0000-0000-0000";
     const instanceId = "inst_MOCK_0000000000";
-    const upstream = await new MockPolarClient().validate(licenseKey, instanceId);
+    const upstream = await new MockCreemClient().validate(licenseKey, instanceId);
     await revokeByLicenseKeyId(env.DB, {
       licenseKeyId: upstream.licenseKeyId,
       orderId: "ord_before_validate",

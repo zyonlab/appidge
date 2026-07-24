@@ -9,7 +9,7 @@
 | 官网（apps/web） | `staging.appidge.com` | `appidge.com` / `www.appidge.com` | Worker `appidge-web-*`，静态资源 |
 | API（apps/api） | `api-staging.appidge.com`（MOCK_MODE=false，Polar sandbox） | `api.appidge.com`（Polar live） | Worker `appidge-api-*` |
 | 更新（infra/updates） | `updates-staging.appidge.com` | `updates.appidge.com` | Worker `appidge-updates-*`，静态资源托管 DMG/appcast（DMG >25MiB 才迁 R2） |
-| D1 | `appidge-licensing-staging` | `appidge-licensing-production`（id 占位，待创建） | 各一库，migrations `0001`~`0003` |
+| D1 | `appidge-licensing-staging` | `appidge-licensing-production` `1db51c0e-9d4b-4b32-82f7-e02553508c11`（APAC，2026-07-24 创建） | 各一库，migrations `0001`~`0003` |
 
 环境矩阵的单一真相源：`ops/environments/{staging,production}.conf`；
 部署/校验统一入口：`ops/bin/appidge-ops`（runbook 见 `ops/README.md`）。
@@ -97,7 +97,7 @@ ops/bin/appidge-ops deploy-web staging --apply   # 公开构建配置显式来�
 - Worker `appidge-api` `[env.production]` route → `api.appidge.com`（已入 `wrangler.toml`），MOCK_MODE=false + 真实 Polar live IDs/secret（当前占位，preflight fail closed）。
 - Worker `appidge-web` `[env.production]` route → `appidge.com` + `www.appidge.com`（配置已在 `apps/web/wrangler.jsonc`）。
 - Worker `appidge-updates` `[env.production]` route → `updates.appidge.com`（Workers 静态资源；staging 已分离到 `updates-staging.appidge.com`，二者可并存）。
-- production D1 `appidge-licensing-production`：待 `wrangler d1 create` + 回填 id + 三条 migration。
+- production D1 `appidge-licensing-production`：✅ 已创建（`1db51c0e-9d4b-4b32-82f7-e02553508c11`，APAC）+ 回填 id + 三条 migration 已应用（2026-07-24）。
 - ✅ 域名已统一为 `appidge.com`（prod: appidge.com / api.appidge.com / updates.appidge.com；staging: staging / api-staging / updates-staging 子域）。
 
 ## 状态

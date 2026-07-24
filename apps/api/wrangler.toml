@@ -63,7 +63,7 @@ migrations_dir = "migrations"
 # ── production（正式）────────────────────────────────────────────────
 # 自定义域：api.appidge.com（custom_domain=true，wrangler 自动建 DNS+证书）。
 # MOCK_MODE 关，base 指向生产 Polar。secret 仍走 `wrangler secret put --env production`。
-# ⚠️ POLAR_*_ID 与 database_id 仍是占位——appidge-ops preflight production 会 fail closed
+# ⚠️ POLAR_*_ID 仍是占位（database_id 已回填真实值）——appidge-ops preflight production 会 fail closed
 #    并逐项列出；由用户提供真实值后才可部署（不猜测、不伪造）。
 [env.production]
 workers_dev = false
@@ -82,10 +82,9 @@ RATE_LIMIT_MAX = "60"
 RATE_LIMIT_WINDOW_MS = "60000"
 MAX_BODY_BYTES = "16384"
 
-# production 专用 D1（与 staging 库隔离）。database_id 为占位：由用户
-# `wrangler d1 create appidge-licensing-production` 后回填（preflight 在此之前 fail closed）。
+# production 专用 D1（与 staging 库隔离，区域 APAC）。2026-07-24 创建并回填真实 id。
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "appidge-licensing-production"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "1db51c0e-9d4b-4b32-82f7-e02553508c11"
 migrations_dir = "migrations"

@@ -281,13 +281,26 @@ if [ -x "$CLI" ]; then
       t_fail "production preflight 因占位 fail closed（占位存在却通过了）"
     fi
     n=$(printf '%s\n' "$pf_out" | grep -c 'PREFLIGHT-FAIL:')
-    [ "$n" -ge 4 ] && t_pass "production preflight 逐项列出全部缺失（$n 项 ≥ 4）" \
+    [ "$n" -ge 1 ] && t_pass "production preflight 逐项列出全部缺失（$n 项 ≥ 1）" \
       || t_fail "production preflight 逐项列出全部缺失（只有 $n 项）"
-    for item in POLAR_ORGANIZATION_ID POLAR_PRODUCT_ID POLAR_BENEFIT_ID database_id PUBLIC_POLAR_CHECKOUT_URL; do
-      printf '%s\n' "$pf_out" | grep -q "$item" \
-        && t_pass "production preflight 缺失项含 $item" \
-        || t_fail "production preflight 缺失项含 $item"
+    # 只断言「仍是占位」的项被列出——真实值已回填的项（如 2026-07-24 起的 D1 id）不得再被要求缺失。
+    for item in POLAR_ORGANIZATION_ID POLAR_PRODUCT_ID POLAR_BENEFIT_ID; do
+      if toml_prod_section | grep -q "${item}[^_]*PLACEHOLDER"; then
+        printf '%s\n' "$pf_out" | grep -q "$item" \
+          && t_pass "production preflight 缺失项含 $item" \
+          || t_fail "production preflight 缺失项含 $item"
+      fi
     done
+    if toml_prod_section | grep -q '00000000-0000-0000-0000-000000000000'; then
+      printf '%s\n' "$pf_out" | grep -q 'database_id' \
+        && t_pass "production preflight 缺失项含 database_id" \
+        || t_fail "production preflight 缺失项含 database_id"
+    fi
+    if grep -q 'REQUIRED_' "$PC" 2>/dev/null; then
+      printf '%s\n' "$pf_out" | grep -q 'PUBLIC_POLAR_CHECKOUT_URL' \
+        && t_pass "production preflight 缺失项含 PUBLIC_POLAR_CHECKOUT_URL" \
+        || t_fail "production preflight 缺失项含 PUBLIC_POLAR_CHECKOUT_URL"
+    fi
   else
     [ $pf_rc -eq 0 ] && t_pass "production preflight（真实值已填）通过" \
       || t_fail "production preflight（真实值已填）通过：$pf_out"

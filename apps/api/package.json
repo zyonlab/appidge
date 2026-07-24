@@ -2,7 +2,7 @@
   "name": "api",
   "version": "0.0.0",
   "private": true,
-  "description": "Appidge license facade + Polar webhook Worker (Cloudflare, TypeScript module Worker)",
+  "description": "Appidge license facade + Creem webhook Worker (Cloudflare, TypeScript module Worker)",
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
@@ -12,7 +12,7 @@
     "test:workers": "vitest run --config vitest.config.ts",
     "test:contract": "vitest run --config vitest.node.config.ts",
     "build": "wrangler deploy --dry-run --outdir dist",
-    "smoke:polar": "node --experimental-strip-types scripts/polar-sandbox-smoke.ts"
+    "smoke:creem": "node --experimental-strip-types scripts/creem-sandbox-smoke.ts"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.9.10",

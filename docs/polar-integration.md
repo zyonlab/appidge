@@ -1,5 +1,9 @@
 # Polar.sh 集成基线 — 原生 macOS App(Developer ID)
 
+> ⚠️ **已废弃（2026-07-24）**：license 后端已整体切换回 **Creem**，现行基线见
+> `docs/creem-integration.md`；本文档仅留作历史对照（Standard Webhooks 验签、
+> benefit_grant 精确吊销等 Polar 特有机制的记录），不要按本文实现新代码。
+
 > 由 Creem 迁移而来（口碑因素）。本文档据 Polar 官方 OpenAPI（`https://sandbox-api.polar.sh/openapi.json`）+ 官方文档核实；标注 `⚠️需sandbox实测` 的项在上线前用真实 sandbox 复核。license API 与 webhook 验签方案清晰；退款→吊销的自动行为已从 schema 推断，仍以 sandbox 实测为准。
 
 ## 0. 一句话结论

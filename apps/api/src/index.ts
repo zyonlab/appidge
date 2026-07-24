@@ -1,5 +1,5 @@
 // Appidge license facade Worker —— module Worker，原生 fetch 路由（无框架）。
-// 公开路由仅：GET /healthz、POST /v1/licenses/{activate,validate,deactivate}、POST /v1/webhooks/polar。
+// 公开路由仅：GET /healthz、POST /v1/licenses/{activate,validate,deactivate}、POST /v1/webhooks/creem。
 import type { Env } from "./env";
 import { isMockMode, intVar } from "./env";
 import { buildContext, type AppContext } from "./context";
@@ -46,7 +46,7 @@ export async function handleRequest(req: Request, ctx: AppContext): Promise<Resp
   }
 
   // webhook
-  if (path === "/v1/webhooks/polar") {
+  if (path === "/v1/webhooks/creem") {
     if (req.method !== "POST") return errorResponse("invalid_request", 405, "Method not allowed");
     if (!ctx.rateLimiter.check(clientKey(req, path))) {
       return errorResponse("rate_limited", 429, "Too many requests");

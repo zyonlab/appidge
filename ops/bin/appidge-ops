@@ -112,7 +112,7 @@ preflight_remote() {
   fi
   ops_note "wrangler 登录 OK"
   secrets=$(wrangler_run api secret list --env "$OPS_ENV" 2>/dev/null || true)
-  for s in POLAR_ACCESS_TOKEN POLAR_WEBHOOK_SECRET LICENSE_HMAC_PEPPER; do
+  for s in CREEM_API_KEY CREEM_WEBHOOK_SECRET LICENSE_HMAC_PEPPER; do
     printf '%s' "$secrets" | grep -q "\"$s\"" \
       || fail_add "Worker secret 名缺失（--env ${OPS_ENV}）：${s}（wrangler secret put $s --env ${OPS_ENV}）"
   done
@@ -269,9 +269,9 @@ cmd_deploy_web() {
       fi
     done
   else
-    for bad in "-staging.appidge.com" "staging.appidge.com" "sandbox" ".invalid"; do
+    for bad in "-staging.appidge.com" "staging.appidge.com" "sandbox" "creem.io/test" ".invalid"; do
       if grep -RFq "$bad" "$dist"; then
-        ops_die "production 产物包含 staging/sandbox 痕迹：${bad}（环境交叉，拒绝部署）"
+        ops_die "production 产物包含 staging/sandbox/test 痕迹：${bad}（环境交叉，拒绝部署）"
       fi
     done
   fi
@@ -451,7 +451,7 @@ cmd_smoke() {
   if [ "$OPS_ENV" = production ]; then
     ops_note "production smoke 默认只做 health/静态检查；真实 license 写操作需单独授权"
   else
-    ops_note "staging activate/validate/deactivate 闭环需用户提供 sandbox license key（人工闸门）"
+    ops_note "staging activate/validate/deactivate 闭环需用户提供 Creem test license key（人工闸门）"
   fi
   ops_note "macOS 升级链路：scripts/verify-staging-update.sh --feed https://$UPDATES_HOST/appcast.xml（真机系统扩展/Sparkle 升级仍是人工闸门）"
   fail_flush

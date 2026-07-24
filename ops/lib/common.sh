@@ -88,7 +88,7 @@ validate_config_urls() { # 依赖 load_environment 已执行
     if is_placeholder "$v"; then
       case "$k" in
         PUBLIC_POLAR_CHECKOUT_URL)
-          fail_add "$k 缺真实 CHECKOUT 链接（当前：${v:-空}）——人工闸门，由用户提供 Polar Hosted Checkout URL" ;;
+          fail_add "$k 缺真实 CHECKOUT 链接（当前：${v:-空}）——人工闸门，由用户提供 Creem live 支付链接" ;;
         *)
           fail_add "$k 是占位/空值：${v:-空}" ;;
       esac
@@ -104,7 +104,7 @@ validate_config_urls() { # 依赖 load_environment 已执行
     esac
     # checkout URL 不得是 API token 形态
     case "$v" in
-      *polar_oat_*|*whsec_*) fail_add "$k 疑似包含 API token/secret：拒绝" ; continue ;;
+      *polar_oat_*|*creem_test_*|*creem_live_*|*whsec_*) fail_add "$k 疑似包含 API token/secret：拒绝" ; continue ;;
     esac
 
     if [ "$_env" = production ]; then
@@ -137,15 +137,27 @@ validate_config_urls() { # 依赖 load_environment 已执行
         fi ;;
       LICENSE_CHECKOUT_URL)
         if [ "$_env" = staging ]; then
-          [ "$h" = "staging.appidge.com" ] || fail_add "staging $k 应指向 staging.appidge.com/pricing：$v"
+          # staging 的 App 内「购买」直达 Creem test 支付链接
+          case "$v" in
+            https://www.creem.io/test/*|https://creem.io/test/*) ;;
+            *) fail_add "staging $k 应是 Creem test 支付链接（https://www.creem.io/test/...）：$v" ;;
+          esac
         else
           [ "$h" = "appidge.com" ] || fail_add "production $k 应指向 appidge.com/pricing：$v"
         fi ;;
       PUBLIC_POLAR_CHECKOUT_URL)
         if [ "$_env" = staging ]; then
+          case "$v" in
+            https://www.creem.io/test/*|https://creem.io/test/*) ;;
+            *) fail_add "staging checkout 应是 Creem test 支付链接（https://www.creem.io/test/...）：$v" ;;
+          esac
+        else
           case "$h" in
-            *sandbox*polar.sh|sandbox.polar.sh) ;;
-            *) fail_add "staging checkout 应是 Polar sandbox 链接（host 含 sandbox…polar.sh）：$h" ;;
+            www.creem.io|creem.io) ;;
+            *) fail_add "production checkout 应是 Creem 支付链接（host creem.io）：$h" ;;
+          esac
+          case "$v" in
+            */test/*) fail_add "production checkout 不得是 Creem test 链接（含 /test/）：$v" ;;
           esac
         fi ;;
     esac
@@ -199,10 +211,10 @@ validate_wrangler_topology() {
 validate_production_identifiers() {
   [ "$OPS_ENV" = production ] || return 0
   sec=$(api_prod_section)
-  for var in POLAR_ORGANIZATION_ID POLAR_PRODUCT_ID POLAR_BENEFIT_ID; do
+  for var in CREEM_PRODUCT_ID; do
     val=$(printf '%s\n' "$sec" | grep -E "^$var *= *\"" | head -1 | cut -d'"' -f2)
     if is_placeholder "$val"; then
-      fail_add "apps/api/wrangler.toml [env.production] $var 是占位：${val:-空}——人工闸门，由用户提供真实 Polar live ID"
+      fail_add "apps/api/wrangler.toml [env.production] $var 是占位：${val:-空}——人工闸门，由用户提供真实 Creem live product id"
     fi
   done
   d1id=$(printf '%s\n' "$sec" | grep -E '^database_id *= *"' | head -1 | cut -d'"' -f2)

@@ -1,6 +1,8 @@
 // D1 数据访问：webhook 幂等登记 + entitlement 状态。
-// entitlements 以 Polar license_key_id 为主键（webhook 与 app 路径共享的稳定 join key）；
+// entitlements 以上游 license 对象 id（列名沿用 license_key_id，Creem=响应顶层 id）为主键；
 // license_fingerprint 为 app 路径惰性填充的索引列（validate 本地-优先吊销用）。
+// ⚠️ Creem webhook 不携带任何 license 标识（订单中心 payload）→ entitlement 行只能由
+// app 路径（activate/validate 成功）创建；webhook 侧只有 order 级 tombstone/吊销。
 // 纪律：只存 license 指纹，不存明文 key / 原始 payload / 非必要 PII。
 
 export type EntitlementStatus = "active" | "revoked";
@@ -66,7 +68,10 @@ export async function markWebhookProcessed(db: D1Database, eventId: string, now:
     .run();
 }
 
-// benefit_grant.created：置为 active，但**绝不把已 revoked 翻回 active**（退款/拒付优先）。
+// 授予路径写入：置为 active，但**绝不把已 revoked 翻回 active**（退款/拒付优先），
+// 且原子命中 refund_tombstones —— 退款先到的订单直接创建为 revoked。
+// Creem 现状：webhook 不带 license → 本函数当前只被测试/未来 order↔license 桥使用；
+// 常规写入走 upsertAppMapping（app 路径）。
 export async function upsertActiveEntitlement(
   db: D1Database,
   e: {
@@ -133,7 +138,7 @@ export async function upsertActiveEntitlement(
     .run();
 }
 
-// benefit_grant.revoked：按 license_key_id 精确吊销。可能先于 grant 到达（用 id upsert 建行）。
+// 按上游 license id 精确吊销（运营侧本地 deny 杠杆；可先于任何授予记录到达，用 id upsert 建行）。
 export async function revokeByLicenseKeyId(
   db: D1Database,
   e: { licenseKeyId: string; orderId?: string; customerId?: string; reason: string; sourceEventId: string; now: string },
@@ -154,7 +159,8 @@ export async function revokeByLicenseKeyId(
     .run();
 }
 
-// 无 license_key_id 时按 order 吊销（order.refunded/refund.created 兜底）。返回受影响行数。
+// 按 order 吊销（refund.created/dispute.created）。返回受影响行数。
+// Creem 流程里 app 路径拿不到 order id → 常态命中 0 行，退款事实由 tombstone 永久保存。
 export async function revokeByOrder(
   db: D1Database,
   e: { orderId: string; reason: string; now: string },
@@ -166,8 +172,8 @@ export async function revokeByOrder(
   return res.meta.changes ?? 0;
 }
 
-// refund.created / order.refunded 可能先于 benefit_grant.created 到达。先永久记录 order tombstone，
-// 后来的 grant 在同一条原子 upsert 中检查它，绝不会把已退款订单创建成 active。
+// refund.created / dispute.created 可能先于任何授予记录到达。先永久记录 order tombstone，
+// 后来的授予写入在同一条原子 upsert 中检查它，绝不会把已退款订单创建成 active。
 export async function recordRefundTombstone(
   db: D1Database,
   e: { orderId: string; reason: string; sourceEventId: string; now: string },
@@ -185,7 +191,20 @@ export async function recordRefundTombstone(
     .run();
 }
 
-// app 路径（activate/validate 成功）惰性登记 fingerprint ↔ license_key_id 映射。
+// 按 license 指纹吊销（若未来 Creem payload 携带 license key 时的精确吊销路径）。
+// UPDATE-only：只吊销 app 路径已登记指纹的行，不凭指纹凭空建行。返回受影响行数。
+export async function revokeByFingerprint(
+  db: D1Database,
+  e: { fingerprint: string; reason: string; now: string },
+): Promise<number> {
+  const res = await db
+    .prepare("UPDATE entitlements SET status = 'revoked', reason = ?, updated_at = ? WHERE license_fingerprint = ?")
+    .bind(e.reason, e.now, e.fingerprint)
+    .run();
+  return res.meta.changes ?? 0;
+}
+
+// app 路径（activate/validate 成功）惰性登记 fingerprint ↔ license id 映射。
 // **绝不把已 revoked 翻回 active**；仅补全 fingerprint 供 validate 本地-优先命中。
 export async function upsertAppMapping(
   db: D1Database,

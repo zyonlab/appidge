@@ -50,7 +50,7 @@ export const faq: Record<'zh' | 'en', FaqCopy> = {
       {
         q: '买了之后怎么激活？',
         aHtml:
-          '付款后许可证密钥会发到你邮箱（Polar 客户门户里也能查）。打开 Appidge 粘贴密钥就行。密钥存在 macOS 钥匙串里，不落明文。',
+          '付款后许可证密钥会发到你邮箱（Creem 客户门户里也能查）。打开 Appidge 粘贴密钥就行。密钥存在 macOS 钥匙串里，不落明文。',
       },
       {
         q: '离线还能用吗？',
@@ -104,7 +104,7 @@ export const faq: Record<'zh' | 'en', FaqCopy> = {
       {
         q: 'How do I activate after buying?',
         aHtml:
-          'Your license key arrives by email after payment (it’s also in the Polar customer portal). Open Appidge and paste the key. It’s stored in the macOS Keychain, never in plain text files.',
+          'Your license key arrives by email after payment (it’s also in the Creem customer portal). Open Appidge and paste the key. It’s stored in the macOS Keychain, never in plain text files.',
       },
       {
         q: 'Does it work offline?',

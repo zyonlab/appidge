@@ -1,4 +1,4 @@
-// 加密工具：Polar webhook 验签（Standard Webhooks）、恒定时间比较、license 指纹。
+// 加密工具：Creem webhook 验签（HMAC-SHA256 hex over raw body）、恒定时间比较、license 指纹。
 // 全部走 WebCrypto（Workers runtime 原生）。
 
 const enc = new TextEncoder();
@@ -17,19 +17,6 @@ function toHex(bytes: Uint8Array): string {
   return out;
 }
 
-function bytesToBase64(bytes: Uint8Array): string {
-  let bin = "";
-  for (const b of bytes) bin += String.fromCharCode(b);
-  return btoa(bin);
-}
-
-function base64ToBytes(b64: string): Uint8Array {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
 // 恒定时间比较两个字符串（长度不同也走满全程，避免早退时序泄漏）。
 export function timingSafeEqual(a: string, b: string): boolean {
   const ab = enc.encode(a);
@@ -42,76 +29,28 @@ export function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-// Standard Webhooks 密钥可能带 `whsec_` 前缀，其余部分为 base64。解出原始字节。
-function decodeWebhookSecret(secret: string): Uint8Array {
-  const raw = secret.startsWith("whsec_") ? secret.slice("whsec_".length) : secret;
-  try {
-    return base64ToBytes(raw);
-  } catch {
-    // 非 base64 → 退化为原始 UTF-8 字节（容错，不抛）
-    return enc.encode(raw);
-  }
-}
-
-export interface WebhookHeaders {
-  id: string | null; // webhook-id
-  timestamp: string | null; // webhook-timestamp（Unix 秒）
-  signature: string | null; // webhook-signature（空格分隔的 v1,<base64> 列表）
-}
-
-// 允许的时间戳漂移（防重放）。默认 ±5 分钟。
-const DEFAULT_TOLERANCE_S = 300;
-
-// Standard Webhooks 验签：
-//   signedContent = `${id}.${timestamp}.${rawBody}`
-//   expected = base64(HMAC-SHA256(secretBytes, signedContent))
-//   webhook-signature 头为空格分隔的多个 `v1,<base64sig>`，任一匹配即通过。
-// 同时校验时间戳漂移，超窗直接拒绝。
-export async function verifyStandardWebhook(
+// Creem webhook 验签（官方 docs.creem.io/code/webhooks，2026-07 复核）：
+//   expected = hex(HMAC-SHA256(secret, rawBody))，与 `creem-signature` 头恒定时间比较。
+//   ⚠️ 与 Standard Webhooks（Polar）不同：
+//     - secret 按 Dashboard 显示的字面值使用（官方示例 createHmac('sha256', secret) 直接
+//       传字符串，whsec_ 前缀不剥离、不做 base64 解码）。
+//     - 没有 webhook-id/webhook-timestamp 头，签名不含时间戳 → 无漂移窗口可校验；
+//       重放防御依赖 payload 顶层事件 ID 的幂等登记（handlers/webhook.ts）。
+export async function verifyCreemWebhook(
   secret: string,
   rawBody: ArrayBuffer,
-  headers: WebhookHeaders,
-  opts?: { nowMs?: number; toleranceS?: number },
+  signatureHeader: string | null,
 ): Promise<boolean> {
-  const { id, timestamp, signature } = headers;
-  if (!id || !timestamp || !signature) return false;
-
-  const ts = Number.parseInt(timestamp, 10);
-  if (!Number.isFinite(ts)) return false;
-  const nowS = Math.floor((opts?.nowMs ?? Date.now()) / 1000);
-  const tolerance = opts?.toleranceS ?? DEFAULT_TOLERANCE_S;
-  if (Math.abs(nowS - ts) > tolerance) return false;
-
-  const bodyStr = new TextDecoder().decode(rawBody);
-  const signedContent = enc.encode(`${id}.${timestamp}.${bodyStr}`);
-  const secretBytes = decodeWebhookSecret(secret);
-  const expected = bytesToBase64(await hmacSha256(secretBytes, signedContent));
-
-  const candidates = signature
-    .split(" ")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map((tok) => (tok.startsWith("v1,") ? tok.slice(3) : tok.includes(",") ? tok.slice(tok.indexOf(",") + 1) : tok));
-
-  let ok = false;
-  for (const c of candidates) {
-    // 全程比较所有候选，避免早退
-    ok = timingSafeEqual(expected, c) || ok;
-  }
-  return ok;
+  if (!secret || !signatureHeader) return false;
+  const expected = toHex(await hmacSha256(enc.encode(secret), new Uint8Array(rawBody)));
+  // hex 大小写不敏感比较（我们生成小写；对方若给大写也接受）。
+  return timingSafeEqual(expected, signatureHeader.trim().toLowerCase());
 }
 
-// 供测试/工具生成 Standard Webhooks 签名头值（`v1,<base64>`）。
-export async function signStandardWebhook(
-  secret: string,
-  id: string,
-  timestamp: string,
-  rawBody: ArrayBuffer | Uint8Array,
-): Promise<string> {
-  const bodyStr = new TextDecoder().decode(rawBody instanceof Uint8Array ? rawBody : new Uint8Array(rawBody));
-  const signedContent = enc.encode(`${id}.${timestamp}.${bodyStr}`);
-  const sig = bytesToBase64(await hmacSha256(decodeWebhookSecret(secret), signedContent));
-  return `v1,${sig}`;
+// 供测试/工具生成 creem-signature 头值（hex）。
+export async function signCreemWebhook(secret: string, rawBody: ArrayBuffer | Uint8Array): Promise<string> {
+  const data = rawBody instanceof Uint8Array ? rawBody : new Uint8Array(rawBody);
+  return toHex(await hmacSha256(enc.encode(secret), data));
 }
 
 // license 指纹：HMAC-SHA256(pepper, licenseKey) 的 hex。存 D1，绝不存明文 key。

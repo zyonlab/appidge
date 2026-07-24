@@ -1,5 +1,5 @@
 # apps/api/wrangler.toml — Appidge license facade Worker
-# secrets (POLAR_ACCESS_TOKEN / POLAR_WEBHOOK_SECRET / LICENSE_HMAC_PEPPER) 走 `wrangler secret put`，
+# secrets (CREEM_API_KEY / CREEM_WEBHOOK_SECRET / LICENSE_HMAC_PEPPER) 走 `wrangler secret put`，
 # 绝不写进本文件或 git。本地 dev 用 .dev.vars（git-ignored）。
 name = "appidge-api"
 main = "src/index.ts"
@@ -7,15 +7,13 @@ compatibility_date = "2025-07-01"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = false
 
-# 非秘密的构建期配置。MOCK_MODE 默认开：本地/CI 用协议 mock，不触真实 Polar。
+# 非秘密的构建期配置。MOCK_MODE 默认开：本地/CI 用协议 mock，不触真实 Creem。
 # 生产用 `wrangler deploy --var MOCK_MODE:false` 或 environment 覆盖，并注入真实 secret。
-# POLAR_ORGANIZATION_ID/PRODUCT_ID/BENEFIT_ID 为非秘密标识，由部署者填入真实值。
+# CREEM_PRODUCT_ID 为非秘密标识，由部署者填入真实值。
 [vars]
 MOCK_MODE = "true"
-POLAR_API_BASE = "https://sandbox-api.polar.sh"
-POLAR_ORGANIZATION_ID = "org_PLACEHOLDER_xxxxxxxx"
-POLAR_PRODUCT_ID = "prod_PLACEHOLDER_xxxxxxxx"
-POLAR_BENEFIT_ID = "ben_PLACEHOLDER_xxxxxxxx"
+CREEM_API_BASE = "https://test-api.creem.io"
+CREEM_PRODUCT_ID = "prod_PLACEHOLDER_xxxxxxxx"
 # 限速（滥用保护）：每 IP+路由 每窗口最大请求数 / 窗口毫秒。
 RATE_LIMIT_MAX = "60"
 RATE_LIMIT_WINDOW_MS = "60000"
@@ -32,8 +30,9 @@ migrations_dir = "migrations"
 
 # ── staging（测试预览）──────────────────────────────────────────────
 # 自定义域：api-staging.appidge.com（custom_domain=true，wrangler 自动建 DNS+证书）。
-# MOCK_MODE=false 打真实 Polar sandbox：需先填 POLAR_ORGANIZATION_ID/PRODUCT_ID/BENEFIT_ID，
-# 并 `wrangler secret put --env staging` 注入 POLAR_ACCESS_TOKEN/POLAR_WEBHOOK_SECRET/LICENSE_HMAC_PEPPER。
+# MOCK_MODE=false 打真实 Creem test API（base https://test-api.creem.io，key 前缀 creem_test_），
+# 需 `wrangler secret put --env staging` 注入 CREEM_API_KEY/CREEM_WEBHOOK_SECRET/LICENSE_HMAC_PEPPER。
+# Creem 后台 webhook 已指向 https://api-staging.appidge.com/v1/webhooks/creem。
 [env.staging]
 workers_dev = false
 
@@ -43,12 +42,9 @@ custom_domain = true
 
 [env.staging.vars]
 MOCK_MODE = "false"
-POLAR_API_BASE = "https://sandbox-api.polar.sh"
-# 非秘密标识（access token / webhook secret 走 `wrangler secret put --env staging`，不入 git）。
-POLAR_ORGANIZATION_ID = "63e7ed2c-c47a-4542-91f6-b04b74960206"
-# sandbox 测试 product + License Keys benefit（非秘密标识）。
-POLAR_PRODUCT_ID = "003ce8a1-4b8a-446a-992f-094d033b90c7"
-POLAR_BENEFIT_ID = "f00313a0-2491-4654-84db-4b27dfeffa6a"
+CREEM_API_BASE = "https://test-api.creem.io"
+# test 模式产品（非秘密标识；测试支付链接 https://www.creem.io/test/payment/<product_id>）。
+CREEM_PRODUCT_ID = "prod_19wdgqeFewovz4fWqITeaX"
 RATE_LIMIT_MAX = "60"
 RATE_LIMIT_WINDOW_MS = "60000"
 MAX_BODY_BYTES = "16384"
@@ -62,9 +58,9 @@ migrations_dir = "migrations"
 
 # ── production（正式）────────────────────────────────────────────────
 # 自定义域：api.appidge.com（custom_domain=true，wrangler 自动建 DNS+证书）。
-# MOCK_MODE 关，base 指向生产 Polar。secret 仍走 `wrangler secret put --env production`。
-# ⚠️ POLAR_*_ID 仍是占位（database_id 已回填真实值）——appidge-ops preflight production 会 fail closed
-#    并逐项列出；由用户提供真实值后才可部署（不猜测、不伪造）。
+# MOCK_MODE 关，base 指向生产 Creem。secret 仍走 `wrangler secret put --env production`。
+# ⚠️ CREEM_PRODUCT_ID 是 REQUIRED_ 占位（database_id 已回填真实值）——appidge-ops preflight
+#    production 会 fail closed 并逐项列出；由用户提供真实 live product id 后才可部署（不猜测、不伪造）。
 [env.production]
 workers_dev = false
 
@@ -74,10 +70,8 @@ custom_domain = true
 
 [env.production.vars]
 MOCK_MODE = "false"
-POLAR_API_BASE = "https://api.polar.sh"
-POLAR_ORGANIZATION_ID = "org_PLACEHOLDER_xxxxxxxx"
-POLAR_PRODUCT_ID = "prod_PLACEHOLDER_xxxxxxxx"
-POLAR_BENEFIT_ID = "ben_PLACEHOLDER_xxxxxxxx"
+CREEM_API_BASE = "https://api.creem.io"
+CREEM_PRODUCT_ID = "REQUIRED_CREEM_LIVE_PRODUCT_ID"
 RATE_LIMIT_MAX = "60"
 RATE_LIMIT_WINDOW_MS = "60000"
 MAX_BODY_BYTES = "16384"

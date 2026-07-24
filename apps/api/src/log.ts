@@ -12,8 +12,8 @@ export function redact(input: unknown, secrets: string[]): string {
       s = s.split(secret).join("[REDACTED]");
     }
   }
-  // 兜底：形似 Polar/webhook token（polar_oat_ 等 organization access token、whsec_）打码
-  s = s.replace(/\b(polar_[a-z]{2,6}_|whsec_)[A-Za-z0-9_-]{6,}\b/g, "$1[REDACTED]");
+  // 兜底：形似 Creem/webhook token（creem_test_/creem_live_ API key、whsec_）打码
+  s = s.replace(/\b(creem_[a-z]{2,6}_|whsec_)[A-Za-z0-9_-]{6,}\b/g, "$1[REDACTED]");
   return s;
 }
 

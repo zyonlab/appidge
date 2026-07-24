@@ -39,6 +39,7 @@ const SECRET_PATTERNS = [
   /\bx-api-key\b/i,
   /\bsk_(live|test)_[A-Za-z0-9]/,
   /\bpolar_[a-z]{2,5}_/i,
+  /\bcreem_(test|live)_/,
   /webhook[_-]?secret\s*[:=]\s*['"][^'"]+['"]/i,
 ];
 for (const file of walk(join(root, 'src'))) {

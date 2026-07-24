@@ -397,7 +397,8 @@ cmd_smoke() {
   fail_reset
   ok() { ops_note "✅ $1"; }
   ck() { # $1=desc $2=url [$3=grep]
-    body=$(curl -fsS -m 30 "$2" 2>/dev/null) || { fail_add "$1：GET $2 失败"; return 0; }
+    # -L：Workers 静态资源会把 /pricing 307 到 /pricing/（真实客户端同样跟随）。
+    body=$(curl -fsSL -m 30 "$2" 2>/dev/null) || { fail_add "$1：GET $2 失败"; return 0; }
     if [ -n "${3:-}" ] && ! printf '%s' "$body" | grep -q "$3"; then
       fail_add "$1：$2 内容缺少 '$3'"
     else

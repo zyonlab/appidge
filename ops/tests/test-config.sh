@@ -206,6 +206,16 @@ if [ -f "$SC" ]; then
   [ "$(conf_get "$SC" API_D1_DATABASE_NAME)" = "appidge-licensing-staging" ] \
     && t_pass "staging D1 名称 = appidge-licensing-staging" \
     || t_fail "staging D1 名称 = appidge-licensing-staging"
+  case "$(conf_get "$SC" PUBLIC_POLAR_CHECKOUT_URL)" in
+    https://www.creem.io/test/*|https://creem.io/test/*)
+      t_pass "staging checkout 是 Creem test 支付链接" ;;
+    *) t_fail "staging checkout 是 Creem test 支付链接" ;;
+  esac
+  case "$(conf_get "$SC" LICENSE_CHECKOUT_URL)" in
+    https://www.creem.io/test/*|https://creem.io/test/*)
+      t_pass "staging LICENSE_CHECKOUT_URL 是 Creem test 支付链接" ;;
+    *) t_fail "staging LICENSE_CHECKOUT_URL 是 Creem test 支付链接" ;;
+  esac
 fi
 
 # production conf 专项：不得包含 staging/sandbox/localhost/.invalid/PLACEHOLDER
@@ -229,6 +239,10 @@ fi
 # conf 不得包含 secret 形态的值（token/secret/pepper 关键字）
 expect_fail "ops/environments 不含 secret 形态键值" \
   grep -riE '(access_token|webhook_secret|hmac_pepper|api_key|polar_oat_|whsec_)' ops/environments
+# Creem API key 形态（小写前缀 creem_test_/creem_live_；大小写敏感，避免误伤
+# REQUIRED_CREEM_LIVE_CHECKOUT_URL 这类大写占位名）
+expect_fail "ops/environments 不含 creem_test_/creem_live_ key 形态" \
+  grep -rE '(creem_test_|creem_live_)[A-Za-z0-9]' ops/environments
 
 # ---------------------------------------------------------------------------
 # 6. [structure] CLI 行为与安全保护（存在 CLI 才测）
@@ -270,7 +284,7 @@ if [ -x "$CLI" ]; then
   #        真实值填入后 ⇒ 本地 preflight 必须通过（结构不阻塞）。
   # ------------------------------------------------------------------
   has_placeholder=0
-  toml_prod_section | grep -qE 'PLACEHOLDER|00000000-0000-0000-0000-000000000000' && has_placeholder=1
+  toml_prod_section | grep -qE 'PLACEHOLDER|REQUIRED_|00000000-0000-0000-0000-000000000000' && has_placeholder=1
   grep -q 'REQUIRED_' "$PC" 2>/dev/null && has_placeholder=1
 
   pf_out=$("$CLI" preflight production 2>&1); pf_rc=$?
@@ -284,8 +298,8 @@ if [ -x "$CLI" ]; then
     [ "$n" -ge 1 ] && t_pass "production preflight 逐项列出全部缺失（$n 项 ≥ 1）" \
       || t_fail "production preflight 逐项列出全部缺失（只有 $n 项）"
     # 只断言「仍是占位」的项被列出——真实值已回填的项（如 2026-07-24 起的 D1 id）不得再被要求缺失。
-    for item in POLAR_ORGANIZATION_ID POLAR_PRODUCT_ID POLAR_BENEFIT_ID; do
-      if toml_prod_section | grep -q "${item}[^_]*PLACEHOLDER"; then
+    for item in CREEM_PRODUCT_ID; do
+      if toml_prod_section | grep -qE "${item}.*(PLACEHOLDER|REQUIRED_)"; then
         printf '%s\n' "$pf_out" | grep -q "$item" \
           && t_pass "production preflight 缺失项含 $item" \
           || t_fail "production preflight 缺失项含 $item"

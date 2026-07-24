@@ -303,6 +303,36 @@ h2 {
 .hero {
   padding: 80px 0 52px;
   text-align: center;
+  position: relative;
+}
+
+/* 品牌白鸽：左侧留白区悬飞（纯装饰;窄屏隐藏防遮挡;reduced-motion 全局停动画） */
+.hero-dove {
+  position: absolute;
+  left: clamp(16px, 5vw, 120px);
+  top: 110px;
+  width: clamp(190px, 19vw, 300px);
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 26px 28px rgba(43, 31, 17, 0.16));
+  animation: dove-fly 4.6s ease-in-out infinite;
+}
+
+@keyframes dove-fly {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-18px) rotate(2.5deg);
+  }
+}
+
+@media (max-width: 1180px) {
+  .hero-dove {
+    display: none;
+  }
 }
 
 .hero-chip {

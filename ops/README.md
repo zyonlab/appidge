@@ -23,7 +23,7 @@ secret 永远走 `wrangler secret put` / 根 `.env`（git-ignored）/ `.dev.vars
 | 组件 | Staging | Production |
 |---|---|---|
 | Web | staging.appidge.com | appidge.com / www.appidge.com |
-| API | api-staging.appidge.com（Polar sandbox） | api.appidge.com（Polar live） |
+| API | api-staging.appidge.com（Creem test） | api.appidge.com（Creem live） |
 | Updates | updates-staging.appidge.com | updates.appidge.com |
 | D1 | appidge-licensing-staging | appidge-licensing-production |
 
@@ -88,13 +88,15 @@ ops/bin/appidge-ops release-manifest production --build-number <N>
 
 ### production 解锁前提（人工闸门）
 
-`preflight production` 会逐项列出缺失。当前必须由用户提供/执行：
+完整逐项清单见 **`docs/prod-launch-checklist.md`**（含每项现状：已备/待填/待配置 + 解锁步骤 + 回填位置一览）。
+`preflight production` 会逐项列出缺失。当前必须由用户提供/执行（支付服务商为 Creem，非 Polar）：
 
-- Polar live organization/product/benefit ID → 填 `apps/api/wrangler.toml [env.production.vars]`（非秘密）。
-- Polar live Hosted Checkout URL → 填 `ops/environments/production.conf` 的 `PUBLIC_POLAR_CHECKOUT_URL`。
-- `wrangler d1 create appidge-licensing-production` → 回填 `database_id`。
-- `wrangler secret put POLAR_ACCESS_TOKEN|POLAR_WEBHOOK_SECRET|LICENSE_HMAC_PEPPER --env production`。
-- Polar live webhook → `https://api.appidge.com/v1/webhooks/polar`。
+- Creem live **product id** → 填 `apps/api/wrangler.toml [env.production.vars]` 的 `CREEM_PRODUCT_ID`（非秘密；Creem 无需 org/benefit id）。
+- Creem live **支付链接** → 填 `ops/environments/production.conf` 的 `PUBLIC_POLAR_CHECKOUT_URL`（host creem.io，不含 /test/）。
+- D1 `appidge-licensing-production` **已创建并迁移**（id 已回填 `wrangler.toml`）；上线前用 `preflight production --remote` 复核远端无 pending。
+- `wrangler secret put CREEM_API_KEY|CREEM_WEBHOOK_SECRET|LICENSE_HMAC_PEPPER --env production`（值待 Creem live 阶段提供）。
+- Creem live webhook → `https://api.appidge.com/v1/webhooks/creem`（路径 `/creem`）。
+- `appidge.com` zone 已在本 Cloudflare 账号（custom_domain 自动建 DNS/证书的前提）。
 - staging 全链路 smoke 通过 + production 发布审批。
 
 ## 回滚

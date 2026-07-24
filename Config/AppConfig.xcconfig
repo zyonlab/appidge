@@ -19,5 +19,15 @@ LICENSE_CHECKOUT_URL = https:/$()/appidge.com/pricing
 // 注意:xcconfig 把 `//` 当行注释起点,URL 里的双斜杠会被吞掉;用空展开 $() 隔断两个斜杠,
 //       展开后仍是 https://updates.appidge.com/appcast.xml。命令行 xcodebuild VAR=... 覆盖不受此限。
 SPARKLE_FEED_URL = https:/$()/updates.appidge.com/appcast.xml
+
+// 官网基址（App 内跳转官网页面的根地址，与 LICENSE_CHECKOUT_URL 同源）。
+// 默认 = prod 裸域；staging 覆盖: https://staging.appidge.com。
+// 注意同上：URL 里的双斜杠用空展开 $() 隔断，避免被 xcconfig 行注释吞掉。
+SITE_BASE_URL = https:/$()/appidge.com
+
+// 免费试用天数（授权前可用期上限）。默认 = prod 值 7；
+// staging 可在 ops/environments/staging.conf 临时改小（如 1）便于调试，命令行 build 注入覆盖此默认。
+TRIAL_DURATION_DAYS = 7
+
 // 让编译器把 SwiftUI 本地化字符串提取/合并进 catalog（IDE 构建自动同步；防新串回退成中文源）。
 SWIFT_EMIT_LOC_STRINGS = YES

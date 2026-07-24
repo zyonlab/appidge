@@ -36,6 +36,15 @@
 	     构建期可用 LICENSE_CHECKOUT_URL 覆盖。 -->
 	<key>LicenseCheckoutURL</key>
 	<string>$(LICENSE_CHECKOUT_URL)</string>
+	<!-- 官网基址。App 内跳转官网页面(退款/隐私/条款/帮助等)的根地址,与 LicenseCheckoutURL 同源。
+	     构建期由 SITE_BASE_URL 注入(staging→staging.appidge.com,prod→appidge.com);
+	     Release 默认值见 Config/AppConfig.xcconfig。 -->
+	<key>SiteBaseURL</key>
+	<string>$(SITE_BASE_URL)</string>
+	<!-- 免费试用天数。App 授权前的可用期上限,构建期由 TRIAL_DURATION_DAYS 注入
+	     (prod=7;staging 可临时改小便于调试)。Release 默认值见 Config/AppConfig.xcconfig。 -->
+	<key>TrialDurationDays</key>
+	<string>$(TRIAL_DURATION_DAYS)</string>
 	<!-- Sparkle EdDSA(ed25519)更新签名公钥。由 Sparkle generate_keys 生成的密钥对之公钥;
 	     公钥可公开、须提交(App 靠它验签更新),私钥仅存 macOS 登录钥匙串、永不进 git
 	     (见 docs/sparkle-autoupdate.md)。全环境共用同一 keypair(公钥不随 staging/prod 变)。 -->

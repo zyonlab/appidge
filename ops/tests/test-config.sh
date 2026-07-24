@@ -139,7 +139,7 @@ done
 # ---------------------------------------------------------------------------
 # 5. [structure] 环境配置契约：allowlist keys、环境匹配、URL 规则
 # ---------------------------------------------------------------------------
-ALLOW_KEYS='APPIDGE_ENVIRONMENT PUBLIC_SITE_URL PUBLIC_POLAR_CHECKOUT_URL PUBLIC_API_BASE_URL PUBLIC_DOWNLOAD_URL LICENSE_API_BASE_URL LICENSE_CHECKOUT_URL SPARKLE_FEED_URL API_D1_DATABASE_NAME'
+ALLOW_KEYS='APPIDGE_ENVIRONMENT PUBLIC_SITE_URL PUBLIC_POLAR_CHECKOUT_URL PUBLIC_API_BASE_URL PUBLIC_DOWNLOAD_URL LICENSE_API_BASE_URL LICENSE_CHECKOUT_URL SPARKLE_FEED_URL SITE_BASE_URL TRIAL_DURATION_DAYS API_D1_DATABASE_NAME'
 
 conf_keys() { grep -E '^[A-Z_]+=' "$1" | cut -d= -f1; }
 conf_get() { # $1=file $2=key —— 在纯净子 shell 里 source 后取值
@@ -225,6 +225,57 @@ if [ -f "$PC" ]; then
     && t_pass "production D1 名称 = appidge-licensing-production" \
     || t_fail "production D1 名称 = appidge-licensing-production"
 fi
+
+# ---------------------------------------------------------------------------
+# 5b. [structure] SITE_BASE_URL / TRIAL_DURATION_DAYS 注入键契约
+#     （构建期注入 App Info.plist；键名 App UI 依赖，值必须按环境正确且不交叉）
+# ---------------------------------------------------------------------------
+url_host() { printf '%s' "$1" | sed -e 's|^[a-z]*://||' -e 's|[/:].*$||'; }
+
+for env in staging production; do
+  conf="ops/environments/$env.conf"
+  [ -f "$conf" ] || continue
+
+  # 两键必须声明
+  grep -q '^SITE_BASE_URL=' "$conf" \
+    && t_pass "$conf 声明 SITE_BASE_URL" || t_fail "$conf 声明 SITE_BASE_URL"
+  grep -q '^TRIAL_DURATION_DAYS=' "$conf" \
+    && t_pass "$conf 声明 TRIAL_DURATION_DAYS" || t_fail "$conf 声明 TRIAL_DURATION_DAYS"
+
+  sbu=$(conf_get "$conf" SITE_BASE_URL)
+  psu=$(conf_get "$conf" PUBLIC_SITE_URL)
+  tdd=$(conf_get "$conf" TRIAL_DURATION_DAYS)
+
+  # SITE_BASE_URL 必须 HTTPS
+  case "$sbu" in
+    https://*) t_pass "$conf SITE_BASE_URL 是 HTTPS" ;;
+    *) t_fail "$conf SITE_BASE_URL 是 HTTPS（实际：${sbu:-空}）" ;;
+  esac
+
+  # SITE_BASE_URL 必须与 PUBLIC_SITE_URL 同源（防环境交叉）
+  [ "$(url_host "$sbu")" = "$(url_host "$psu")" ] \
+    && t_pass "$conf SITE_BASE_URL 与 PUBLIC_SITE_URL 同源" \
+    || t_fail "$conf SITE_BASE_URL 与 PUBLIC_SITE_URL 同源（$(url_host "$sbu") ≠ $(url_host "$psu")）"
+
+  # TRIAL_DURATION_DAYS 必须是正整数
+  case "$tdd" in
+    ''|*[!0-9]*|0) t_fail "$conf TRIAL_DURATION_DAYS 是正整数（实际：${tdd:-空}）" ;;
+    *) t_pass "$conf TRIAL_DURATION_DAYS 是正整数" ;;
+  esac
+done
+
+# staging 专项：site 用 staging 域
+case "$(conf_get "$SC" SITE_BASE_URL)" in
+  https://staging.appidge.com*) t_pass "staging SITE_BASE_URL 用 staging.appidge.com" ;;
+  *) t_fail "staging SITE_BASE_URL 用 staging.appidge.com" ;;
+esac
+# production 专项：site 用裸域、trial 固定 7
+[ "$(url_host "$(conf_get "$PC" SITE_BASE_URL)")" = "appidge.com" ] \
+  && t_pass "production SITE_BASE_URL 用裸域 appidge.com" \
+  || t_fail "production SITE_BASE_URL 用裸域 appidge.com"
+[ "$(conf_get "$PC" TRIAL_DURATION_DAYS)" = "7" ] \
+  && t_pass "production TRIAL_DURATION_DAYS = 7" \
+  || t_fail "production TRIAL_DURATION_DAYS = 7"
 
 # conf 不得包含 secret 形态的值（token/secret/pepper 关键字）
 expect_fail "ops/environments 不含 secret 形态键值" \

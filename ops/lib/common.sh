@@ -50,7 +50,7 @@ url_host() { # 提取 https URL 的 host（不含 path/port）
 # 环境配置读取：allowlist keys、POSIX sourceable、APPIDGE_ENVIRONMENT 与参数一致。
 # 测试可用 APPIDGE_OPS_CONFIG_DIR 指向 fixture 目录。
 # ---------------------------------------------------------------------------
-OPS_ALLOW_KEYS='APPIDGE_ENVIRONMENT PUBLIC_SITE_URL PUBLIC_POLAR_CHECKOUT_URL PUBLIC_API_BASE_URL PUBLIC_DOWNLOAD_URL LICENSE_API_BASE_URL LICENSE_CHECKOUT_URL SPARKLE_FEED_URL API_D1_DATABASE_NAME'
+OPS_ALLOW_KEYS='APPIDGE_ENVIRONMENT PUBLIC_SITE_URL PUBLIC_POLAR_CHECKOUT_URL PUBLIC_API_BASE_URL PUBLIC_DOWNLOAD_URL LICENSE_API_BASE_URL LICENSE_CHECKOUT_URL SPARKLE_FEED_URL SITE_BASE_URL TRIAL_DURATION_DAYS API_D1_DATABASE_NAME'
 
 load_environment() { # $1 = staging|production
   OPS_ENV=$1
@@ -83,7 +83,8 @@ validate_config_urls() { # 依赖 load_environment 已执行
   _env=$OPS_ENV
 
   for k in PUBLIC_SITE_URL PUBLIC_POLAR_CHECKOUT_URL PUBLIC_API_BASE_URL \
-           PUBLIC_DOWNLOAD_URL LICENSE_API_BASE_URL LICENSE_CHECKOUT_URL SPARKLE_FEED_URL; do
+           PUBLIC_DOWNLOAD_URL LICENSE_API_BASE_URL LICENSE_CHECKOUT_URL SPARKLE_FEED_URL \
+           SITE_BASE_URL; do
     eval "v=\${$k:-}"
     if is_placeholder "$v"; then
       case "$k" in
@@ -117,7 +118,7 @@ validate_config_urls() { # 依赖 load_environment 已执行
     # appidge 自有域按环境精确匹配（防交叉：staging 包指向 prod feed 或反之）
     h=$(url_host "$v")
     case "$k" in
-      PUBLIC_SITE_URL)
+      PUBLIC_SITE_URL|SITE_BASE_URL)
         if [ "$_env" = staging ]; then
           [ "$h" = "staging.appidge.com" ] || fail_add "staging $k host 应为 staging.appidge.com：$h"
         else
@@ -150,6 +151,19 @@ validate_config_urls() { # 依赖 load_environment 已执行
         fi ;;
     esac
   done
+
+  # SITE_BASE_URL 必须与 PUBLIC_SITE_URL 同源（防环境交叉：站点跳转与官网构建落在同一环境）
+  if [ -n "${SITE_BASE_URL:-}" ] && [ -n "${PUBLIC_SITE_URL:-}" ]; then
+    [ "$(url_host "$SITE_BASE_URL")" = "$(url_host "$PUBLIC_SITE_URL")" ] \
+      || fail_add "SITE_BASE_URL host（$(url_host "$SITE_BASE_URL")）应与 PUBLIC_SITE_URL host（$(url_host "$PUBLIC_SITE_URL")）同源"
+  fi
+
+  # TRIAL_DURATION_DAYS 必须是正整数（production 固定 7；staging 可调小便于调试）
+  case "${TRIAL_DURATION_DAYS:-}" in
+    ''|*[!0-9]*|0) fail_add "TRIAL_DURATION_DAYS 应为正整数：${TRIAL_DURATION_DAYS:-空}" ;;
+    *) [ "$_env" != production ] || [ "$TRIAL_DURATION_DAYS" = 7 ] \
+         || fail_add "production TRIAL_DURATION_DAYS 应为 7：$TRIAL_DURATION_DAYS" ;;
+  esac
 
   [ "${API_D1_DATABASE_NAME:-}" = "appidge-licensing-$_env" ] \
     || fail_add "API_D1_DATABASE_NAME 应为 appidge-licensing-${_env}：${API_D1_DATABASE_NAME:-空}"

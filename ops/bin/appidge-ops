@@ -241,8 +241,14 @@ cmd_deploy_api() {
   ops_note "记录当前 deployment（回滚点）："
   wrangler_run api deployments list --env "$OPS_ENV" 2>/dev/null | head -20 || true
   wrangler_run api deploy --env "$OPS_ENV"
-  ops_note "部署后健康检查：https://$API_HOST/healthz"
-  curl -fsS -m 30 "https://$API_HOST/healthz" || ops_die "healthz 失败——考虑 wrangler rollback --env $OPS_ENV"
+  ops_note "部署后健康检查：https://$API_HOST/healthz（自定义域名版本切换有 10~30s 传播窗口,带重试）"
+  _hz_ok=0
+  for _i in 1 2 3 4 5 6; do
+    if curl -fsS -m 15 "https://$API_HOST/healthz"; then _hz_ok=1; break; fi
+    ops_note "healthz 第 ${_i} 次未通过,8s 后重试…"
+    sleep 8
+  done
+  [ "$_hz_ok" = 1 ] || ops_die "healthz 连续 6 次失败（≈90s）——考虑 wrangler rollback --env $OPS_ENV"
   echo
 }
 

@@ -77,9 +77,7 @@ struct SettingsView: View {
             Section("网络接管") {
                 if store.state.extensionNeedsRebind {
                     Label {
-                        Text("接管会话绑在旧扩展实例上（运行 \(store.state.runningExtensionVersion ?? "?")、"
-                            + "已安装 \(store.state.bundledExtensionVersion ?? "?")）——流量可能被交给僵尸扩展。"
-                            + "已自动尝试重绑；若仍异常，点「重启接管」，或重启电脑清理旧扩展。")
+                        Text("接管会话绑在旧扩展实例上（运行 \(store.state.runningExtensionVersion ?? "?")、已安装 \(store.state.bundledExtensionVersion ?? "?")）——流量可能被交给僵尸扩展。已自动尝试重绑；若仍异常，点「重启接管」，或重启电脑清理旧扩展。")
                             .fixedSize(horizontal: false, vertical: true)
                     } icon: {
                         Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
@@ -101,10 +99,7 @@ struct SettingsView: View {
                     }
                     .controlSize(.small)
                 }
-                Text("网络出问题时的恢复出口，无需重启电脑：「重启接管」把会话重新绑定到最新扩展"
-                    + "（等于在系统设置里关开一次网络扩展，修复「拦到流量却不转发」的僵尸态）；"
-                    + "「停止接管」结束当前会话，所有应用立即恢复原生直连；"
-                    + "「重置」进一步把系统网络设置里的 appidge 代理配置整个移除（系统扩展保持安装）。")
+                Text("网络出问题时的恢复出口，无需重启电脑：「重启接管」把会话重新绑定到最新扩展（等于在系统设置里关开一次网络扩展，修复「拦到流量却不转发」的僵尸态）；「停止接管」结束当前会话，所有应用立即恢复原生直连；「重置」进一步把系统网络设置里的 appidge 代理配置整个移除（系统扩展保持安装）。")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

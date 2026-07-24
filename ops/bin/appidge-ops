@@ -324,7 +324,7 @@ cmd_build_macos() {
 
   APPIDGE_BUILD_NUMBER="$BUILD_NUMBER"
   APPIDGE_ENVIRONMENT="$OPS_ENV"
-  export APPIDGE_BUILD_NUMBER APPIDGE_ENVIRONMENT LICENSE_API_BASE_URL LICENSE_CHECKOUT_URL SPARKLE_FEED_URL
+  export APPIDGE_BUILD_NUMBER APPIDGE_ENVIRONMENT LICENSE_API_BASE_URL LICENSE_CHECKOUT_URL SPARKLE_FEED_URL SITE_BASE_URL TRIAL_DURATION_DAYS
   ( cd "$OPS_ROOT" && sh scripts/archive-and-notarize.sh )
   ( cd "$OPS_ROOT" && sh scripts/make-dmg.sh )
 
@@ -338,7 +338,9 @@ cmd_build_macos() {
   [ "$(pb SUFeedURL)" = "$SPARKLE_FEED_URL" ] || ops_die "产物 SUFeedURL=$(pb SUFeedURL) ≠ $SPARKLE_FEED_URL"
   [ "$(pb LicenseAPIBaseURL)" = "$LICENSE_API_BASE_URL" ] || ops_die "产物 LicenseAPIBaseURL 不符"
   [ "$(pb LicenseCheckoutURL)" = "$LICENSE_CHECKOUT_URL" ] || ops_die "产物 LicenseCheckoutURL 不符"
-  ops_note "build-macos $OPS_ENV OK：build=${BUILD_NUMBER}，三个 URL 已按环境注入并验证"
+  [ "$(pb SiteBaseURL)" = "$SITE_BASE_URL" ] || ops_die "产物 SiteBaseURL=$(pb SiteBaseURL) ≠ $SITE_BASE_URL"
+  [ "$(pb TrialDurationDays)" = "$TRIAL_DURATION_DAYS" ] || ops_die "产物 TrialDurationDays=$(pb TrialDurationDays) ≠ $TRIAL_DURATION_DAYS"
+  ops_note "build-macos $OPS_ENV OK：build=${BUILD_NUMBER}，URL/试用配置已按环境注入并验证"
 }
 
 find_generate_appcast() {

@@ -26,7 +26,7 @@ extension ProxyExtensionProvider {
     /// handleNewFlow 必须**同步**决定接管与否(返回 Bool),不能 await actor。这是原 async effectiveRule
     /// 的同步镜像:用锁保护的快照(storedMatchRules / storedPerProcessRules / storedProxyConfig)做
     /// 完全相同的判定,结论分两种:
-    /// - `.bypass`:转发环硬化的四道闸(自身来源 / 回环 / 私网段 / 上游排除)命中,**或者**最终解出
+    /// - `.bypass`:硬闸(自身来源 / 环旁路 / Apple 签名基础设施 / 回环 / 私网段 / 上游排除)命中,**或者**最终解出
     ///   的规则就是 `.direct`——一律不接管,让系统原生处理。
     /// - `.handle(rule)`:只有 `.proxied`/`.block` 才接管。
     ///
@@ -93,13 +93,20 @@ extension ProxyExtensionProvider {
         if isHardBypassOrigin(sourceID: sourceID, sourcePath: sourcePath) {
             return (.bypass, "bypass:loop-hard-bypass")
         }
-        // ③ 地址类硬闸(回环/私网/上游)—— 一律 .bypass,不接管、活动栏不可见。
+        // ③ Apple 签名/公证基础设施域名硬闸(内置,先于用户规则):codesign 时间戳/OCSP/CRL/
+        //    公证 API 走了抖动代理会直接打断 archive/notarize(实证 "A timestamp was expected
+        //    but was not found" 复发三次)。与 ①② 同级的「强制直连」——用户写了 *.apple.com
+        //    走代理也不影响这几个域名;精确匹配语义与列表见 EngineKit.AppleInfrastructureExclusion。
+        if let host = candidates.first(where: { AppleInfrastructureExclusion.isAppleInfrastructure(host: $0) }) {
+            return (.bypass, "bypass:apple-infra(\(host))")
+        }
+        // ④ 地址类硬闸(回环/私网/上游)—— 一律 .bypass,不接管、活动栏不可见。
         //    注:回环流量实测**从不**到达 transparent proxy provider(平台限制,ExtDiag 实证
         //    loopback 判定 0 命中),这里的回环分支只是防御性兜底。
         if let reason = addressBypassReason(hosts: candidates, port: port) {
             return (.bypass, reason)
         }
-        // ④ 本地代理(xray/yunti):**观测**——登记连接让活动栏可见(它连了哪里),但**绝不接管
+        // ⑤ 本地代理(xray/yunti):**观测**——登记连接让活动栏可见(它连了哪里),但**绝不接管
         //    数据通路**。这不是保守,是架构决定的硬约束:本地代理是全系统代理流量的**汇聚点**,
         //    「接管+直连」意味着所有经它代理的应用的每一字节都要被我们的 pump 二次读写 =
         //    把全系统代理吞吐翻倍过一遍扩展进程(0.2.12/0.2.24/0.2.30 三次同根因事故都是这个;
@@ -108,7 +115,7 @@ extension ProxyExtensionProvider {
         if isLocalProxyOrigin(sourceID: sourceID, sourcePath: sourcePath) {
             return (.observe, "observe:local-proxy-origin")
         }
-        // ⑤ 解出动作:细粒度规则表(首个命中)优先于每进程规则;都没有 → 默认 .direct(策略 A:
+        // ⑥ 解出动作:细粒度规则表(首个命中)优先于每进程规则;都没有 → 默认 .direct(策略 A:
         //    默认就接管并直连计量,活动栏能看到每条连接)。
         let resolved = resolveAction(sourceID: sourceID, hosts: candidates, port: port)
         let action = resolved.rule
@@ -124,7 +131,7 @@ extension ProxyExtensionProvider {
     }
 
     /// 自身组件(app/扩展本体)硬边界:接管自己必然自套死循环。只比对静态的 `selfXxx`,
-    /// **不含**本地代理(后者直连接管展示,见 `resolveDecision` ④)。
+    /// **不含**本地代理(后者直连接管展示,见 `resolveDecision` ⑤)。
     private func selfBypassReason(sourceID: String, sourcePath: String?) -> String? {
         if ProcessOriginExclusion.shouldBypass(sourceIdentifier: sourceID, ownIdentifiers: selfIdentifiers) {
             return "bypass:self-identifier"

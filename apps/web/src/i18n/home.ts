@@ -108,7 +108,7 @@ export const home: Record<'zh' | 'en', HomeCopy> = {
       stateLatest: '最新生效',
       stateOverridden: '已覆盖',
       captionHtml:
-        '<b>活动页里点一下进程</b>，路由当场切换——新规则立即生效，自动覆盖旧规则',
+        '<b>点一下进程，或右键呼出菜单</b>，直接给它定规则——走代理、直连还是拦截，当场生效',
     },
     scenes: {
       eyebrow: '这些坑你多半踩过',
@@ -271,7 +271,7 @@ export const home: Record<'zh' | 'en', HomeCopy> = {
       stateLatest: 'in effect',
       stateOverridden: 'overridden',
       captionHtml:
-        '<b>In the app, click any process</b> to flip its route — the new rule takes effect immediately and overrides the old one',
+        '<b>Click or right-click any process</b> to set its rule — proxy, direct, or block — and it takes effect on the spot',
     },
     scenes: {
       eyebrow: 'Sound familiar?',

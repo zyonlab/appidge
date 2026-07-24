@@ -3,16 +3,23 @@
  * 首页产品展示：Activity 界面的纯 HTML/CSS 1:1 复刻（对照已删除的 activity.webp 截图布局）。
  *
  * 硬约束（check-site.mjs 契约）：
- *  - 初始 13 行连接 + 日志 + 状态栏全部服务端渲染 —— 无 JS 也完整可看（渐进增强）。
- *  - 内联 vanilla JS 只做本地模拟（新连接/计时/字节增长/日志滚动），零网络请求。
- *  - prefers-reduced-motion 时不启动任何定时器。
+ *  - 初始 16 行连接 + 日志 + 状态栏全部服务端渲染 —— 无 JS 也完整可看（渐进增强）。
+ *  - 内联 vanilla JS 只做本地模拟（新连接/计时/字节增长/日志滚动/规则菜单），零网络请求。
+ *  - prefers-reduced-motion 时不启动任何定时器；规则菜单交互不依赖动效，仍可用（瞬时显隐）。
  *
  * 体积纪律：重复出现的图标（✓ 圈、徽章图标、进程图标配色）全部收进 global.css
  * 一次定义（伪元素 / data URI / .amock-i-* 类），行内只留必要文本。
  *
- * 演示数据可信且无敏感信息：知名真实工具 + 真实公共域名，
- * 其余目的地用文档保留 IP（192.0.2.x / 198.51.100.x / 203.0.113.x）。
+ * 演示数据可信且无敏感信息：前排全是 2026 热门 AI/LLM 开发与 agent 工具（SSR 文本，兼顾 SEO），
+ * 进程名/bundle id 与 API/下载端点均为真实核实过的公开域名（Cursor api2.cursor.sh、
+ * Copilot api.githubcopilot.com、Windsurf server.codeium.com、Ollama registry.ollama.ai …），
+ * 其余目的地用文档保留 IP（192.0.2.x / 198.51.100.x）。
  * UI 文本固定英文 —— 复刻的是 App 界面语言，中英官网共用本组件。
+ *
+ * 交互 mock（对照 App/ConnectionsTable.swift:98 的真实右键菜单）：
+ * 左键/右键连接行 → macOS 风格菜单「Create rule for host:port」+ Proxy/Direct/Block
+ * （文案取自 App String Catalog 英文译文），选择后该进程全部行徽章即时切换、Log 追加判定行、
+ * 再次打开显示当前态勾选。Esc/点外部关闭。菜单 SSR 输出但 hidden，无 JS 时不可见不碍事。
  */
 
 interface Props {
@@ -25,21 +32,37 @@ type Rule = 'proxy' | 'direct' | 'block';
 
 /** c: global.css 里的图标配色类；L: 图标字母（空 = 无图标的普通可执行文件，白底描边方块） */
 interface Proc {
+  k: string;
   n: string;
   id: string;
   c: string;
   L: string;
 }
 
-const P: Record<string, Proc> = {
-  wechat: { n: 'WeChat', id: 'com.tencent.xinWeChat', c: 'amock-i-wc', L: 'W' },
+/* AI 工具在前（调研核实过的真实进程/bundle id 与端点），传统工具殿后 */
+const P0 = {
   claude: { n: '2.1.214', id: 'com.anthropic.claude-code', c: '', L: '' },
-  docker: { n: 'Docker', id: 'com.docker.docker', c: 'amock-i-dk', L: 'D' },
-  pip: { n: 'pip', id: 'python3.13', c: 'amock-i-py', L: 'P' },
-  git: { n: 'git', id: '/usr/bin/git', c: 'amock-i-git', L: 'G' },
-  tg: { n: 'Telegram', id: 'ru.keepcoder.Telegram', c: 'amock-i-tg', L: 'T' },
+  cursor: { n: 'Cursor', id: 'com.todesktop.230313mzl4w4u92', c: 'amock-i-ai', L: 'C' },
+  chatgpt: { n: 'ChatGPT', id: 'com.openai.chat', c: 'amock-i-ai', L: 'G' },
+  copilot: { n: 'Copilot', id: 'copilot-language-server', c: '', L: 'C' },
+  windsurf: { n: 'Windsurf', id: 'com.exafunction.windsurf', c: 'amock-i-ws', L: 'W' },
+  gemini: { n: 'gemini', id: '/opt/homebrew/bin/gemini', c: '', L: 'G' },
+  ollama: { n: 'ollama', id: '/usr/local/bin/ollama', c: '', L: 'O' },
+  codex: { n: 'codex', id: '/opt/homebrew/bin/codex', c: '', L: 'X' },
+  lmstudio: { n: 'LM Studio', id: 'ai.elementlabs.lmstudio', c: 'amock-i-lm', L: 'L' },
+  aider: { n: 'aider', id: '/opt/homebrew/bin/aider', c: '', L: 'A' },
+  hf: { n: 'hf', id: '/opt/homebrew/bin/hf', c: '', L: 'H' },
+  uv: { n: 'uv', id: '/opt/homebrew/bin/uv', c: '', L: 'U' },
+  claudedesk: { n: 'Claude', id: 'com.anthropic.claudefordesktop', c: 'amock-i-an', L: 'C' },
   node: { n: 'node', id: '/usr/local/bin/node', c: 'amock-i-nd', L: 'N' },
-};
+  wechat: { n: 'WeChat', id: 'com.tencent.xinWeChat', c: 'amock-i-wc', L: 'W' },
+  git: { n: 'git', id: '/usr/bin/git', c: 'amock-i-git', L: 'G' },
+  docker: { n: 'Docker', id: 'com.docker.docker', c: 'amock-i-dk', L: 'D' },
+} satisfies Record<string, Omit<Proc, 'k'>>;
+
+const P: Record<keyof typeof P0, Proc> = Object.fromEntries(
+  Object.entries(P0).map(([k, v]) => [k, { ...v, k }]),
+) as Record<keyof typeof P0, Proc>;
 
 /* —— HTML 片段构造（与内联脚本里的同名构造保持一致：改这里必须同步改 <script>）—— */
 const appHtml = (p: Proc): string =>
@@ -61,7 +84,8 @@ const scopeOf = (p: Proc, dest: string, rule: Rule): string =>
       ? `${p.id} · ${dest.split(':')[0]} · ${dest.split(':')[1]}`
       : `${p.id} · * · Any port`;
 
-/* —— 初始 13 行（服务端渲染；分布对照截图：多数 Direct，WeChat 走 Proxy，claude-code 遥测 Block）—— */
+/* —— 初始 16 行（服务端渲染；前 13 行全是 AI 工具 —— SSR 文本，SEO 关键词；
+ * claude-code 的 datadog 遥测 Block 是卖点行；WeChat/git/Docker 殿后）—— */
 interface Row {
   p: Proc;
   dest: string;
@@ -74,16 +98,6 @@ interface Row {
 }
 
 const ROWS: Row[] = [
-  { p: P.wechat, dest: '198.51.100.24:80', rule: 'proxy', sent: '723 bytes', recv: '379 bytes' },
-  { p: P.docker, dest: 'registry-1.docker.io:443', rule: 'direct', sent: '396 bytes', recv: '232 bytes' },
-  { p: P.tg, dest: '203.0.113.44:443', rule: 'direct', sent: '600 bytes', recv: '410 bytes' },
-  { p: P.git, dest: 'github.com:443', rule: 'direct', sent: '119 bytes', recv: '151 bytes' },
-  { p: P.wechat, dest: '198.51.100.24:80', rule: 'proxy', sent: '721 bytes', recv: '347 bytes' },
-  { p: P.claude, dest: 'http-intake.logs.us5.datadoghq.com:443', rule: 'block', sent: '0 KB', recv: '0 KB' },
-  { p: P.claude, dest: 'http-intake.logs.us5.datadoghq.com:443', rule: 'block', sent: '0 KB', recv: '0 KB' },
-  { p: P.pip, dest: 'pypi.org:443', rule: 'direct', sent: '396 bytes', recv: '232 bytes' },
-  { p: P.docker, dest: '192.0.2.15:58999', rule: 'direct', sent: '592 bytes', recv: '410 bytes' },
-  { p: P.git, dest: 'codeload.github.com:443', rule: 'direct', sent: '119 bytes', recv: '151 bytes' },
   {
     p: P.claude,
     dest: 'api.anthropic.com:443',
@@ -94,9 +108,35 @@ const ROWS: Row[] = [
     sent: '12.4 KB',
     recv: '86.2 KB',
   },
+  { p: P.cursor, dest: 'api2.cursor.sh:443', rule: 'proxy', sent: '8.1 KB', recv: '64.7 KB' },
+  { p: P.chatgpt, dest: 'chatgpt.com:443', rule: 'proxy', sent: '3.2 KB', recv: '21.9 KB' },
+  { p: P.claude, dest: 'http-intake.logs.us5.datadoghq.com:443', rule: 'block', sent: '0 KB', recv: '0 KB' },
+  { p: P.copilot, dest: 'api.githubcopilot.com:443', rule: 'proxy', sent: '2.4 KB', recv: '18.3 KB' },
+  {
+    p: P.ollama,
+    dest: 'registry.ollama.ai:443',
+    rule: 'direct',
+    live: 132,
+    sentB: 84000,
+    recvB: 432900000,
+    sent: '82.0 KB',
+    recv: '412.9 MB',
+  },
+  { p: P.windsurf, dest: 'server.codeium.com:443', rule: 'proxy', sent: '5.8 KB', recv: '40.2 KB' },
+  { p: P.gemini, dest: 'generativelanguage.googleapis.com:443', rule: 'proxy', sent: '1.9 KB', recv: '14.6 KB' },
+  { p: P.codex, dest: 'api.openai.com:443', rule: 'proxy', sent: '9.6 KB', recv: '52.4 KB' },
+  { p: P.lmstudio, dest: 'huggingface.co:443', rule: 'direct', sent: '618 bytes', recv: '3.1 KB' },
+  { p: P.aider, dest: 'api.deepseek.com:443', rule: 'proxy', sent: '4.3 KB', recv: '27.8 KB' },
+  { p: P.hf, dest: 'cdn-lfs.huggingface.co:443', rule: 'direct', sent: '712 bytes', recv: '96.4 MB' },
+  { p: P.uv, dest: 'files.pythonhosted.org:443', rule: 'direct', sent: '441 bytes', recv: '18.7 MB' },
   { p: P.wechat, dest: '198.51.100.24:80', rule: 'proxy', sent: '723 bytes', recv: '379 bytes' },
-  { p: P.tg, dest: '203.0.113.44:443', rule: 'direct', sent: '394 bytes', recv: '232 bytes' },
+  { p: P.git, dest: 'github.com:443', rule: 'direct', sent: '119 bytes', recv: '151 bytes' },
+  { p: P.docker, dest: 'registry-1.docker.io:443', rule: 'direct', sent: '396 bytes', recv: '232 bytes' },
 ];
+
+/** Active 行 SSR 计时文本 mm:ss（脚本 dur() 的同款格式） */
+const durText = (s: number): string =>
+  `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
 /* —— 初始日志。DOM 序新→旧：容器是 column-reverse（首个子元素渲染在底部），
  * 视觉上最新一条钉在可视底部，JS 用 afterbegin 追加即自动跟随滚动。 —— */
@@ -114,31 +154,37 @@ const logHtml = (t: string, p: Proc, dest: string, rule: Rule, state: string): s
   }</div>`;
 
 const LOGS: string[] = [
-  logHtml('12:19:32', P.wechat, '198.51.100.24:80', 'proxy', 'Closed'),
-  logHtml('12:19:18', P.docker, 'registry-1.docker.io:443', 'direct', 'Closed'),
-  logHtml('12:19:18', P.tg, '203.0.113.44:443', 'direct', 'Closed'),
-  logHtml('12:19:15', P.wechat, '198.51.100.24:80', 'proxy', 'Closed'),
-  logHtml('12:19:12', P.claude, 'http-intake.logs.us5.datadoghq.com:443', 'block', 'Closed'),
-  logHtml('12:18:48', P.pip, 'pypi.org:443', 'direct', 'Closed'),
-  logHtml('12:18:48', P.docker, '192.0.2.15:58999', 'direct', 'Closed'),
-  logHtml('12:18:48', P.git, 'codeload.github.com:443', 'direct', 'Closed'),
+  logHtml('12:19:32', P.cursor, 'api2.cursor.sh:443', 'proxy', 'Closed'),
+  logHtml('12:19:29', P.claude, 'http-intake.logs.us5.datadoghq.com:443', 'block', 'Closed'),
+  logHtml('12:19:24', P.chatgpt, 'chatgpt.com:443', 'proxy', 'Closed'),
+  logHtml('12:19:18', P.copilot, 'api.githubcopilot.com:443', 'proxy', 'Closed'),
+  logHtml('12:19:12', P.windsurf, 'server.codeium.com:443', 'proxy', 'Closed'),
+  logHtml('12:19:04', P.gemini, 'generativelanguage.googleapis.com:443', 'proxy', 'Closed'),
+  logHtml('12:18:55', P.codex, 'api.openai.com:443', 'proxy', 'Closed'),
   logHtml('12:18:41', P.claude, 'api.anthropic.com:443', 'proxy', 'Active'),
-  logHtml('12:18:31', P.wechat, '198.51.100.24:80', 'proxy', 'Closed'),
+  logHtml('12:18:33', P.aider, 'api.deepseek.com:443', 'proxy', 'Closed'),
+  logHtml('12:17:20', P.ollama, 'registry.ollama.ai:443', 'direct', 'Active'),
 ];
 
-/* —— 动态模拟候选池（紧凑字段直接进内联脚本；权重靠重复条目：多数 Direct）—— */
+/* —— 动态模拟候选池（紧凑字段直接进内联脚本；AI 工具占多数，权重靠重复条目）—— */
 const pi = (p: Proc, dest: string, rule: Rule) => ({ ...p, dest, rule });
 const POOL = [
-  pi(P.docker, 'registry-1.docker.io:443', 'direct'),
-  pi(P.pip, 'pypi.org:443', 'direct'),
-  pi(P.pip, 'files.pythonhosted.org:443', 'direct'),
-  pi(P.git, 'github.com:443', 'direct'),
-  pi(P.node, 'registry.npmjs.org:443', 'direct'),
-  pi(P.tg, '203.0.113.44:443', 'direct'),
-  pi(P.wechat, '198.51.100.24:80', 'proxy'),
-  pi(P.wechat, '203.0.113.9:443', 'proxy'),
   pi(P.claude, 'api.anthropic.com:443', 'proxy'),
   pi(P.claude, 'http-intake.logs.us5.datadoghq.com:443', 'block'),
+  pi(P.cursor, 'api2.cursor.sh:443', 'proxy'),
+  pi(P.chatgpt, 'chatgpt.com:443', 'proxy'),
+  pi(P.copilot, 'api.githubcopilot.com:443', 'proxy'),
+  pi(P.claudedesk, 'claude.ai:443', 'proxy'),
+  pi(P.gemini, 'generativelanguage.googleapis.com:443', 'proxy'),
+  pi(P.codex, 'api.openai.com:443', 'proxy'),
+  pi(P.aider, 'api.deepseek.com:443', 'proxy'),
+  pi(P.node, 'openrouter.ai:443', 'proxy'),
+  pi(P.node, 'api.smith.langchain.com:443', 'proxy'),
+  pi(P.hf, 'cdn-lfs.huggingface.co:443', 'direct'),
+  pi(P.ollama, 'registry.ollama.ai:443', 'direct'),
+  pi(P.git, 'github.com:443', 'direct'),
+  pi(P.docker, 'registry-1.docker.io:443', 'direct'),
+  pi(P.wechat, '198.51.100.24:80', 'proxy'),
 ];
 
 /* 状态栏初始值（与 SSR 文本一致，供 JS 接续爬升）；12:19:32 是虚拟时钟起点 */
@@ -150,7 +196,7 @@ const SORT_SVG =
 ---
 
 <div class="amock-viewport">
-  <div class="amock" role="img" aria-label={title}>
+  <div class="amock" role="group" aria-label={title}>
     <!-- 标题栏 -->
     <div class="amock-titlebar">
       <span class="amock-lights"><i></i><i></i><i></i></span>
@@ -204,7 +250,7 @@ const SORT_SVG =
       </span>
     </div>
 
-    <!-- 连接表（初始 13 行 SSR；JS 只做增强） -->
+    <!-- 连接表（初始 16 行 SSR；JS 只做增强） -->
     <div class="amock-scroll">
       <table class="amock-table">
         <thead>
@@ -221,19 +267,17 @@ const SORT_SVG =
           {
             ROWS.map((r) => (
               <tr
+                data-p={r.p.k}
                 data-sec={r.live !== undefined ? String(r.live) : undefined}
                 data-sent={r.live !== undefined ? String(r.sentB) : undefined}
                 data-recv={r.live !== undefined ? String(r.recvB) : undefined}
-                data-n={r.live !== undefined ? r.p.n : undefined}
-                data-rule={r.live !== undefined ? r.rule : undefined}
-                data-scope={r.live !== undefined ? scopeOf(r.p, r.dest, r.rule) : undefined}
               >
                 <td set:html={appHtml(r.p)} />
                 <td>{r.dest}</td>
                 <td
                   set:html={
                     r.live !== undefined
-                      ? `<span class="amock-st amock-st-live"><i></i><span class="amock-dur">00:${String(r.live).padStart(2, '0')}</span></span>`
+                      ? `<span class="amock-st amock-st-live"><i></i><span class="amock-dur">${durText(r.live)}</span></span>`
                       : ST_CLOSED
                   }
                 />
@@ -296,30 +340,46 @@ const SORT_SVG =
       <span class="amock-okdot"></span>
       Engine OK
       <span class="amock-sep">|</span>
-      <span>Active connections <span id="amock-conns">4</span></span>
+      <span>Active connections <span id="amock-conns">5</span></span>
       <span class="amock-totals">
         <span id="amock-up">↑ 502.3 MB</span>
         <span id="amock-down">↓ 394.9 MB</span>
       </span>
     </div>
+
+    {/* 规则菜单：复刻 App/ConnectionsTable.swift 连接表右键菜单（英文文案取自 String Catalog：
+        「为 %@:%u 建规则」→ Create rule for %@:%u，走代理/直连/拦截 → Proxy/Direct/Block）。
+        SSR 输出但 hidden；无 JS 不可见。勾选 = 该进程当前规则态。 */}
+    <div class="amock-menu" id="amock-menu" hidden role="menu" aria-label="Create rule">
+      <div class="amock-menu-h" id="amock-menu-h">Create rule</div>
+      <div class="amock-menu-sep" aria-hidden="true"></div>
+      <button type="button" role="menuitemradio" aria-checked="false" data-r="proxy">Proxy</button>
+      <button type="button" role="menuitemradio" aria-checked="false" data-r="direct">Direct</button>
+      <button type="button" role="menuitemradio" aria-checked="false" data-r="block" class="amock-menu-red"
+        >Block</button
+      >
+    </div>
   </div>
 </div>
 
-{/* 渐进增强：本地模拟数据滚动，纯本地、零网络请求（check-site.mjs 契约）；
-    prefers-reduced-motion 时不启动。无 JS 时上方 SSR 内容即完整视图。
+{/* 渐进增强：本地模拟数据滚动 + 规则菜单交互，纯本地、零网络请求（check-site.mjs 契约）；
+    prefers-reduced-motion 时不启动定时器，但菜单交互仍可用（点击是用户触发的离散更新）。
+    无 JS 时上方 SSR 内容即完整视图。
     片段模板（amock-proc/amock-badge/amock-ll）与 frontmatter 构造保持一致，改动需同步。
     维护说明（脚本随 HTML 内联进产物，为控制体积不带注释，逻辑速览）：
     - live[]：活跃行登记（含 SSR 里带 data-sec 的行）；封顶 5 行，新增前先收掉最老的。
     - 每 1s：计时递增 + 字节缓慢增长；每 1.5~3s 随机事件：
       新连接（Block 即刻关闭、0 字节，与截图一致）/ 关闭活跃行 / 某行流量突增。
-    - hidden=3：状态栏 Active connections 初值 4 = 3（视口外）+ 表内 1 行 Active。
-    - 日志追加于底部并自动滚动；"500" 计数随之递增；时钟是 12:19:32 起步的虚拟时钟。 */}
-<script is:inline define:vars={{ POOL, UP0, DOWN0, T0 }}>
-  // @ts-nocheck — POOL/UP0/DOWN0/T0 由 Astro define:vars 注入
+    - hidden=3：状态栏 Active connections 初值 5 = 3（视口外）+ 表内 2 行 Active。
+    - 日志追加于底部并自动滚动；"500" 计数随之递增；时钟是 12:19:32 起步的虚拟时钟。
+    - 菜单：左键/右键行 → 定位显示（钳在窗口内）；选择 → rules[进程] 覆盖 + 该进程全部行
+      徽章切换 + Block 时收掉其活跃行 + spawn 一条按新规则判定的连接（写 Log）；
+      Esc / 点外部关闭；再次打开按当前徽章态勾选。 */}
+<script is:inline define:vars={{ P, POOL, UP0, DOWN0, T0 }}>
+  // @ts-nocheck — P/POOL/UP0/DOWN0/T0 由 Astro define:vars 注入
   (() => {
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const $ = (id) => document.getElementById(id);
-    const body = $('amock-rows'), log = $('amock-log');
+    const body = $('amock-rows'), log = $('amock-log'), menu = $('amock-menu');
     if (!body || !log) return;
     const cnt = $('amock-count'), conns = $('amock-conns'), upEl = $('amock-up'), dnEl = $('amock-down');
     let up = UP0, dn = DOWN0, logN = 500;
@@ -339,9 +399,13 @@ const SORT_SVG =
     const lr = (r) => '<span class="amock-l' + (r === 'proxy' ? 'blue">Proxy · SOCKS5' : r === 'direct' ? 'ok">Direct' : 'bad">Block') + '</span>';
     const appHtml = (p) => '<span class="amock-proc"><i class="amock-picon ' + (p.c || 'amock-picon-plain') + '">' + p.L + '</i><b>' + p.n + '</b><span class="amock-bid">(' + p.id + ')</span></span>';
     const scopeOf = (p) => (p.rule === 'direct' ? '* · * · Any port' : p.rule === 'block' ? p.id + ' · ' + p.dest.split(':')[0] + ' · ' + p.dest.split(':')[1] : p.id + ' · * · Any port');
+    const ruleOf = (tr) => (tr.cells[3].innerHTML.match(/amock-badge-(proxy|direct|block)/) || [0, 'direct'])[1];
+    const rules = {};
     const live = [];
-    for (const tr of body.querySelectorAll('tr[data-sec]'))
-      live.push({ tr, sec: +tr.dataset.sec, sent: +tr.dataset.sent, recv: +tr.dataset.recv, n: tr.dataset.n, dest: tr.cells[1].textContent, rule: tr.dataset.rule, scope: tr.dataset.scope });
+    for (const tr of body.querySelectorAll('tr[data-sec]')) {
+      const k = tr.dataset.p, dest = tr.cells[1].textContent, rule = ruleOf(tr);
+      live.push({ tr, k, sec: +tr.dataset.sec, sent: +tr.dataset.sent, recv: +tr.dataset.recv, n: P[k].n, dest, rule, scope: scopeOf({ id: P[k].id, dest, rule }) });
+    }
     const addLog = (o, active) => {
       const tail = active
         ? '<span class="amock-lmu">·</span> <span class="amock-lok">Active</span> <span class="amock-lmu">· Matched ' + o.scope + '</span>'
@@ -371,21 +435,80 @@ const SORT_SVG =
       const on = p.rule !== 'block';
       if (on && live.length >= 5) closeAt(0);
       const sent = on ? 60 + rnd(700) : 0, recv = on ? 80 + rnd(900) : 0;
-      body.insertAdjacentHTML('afterbegin', '<tr' + (on ? ' data-sec="0"' : '') + '><td>' + appHtml(p) + '</td><td>' + p.dest + '</td><td>' + (on ? LIVE : CLOSED) + '</td><td>' + badge(p.rule) + '</td><td>' + (on ? fb(sent) : '0 KB') + '</td><td>' + (on ? fb(recv) : '0 KB') + '</td></tr>');
-      const o = { tr: body.firstElementChild, sec: 0, sent, recv, n: p.n, dest: p.dest, rule: p.rule, scope: scopeOf(p) };
+      body.insertAdjacentHTML('afterbegin', '<tr data-p="' + p.k + '"' + (on ? ' data-sec="0"' : '') + '><td>' + appHtml(p) + '</td><td>' + p.dest + '</td><td>' + (on ? LIVE : CLOSED) + '</td><td>' + badge(p.rule) + '</td><td>' + (on ? fb(sent) : '0 KB') + '</td><td>' + (on ? fb(recv) : '0 KB') + '</td></tr>');
+      const o = { tr: body.firstElementChild, k: p.k, sec: 0, sent, recv, n: p.n, dest: p.dest, rule: p.rule, scope: scopeOf(p) };
       if (on) {
         live.unshift(o);
         up += sent;
         dn += recv;
       }
-      while (body.children.length > 13) {
+      while (body.children.length > 16) {
         const last = body.lastElementChild;
         const j = live.findIndex((x) => x.tr === last);
         if (j >= 0) live.splice(j, 1);
         last.remove();
       }
       addLog(o, on);
+      status();
     };
+    if (menu) {
+      const mh = $('amock-menu-h');
+      const host = menu.parentElement;
+      let tgt = null;
+      const closeMenu = () => {
+        menu.hidden = true;
+        tgt = null;
+      };
+      const openMenu = (tr, x, y) => {
+        const k = tr.dataset.p;
+        if (!k) return;
+        const dest = tr.cells[1].textContent, cur = ruleOf(tr);
+        tgt = { k, dest };
+        mh.textContent = 'Create rule for ' + dest;
+        for (const b of menu.querySelectorAll('button')) b.setAttribute('aria-checked', String(b.dataset.r === cur));
+        menu.hidden = false;
+        const hr = host.getBoundingClientRect();
+        menu.style.left = Math.max(6, Math.min(x - hr.left, host.clientWidth - menu.offsetWidth - 6)) + 'px';
+        menu.style.top = Math.max(6, Math.min(y - hr.top, host.clientHeight - menu.offsetHeight - 6)) + 'px';
+        menu.querySelector('button').focus();
+      };
+      const pick = (r) => {
+        const { k, dest } = tgt;
+        rules[k] = r;
+        for (const tr of body.querySelectorAll('tr[data-p="' + k + '"]')) tr.cells[3].innerHTML = badge(r);
+        for (let i = live.length - 1; i >= 0; i--) {
+          const o = live[i];
+          if (o.k !== k) continue;
+          if (r === 'block') closeAt(i);
+          else {
+            o.rule = r;
+            o.scope = scopeOf({ id: P[k].id, dest: o.dest, rule: r });
+          }
+        }
+        spawn({ ...P[k], dest, rule: r });
+        closeMenu();
+      };
+      const onRow = (e) => {
+        const tr = e.target.closest('#amock-rows tr');
+        if (!tr) return;
+        e.preventDefault();
+        openMenu(tr, e.clientX, e.clientY);
+      };
+      body.addEventListener('click', onRow);
+      body.addEventListener('contextmenu', onRow);
+      menu.addEventListener('contextmenu', (e) => e.preventDefault());
+      menu.addEventListener('click', (e) => {
+        const b = e.target.closest('button');
+        if (b && tgt) pick(b.dataset.r);
+      });
+      document.addEventListener('pointerdown', (e) => {
+        if (!menu.hidden && !menu.contains(e.target)) closeMenu();
+      }, true);
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !menu.hidden) closeMenu();
+      });
+    }
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     setInterval(() => {
       for (const o of live) {
         o.sec += 1;
@@ -403,8 +526,10 @@ const SORT_SVG =
     const schedule = () => {
       setTimeout(() => {
         const r = Math.random();
-        if (r < 0.3) spawn(POOL[rnd(POOL.length)]);
-        else if (r < 0.6 && live.length > 1) closeAt(rnd(live.length));
+        if (r < 0.3) {
+          const q = POOL[rnd(POOL.length)];
+          spawn({ ...q, rule: rules[q.k] || q.rule });
+        } else if (r < 0.6 && live.length > 1) closeAt(rnd(live.length));
         else if (live.length) {
           const o = live[rnd(live.length)];
           const ds = 2048 + rnd(18000), dr = 8192 + rnd(110000);

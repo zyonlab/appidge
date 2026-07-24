@@ -19,21 +19,21 @@ const { locale, t } = Astro.props;
 
 <!-- Hero -->
 <section class="hero">
-  {/* 品牌白鸽（图标抠图,透明底）：宽屏时悬浮于左侧留白,CSS 悬飞动画,纯装饰 */}
-  <img
-    class="hero-dove"
-    src="/dove.webp"
-    alt=""
-    aria-hidden="true"
-    width="900"
-    height="874"
-    loading="lazy"
-  />
   <div class="container">
     <p class="hero-chip">{t.hero.chip}</p>
     <h1><span class="pain">{t.hero.h1Pain}</span><em>{t.hero.h1Em}</em></h1>
     <p class="hero-sub" set:html={t.hero.subHtml} />
     <div class="cta-row">
+      {/* 品牌白鸽（图标抠图,透明底）：锚定本行左侧、垂直中线对齐,CSS 悬飞,纯装饰 */}
+      <img
+        class="hero-dove"
+        src="/dove.webp"
+        alt=""
+        aria-hidden="true"
+        width="900"
+        height="874"
+        loading="lazy"
+      />
       <a class="btn btn-primary" href={localePath(locale, '/#download')}>{t.hero.ctaDownload}</a>
       <a class="btn btn-secondary" href={POLAR_CHECKOUT_URL} rel="noopener">{t.hero.ctaBuy}</a>
     </div>

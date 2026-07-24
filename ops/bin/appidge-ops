@@ -267,8 +267,10 @@ cmd_deploy_web() {
 }
 
 feed_max_build() { # $1=feed url → 输出 feed 内最大 sparkle:version；查询失败输出空
+  # 兼容两种 Sparkle 写法：属性 sparkle:version="63" 与元素 <sparkle:version>63</sparkle:version>
   curl -fsS -m 20 "$1" 2>/dev/null \
-    | grep -oE 'sparkle:version="[0-9]+"' | grep -oE '[0-9]+' | sort -n | tail -1
+    | grep -oE 'sparkle:version="[0-9]+"|<sparkle:version>[0-9]+' \
+    | grep -oE '[0-9]+' | sort -n | tail -1
 }
 
 cmd_build_macos() {

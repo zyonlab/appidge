@@ -42,4 +42,11 @@ public enum Effect: Sendable, Equatable {
     /// 打开官网定价页或 Polar Hosted Checkout（"购买许可证"）。URL 由 App 层构建期配置提供。
     /// v1 不做浏览器回跳自动灌 key——用户从 Polar 邮件复制 key 回 App 激活。
     case openCheckout(url: String)
+
+    // MARK: - 试用（Trial）副作用
+
+    /// 启动时读取全部本地试用锚点（Keychain + Application Support 文件两份），结果经 `.trialResolved` 回灌。
+    case loadTrialAnchors
+    /// 把试用锚点写回**全部**存储（首启记名 / 抬高水位 / 自愈补写缺失的那一份）。试用信息只是两个时间戳、无 PII。
+    case persistTrialAnchors(TrialInfo)
 }

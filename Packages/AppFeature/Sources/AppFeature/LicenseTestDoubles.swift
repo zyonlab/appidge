@@ -43,6 +43,44 @@ public actor InMemoryLicenseKeychainStore: LicenseKeychainStore {
     public func current() -> LicenseInfo? { stored }
 }
 
+/// 测试专用：内存试用锚点。可注入读/写失败，覆盖「单个锚点故障不影响整体」用例。
+/// 真实实现（Keychain 一份、Application Support 文件一份）在 App 层；这里承担状态机测试。
+public actor InMemoryTrialAnchorStore: TrialAnchorStore {
+    public enum Failure: Error, Equatable { case read, write, clear }
+
+    private var stored: TrialInfo?
+    private var failRead: Bool
+    private var failWrite: Bool
+    private var failClear: Bool
+
+    public init(stored: TrialInfo? = nil, failRead: Bool = false, failWrite: Bool = false, failClear: Bool = false) {
+        self.stored = stored
+        self.failRead = failRead
+        self.failWrite = failWrite
+        self.failClear = failClear
+    }
+
+    public func readAnchor() async throws -> TrialInfo? {
+        if failRead { throw Failure.read }
+        return stored
+    }
+
+    public func writeAnchor(_ info: TrialInfo) async throws {
+        if failWrite { throw Failure.write }
+        stored = info
+    }
+
+    public func clearAnchor() async throws {
+        if failClear { throw Failure.clear }
+        stored = nil
+    }
+
+    /// 测试断言用：当前存了什么。
+    public func current() -> TrialInfo? { stored }
+    /// 测试用：模拟用户删掉这份锚点。
+    public func wipe() { stored = nil }
+}
+
 /// 测试专用：可编程 license facade 客户端。逐次返回预置结果。
 public actor MockLicenseAPIClient: LicenseAPIClient {
     public var activateResult: Result<LicenseResponse, LicenseAPIError>

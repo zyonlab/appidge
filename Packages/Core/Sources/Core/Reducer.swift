@@ -11,6 +11,7 @@ public enum Reducer {
             ?? reduceConnectionLog(state, action)
             ?? reduceLicenseFlow(state, action)
             ?? reduceLicenseValidation(state, action)
+            ?? reduceTrial(state, action)
             ?? reduceLifecycle(state, action)
     }
 

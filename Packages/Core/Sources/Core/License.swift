@@ -33,6 +33,11 @@ public enum LicensePhase: Sendable, Equatable {
     case expired
     /// 可恢复错误（激活失败等，从未获得访问）。载荷为稳定错误码，UI 据此本地化提示。
     case recoverableError(String)
+    /// 纯本地 7 天试用进行中（未激活且未到期）。`daysLeft` = 剩余天数（>0），功能开放
+    /// （``AppState/isLicenseActive`` 为真）。见 ``TrialInfo`` / CLAUDE.md §5.5。
+    case trial(daysLeft: Int)
+    /// 试用已到期——锁付费能力（`isLicenseActive` 为假），但与既有 fail-open 一致**绝不黑洞网络**。
+    case trialExpired
 }
 
 // MARK: - 客户端持久化记录（存 Keychain，非明文 plist/UserDefaults）

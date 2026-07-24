@@ -15,6 +15,9 @@ extension Reducer {
             var fresh = AppState()
             fresh.licensePhase = state.licensePhase
             fresh.license = state.license
+            // 试用同样是账号/安装级、非档案级：切档案不重置试用进度与配置。
+            fresh.trialConfig = state.trialConfig
+            fresh.trial = state.trial
             return (fresh, [])
         case .setPacketCaptureEnabled(let enabled):
             var state = state

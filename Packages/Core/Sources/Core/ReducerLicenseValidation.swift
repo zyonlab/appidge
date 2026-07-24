@@ -38,7 +38,8 @@ extension Reducer {
         switch state.licensePhase {
         case .licensed, .gracePeriod, .expired:
             break
-        case .unlicensed, .activating, .validating, .deactivating, .revoked, .recoverableError:
+        case .unlicensed, .activating, .validating, .deactivating, .revoked, .recoverableError,
+             .trial, .trialExpired:
             return (state, [])
         }
         var state = state
@@ -123,7 +124,15 @@ extension Reducer {
     /// 时钟推进：纯本地判定，不发网络。抬高水位（防回拨），licensed/gracePeriod 期间若本地到期
     /// 或宽限耗尽 → 落 `.expired` 并持久化；其余相位只更新内存高水位、不写盘（免每 tick 写 Keychain）。
     static func licenseClockTick(now: Date, _ state: AppState) -> (AppState, [Effect]) {
-        guard var info = state.license else { return (state, []) }
+        // 无授权记录时，同一 tick 驱动试用倒计时（纯本地，不发网络）。
+        guard var info = state.license else {
+            switch state.licensePhase {
+            case .trial, .trialExpired:
+                return trialClockTick(now: now, state)
+            default:
+                return (state, [])
+            }
+        }
         info.bumpHighWater(now)
         var state = state
         state.license = info

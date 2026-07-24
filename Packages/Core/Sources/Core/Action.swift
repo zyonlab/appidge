@@ -101,4 +101,12 @@ public enum Action: Sendable, Equatable {
     /// Keychain 持久化失败。普通保存失败不锁当前会话；停用清除失败时 Keychain handler 已先写
     /// revoked tombstone，保证旧 active 记录不会在下次启动复活。
     case licensePersistenceFailed(LicensePersistenceOperation)
+
+    // MARK: - 试用（Trial）状态机
+
+    /// 启动请求读取本地试用锚点。→ 产出 `.loadTrialAnchors` effect（App 侧读两锚点后经 `.trialResolved` 回灌）。
+    case trialLoadRequested
+    /// 读回全部试用锚点（可能为空=首启；携带本地 now）。→ 合并取较早 firstLaunchAt/最高水位，
+    /// 首启记名并落 `.trial(daysLeft:)`，后续按锚点算 `.trial`/`.trialExpired`；仅在未激活时生效。
+    case trialResolved(anchors: [TrialInfo], now: Date)
 }

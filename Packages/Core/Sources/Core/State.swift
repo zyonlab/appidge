@@ -52,6 +52,10 @@ public struct AppState: Sendable, Equatable {
     public var licensePhase: LicensePhase
     /// 本地授权记录（存 Keychain）。相位为 licensed/validating/gracePeriod/deactivating 时非 nil。
     public var license: LicenseInfo?
+    /// 试用时长配置（默认 7 天）。App 层从 Info.plist `TrialDurationDays` 注入。
+    public var trialConfig: TrialConfig
+    /// 本地试用锚点（合并两处冗余锚点后的当前视图）。相位为 `.trial`/`.trialExpired` 时非 nil。
+    public var trial: TrialInfo?
 
     /// 会话绑定的扩展是不是旧的:两者都已知且不相等 = 会话绑在旧 provider 上,需重启会话重绑。
     /// 任一未知(还没握手 / 读不到包内版本)时返回 false——不确定就不误报。
@@ -72,10 +76,13 @@ public struct AppState: Sendable, Equatable {
         switch licensePhase {
         case .licensed, .gracePeriod, .deactivating:
             return true
+        case .trial:
+            // 试用期功能开放。
+            return true
         case .validating:
             // expired 记录也允许发起恢复校验，但校验在途不能借 `.validating` 暂时解锁。
             return license?.status == .active
-        case .unlicensed, .activating, .revoked, .expired, .recoverableError:
+        case .unlicensed, .activating, .revoked, .expired, .recoverableError, .trialExpired:
             return false
         }
     }
@@ -96,7 +103,8 @@ public struct AppState: Sendable, Equatable {
         switch licensePhase {
         case .licensed, .gracePeriod, .expired:
             break
-        case .unlicensed, .activating, .validating, .deactivating, .revoked, .recoverableError:
+        case .unlicensed, .activating, .validating, .deactivating, .revoked, .recoverableError,
+             .trial, .trialExpired:
             return false
         }
         return info.referenceNow(now).timeIntervalSince(info.lastValidatedAt) >= Self.licenseValidateInterval
@@ -124,7 +132,9 @@ public struct AppState: Sendable, Equatable {
         runningExtensionVersion: String? = nil,
         bundledExtensionVersion: String? = nil,
         licensePhase: LicensePhase = .unlicensed,
-        license: LicenseInfo? = nil
+        license: LicenseInfo? = nil,
+        trialConfig: TrialConfig = .default,
+        trial: TrialInfo? = nil
     ) {
         self.isEngineHealthy = isEngineHealthy
         self.processes = processes
@@ -148,5 +158,7 @@ public struct AppState: Sendable, Equatable {
         self.bundledExtensionVersion = bundledExtensionVersion
         self.licensePhase = licensePhase
         self.license = license
+        self.trialConfig = trialConfig
+        self.trial = trial
     }
 }

@@ -7,7 +7,9 @@
  *  - 八条路由产物齐全，含 404。
  *  - 内部链接全部指向存在的产物文件。
  *  - 关键 CTA：首页/定价含购买链接，下载/定价含下载链接；购买与下载是两个不同 URL。
- *  - 无 JS 亦可用：产物不含运行时 <script>（仅允许 JSON-LD），核心内容与购买/下载均为原生 <a>。
+ *  - 渐进增强：允许无 src 的内联 <script>（JSON-LD / ActivityMock 本地演示增强），
+ *    禁止任何外部脚本（带 src），内联脚本禁止网络 API 字样（纯本地 mock 数据）；
+ *    无 JS 时 SSR 静态内容完整可见，核心内容与购买/下载均为原生 <a>。
  *  - 不泄露：产物不含私有 API 地址、mock/占位 checkout、secret 模式。
  *  - 法律页（refund/privacy/terms）带草稿/待法务审核标记。
  *
@@ -121,15 +123,32 @@ for (const [name, html] of [['首页', home], ['中文首页', zhHome]]) {
 }
 ok(CHECKOUT !== DOWNLOAD, '购买与下载 URL 不得相同（必须是两个独立动作）');
 
-// ---- 5. 无 JS 亦可用 ----
+// ---- 5. 渐进增强：无 JS 亦可用 ----
+// 契约理由：首页 ActivityMock 是服务端渲染的静态产品视图 + 一段内联 vanilla JS 增强
+// （本地模拟数据滚动，让界面看起来在运行）。无 JS 时 SSR 表格/日志完整可见（渐进增强），
+// 因此契约从「零 <script>」放宽为：
+//   a) 只允许无 src 的内联 script（JSON-LD 或本地增强），任何带 src 的外部脚本仍然禁止；
+//   b) 内联脚本不得出现网络 API 字样（fetch / XMLHttpRequest / WebSocket / EventSource /
+//      sendBeacon）—— 演示数据必须纯本地生成，站点保持零请求、零追踪。
+const NET_API_WORDS = ['fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource', 'sendBeacon'];
 for (const file of htmlFiles) {
   const html = readFileSync(file, 'utf8');
-  const scripts = html.match(/<script\b[^>]*>/gi) ?? [];
-  for (const tag of scripts) {
+  const scriptTags = html.match(/<script\b[^>]*>/gi) ?? [];
+  for (const tag of scriptTags) {
     ok(
-      /type="application\/ld\+json"/i.test(tag),
-      `产物含运行时 <script>（应为纯静态）: ${tag} @ ${relative(dist, file)}`,
+      !/\bsrc\s*=/i.test(tag),
+      `产物含外部脚本 <script src>（只允许内联）: ${tag} @ ${relative(dist, file)}`,
     );
+  }
+  const inlineRe = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
+  let sm;
+  while ((sm = inlineRe.exec(html)) !== null) {
+    for (const word of NET_API_WORDS) {
+      ok(
+        !sm[1].includes(word),
+        `内联脚本出现网络 API 字样 "${word}"（mock 必须纯本地）@ ${relative(dist, file)}`,
+      );
+    }
   }
 }
 // 无 JS 时购买/下载仍是原生锚点
@@ -145,7 +164,9 @@ ok(
 // ---- 6. 不泄露 ----
 const FORBIDDEN = [
   'mock-checkout',
-  'mock', // 任何 mock 残留
+  // 独立单词 mock 的残留（占位 URL、mock server 等）。用词边界正则而非子串：
+  // 首页 ActivityMock 演示组件的 .amock-* class 前缀是刻意命名，不属于 mock 配置残留。
+  /\bmock\b/i,
   'PLACEHOLDER',
   'api.appidge.com', // 私有 API 地址不应出现在营销站产物
   'api.appidge.app', // 迁移前旧域名也不能残留
@@ -159,7 +180,8 @@ for (const file of files) {
   if (!/\.(html|xml|txt|css)$/.test(file)) continue;
   const content = readFileSync(file, 'utf8');
   for (const token of FORBIDDEN) {
-    ok(!content.includes(token), `产物泄露禁用字符串 "${token}" @ ${relative(dist, file)}`);
+    const hit = token instanceof RegExp ? token.test(content) : content.includes(token);
+    ok(!hit, `产物泄露禁用字符串 "${token}" @ ${relative(dist, file)}`);
   }
 }
 

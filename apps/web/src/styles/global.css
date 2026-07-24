@@ -1,7 +1,8 @@
 /* Appidge 官网全局样式 —— 无追踪、无外部字体请求、语义优先。
  * 设计系统：暖白底 + 暖墨文字 + 黑色主按钮 + 陶土橙唯一强调色（设计原型 v5 定稿）。
  * 有意采用单一浅色主题（品牌视觉承诺），color-scheme 固定 light。
- * 交互约束：产物零运行时 JS（check-site.mjs 契约），动效仅用 CSS。 */
+ * 交互约束：仅允许无 src 的内联渐进增强脚本（check-site.mjs 契约：无外部脚本、
+ * 无任何网络请求；无 JS 时全部内容 SSR 完整可见），其余动效仅用 CSS。 */
 
 :root {
   --bg: #ffffff;
@@ -668,6 +669,537 @@ h2 {
 .stage-caption b {
   color: var(--primary);
   font-weight: 600;
+}
+
+/* ── ActivityMock：Activity 界面 1:1 复刻（替代原 activity.webp 截图）────────
+ * 配色对照真实 App 的 macOS 浅色系统外观（systemBlue/Green/Red、灰阶），
+ * 刻意脱离站点暖色 token —— 它扮演“产品截图”，不是站点 UI 的一部分。
+ * 窄屏沿用 .proc-table-scroll 思路：整窗横向滚动，布局不重排。 */
+.amock {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 12px;
+  box-shadow: var(--shadow-strong);
+  overflow: hidden;
+  text-align: left;
+  color: #1d1d1f;
+  font-size: 12.5px;
+  line-height: 1.45;
+  font-family: -apple-system, "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+}
+
+/* 标题栏：交通灯 + 标题 + 居中分段控件 + 右侧工具图标 */
+.amock-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #f6f5f4;
+  border-bottom: 1px solid #e3e2e1;
+}
+
+.amock-lights {
+  display: flex;
+  gap: 7px;
+  flex: none;
+}
+
+.amock-lights i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+
+.amock-lights i:nth-child(1) {
+  background: #ff5f57;
+}
+
+.amock-lights i:nth-child(2) {
+  background: #febc2e;
+}
+
+.amock-lights i:nth-child(3) {
+  background: #28c840;
+}
+
+.amock-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111;
+  flex: none;
+}
+
+.amock-segwrap {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.amock-seg {
+  display: flex;
+  gap: 2px;
+  font-size: 12px;
+  color: #3a3a3e;
+}
+
+.amock-seg span {
+  padding: 3px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.amock-seg .amock-seg-on {
+  background: #e2e1e0;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.amock-winbtns {
+  display: flex;
+  gap: 14px;
+  color: #58585c;
+  flex: none;
+}
+
+.amock-winbtns svg {
+  display: block;
+}
+
+/* 过滤行：搜索占位 + Active only 胶囊 + 垃圾桶 */
+.amock-filter {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #eceae9;
+}
+
+.amock-searchbox {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #98989d;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.amock-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #d8d7d6;
+  border-radius: 99px;
+  padding: 2.5px 11px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #2a2a2e;
+  white-space: nowrap;
+}
+
+.amock-pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3a3a3e;
+}
+
+.amock-trash {
+  color: #86868b;
+  display: flex;
+}
+
+/* 连接表 */
+.amock-scroll {
+  overflow-x: auto;
+}
+
+.amock-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed; /* 固定布局:六列按比例分宽,桌面宽度下不出横向滚动 */
+  min-width: 780px;
+  font-size: 12.5px;
+}
+
+.amock-table th {
+  text-align: left;
+  font-weight: 500;
+  font-size: 11.5px;
+  color: #3c3c40;
+  padding: 6px 10px;
+  border-bottom: 1px solid #e8e6e5;
+  border-left: 1px solid #efedec;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.amock-table th:first-child {
+  border-left: none;
+}
+
+.amock-table th:nth-child(1) {
+  width: 30%;
+}
+
+.amock-table th:nth-child(2) {
+  width: 23%;
+}
+
+.amock-table th:nth-child(3) {
+  width: 11%;
+}
+
+.amock-table th:nth-child(4) {
+  width: 15.5%;
+}
+
+.amock-table th svg {
+  vertical-align: -1px;
+  margin-left: 3px;
+  color: #98989d;
+}
+
+.amock-table td {
+  padding: 4px 10px;
+  border-bottom: 1px solid #f1efee;
+  white-space: nowrap;
+  vertical-align: middle;
+  overflow: hidden;
+}
+
+.amock-table td:nth-child(2) {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: #2a2a2e;
+  text-overflow: ellipsis;
+}
+
+.amock-table th:nth-child(n + 5),
+.amock-table td:nth-child(n + 5) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #3c3c40;
+}
+
+.amock-proc {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.amock-proc b {
+  font-weight: 500;
+  color: #1d1d1f;
+}
+
+.amock-picon {
+  width: 19px;
+  height: 19px;
+  border-radius: 5px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  font-style: normal;
+}
+
+.amock-picon-plain {
+  background: #fff;
+  border: 1px solid #d8d7d6;
+}
+
+/* 进程图标配色（按知名工具品牌近似色;体积考量:类名一次定义,行内不重复 style） */
+.amock-i-wc {
+  background: #2dc100;
+  color: #fff;
+}
+
+.amock-i-dk {
+  background: #1d63ed;
+  color: #fff;
+}
+
+.amock-i-py {
+  background: #3776ab;
+  color: #ffd94a;
+}
+
+.amock-i-git {
+  background: #f05133;
+  color: #fff;
+}
+
+.amock-i-tg {
+  background: #2aabee;
+  color: #fff;
+}
+
+.amock-i-nd {
+  background: #43853d;
+  color: #fff;
+}
+
+.amock-bid {
+  color: #98989d;
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 状态列：灰 ✓ Closed / 绿点 + 绿色计时。
+ * ✓ 圈用伪元素而非行内 SVG —— 12 行重复图标省 ~4KB 产物体积。 */
+.amock-st {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #98989d;
+}
+
+.amock-st:not(.amock-st-live)::before {
+  content: "✓";
+  width: 13px;
+  height: 13px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid #bdbdc1;
+  border-radius: 50%;
+  font-size: 8.5px;
+  line-height: 1;
+}
+
+.amock-st-live {
+  color: #1e9e40;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.amock-st-live i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #2bbf4e;
+}
+
+/* 规则徽章：蓝 Proxy·SOCKS5 / 绿 → Direct / 红 ✋ Block。
+ * 徽章图标走 CSS 伪元素 + data URI（一次定义），避免每行重复行内 SVG。 */
+.amock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 99px;
+  padding: 2.5px 10px;
+  white-space: nowrap;
+}
+
+.amock-badge::before {
+  flex: none;
+}
+
+.amock-badge-proxy {
+  color: #0b6fe0;
+  background: rgba(10, 112, 230, 0.1);
+}
+
+.amock-badge-proxy::before {
+  content: "";
+  width: 11px;
+  height: 11px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M6 11V6.4M6 6.4 2.7 2M6 6.4 9.3 2' fill='none' stroke='%230b6fe0' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+
+.amock-badge-direct {
+  color: #1e9e40;
+  background: rgba(40, 170, 70, 0.11);
+}
+
+.amock-badge-direct::before {
+  content: "→";
+  font-weight: 700;
+}
+
+.amock-badge-block {
+  color: #de3226;
+  background: rgba(224, 50, 40, 0.09);
+}
+
+.amock-badge-block::before {
+  content: "";
+  width: 11px;
+  height: 11px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='%23de3226' d='M5.1 1.1c.4 0 .7.3.7.7v3.4h.5V1.7c0-.4.3-.7.7-.7s.7.3.7.7v3.7h.5V2.6c0-.4.3-.7.7-.7s.7.3.7.7v4.6c0 2.1-1.5 3.7-3.6 3.7-1.7 0-2.7-.9-3.7-2.6l-1-1.7c-.2-.4-.1-.9.3-1.1.4-.2.9-.1 1.1.3l.7 1.1V1.8c0-.4.3-.7.7-.7z'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+
+/* 表格与日志之间的分隔拖柄 */
+.amock-split {
+  height: 11px;
+  background: #fafaf9;
+  border-top: 1px solid #ececeb;
+  border-bottom: 1px solid #ececeb;
+  position: relative;
+}
+
+.amock-split::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 3px;
+  width: 36px;
+  height: 5px;
+  margin-left: -18px;
+  border-radius: 99px;
+  background: #d6d5d4;
+}
+
+/* Log 面板 */
+.amock-loghead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px 5px;
+  font-size: 12.5px;
+  color: #2a2a2e;
+}
+
+.amock-loghead > svg {
+  color: #86868b;
+}
+
+.amock-loghead b {
+  font-weight: 600;
+}
+
+.amock-count {
+  font-size: 11px;
+  color: #58585c;
+  background: #ececeb;
+  border-radius: 99px;
+  padding: 0.5px 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.amock-logact {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+  color: #3a3a3e;
+}
+
+.amock-logact span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.amock-logact svg {
+  color: #86868b;
+}
+
+/* column-reverse：DOM 首个子元素渲染在底部并原生钉住滚动位置——
+ * 无 JS 时即显示最新日志在可视底部，JS 追加(afterbegin)时自动跟随，无需 scroll 代码。 */
+.amock-log {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.8;
+  padding: 2px 14px 6px;
+  height: 182px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  color: #3a3a3e;
+  display: flex;
+  flex-direction: column-reverse;
+}
+
+.amock-ll {
+  flex: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.amock-lt {
+  color: #98989d;
+}
+
+.amock-lmu {
+  color: #a9a9ad;
+}
+
+.amock-lblue {
+  color: #0b6fe0;
+  font-weight: 600;
+}
+
+.amock-lok {
+  color: #1e9e40;
+  font-weight: 600;
+}
+
+.amock-lbad {
+  color: #de3226;
+  font-weight: 700;
+}
+
+/* 底部状态栏 */
+.amock-statusbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  border-top: 1px solid #e8e6e5;
+  font-size: 11.5px;
+  color: #2a2a2e;
+  font-variant-numeric: tabular-nums;
+}
+
+.amock-okdot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2bbf4e;
+  flex: none;
+}
+
+.amock-sep {
+  color: #d4d3d2;
+}
+
+.amock-totals {
+  margin-left: auto;
+  display: flex;
+  gap: 12px;
+  color: #3a3a3e;
+  white-space: nowrap;
+}
+
+/* 窄屏：整窗横向滚动（.proc-table-scroll 思路），布局不重排失真 */
+@media (max-width: 880px) {
+  .amock-viewport {
+    overflow-x: auto;
+    margin: 0 -24px;
+    padding: 0 24px 28px;
+  }
+
+  .amock {
+    min-width: 790px;
+    box-shadow: 0 14px 34px rgba(43, 31, 17, 0.12);
+  }
 }
 
 /* ── 场景卡片 ────────────────────────────── */

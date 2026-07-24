@@ -331,6 +331,24 @@ if [ -x "$CLI" ]; then
   rm -rf "$FIX"
 
   # ------------------------------------------------------------------
+  # wrangler_run 目录正确性（回归：pnpm --dir 曾把 cwd 拉回 apps/api，
+  # 导致 deploy-web/updates 实际部署或 dry-run 的是 api Worker）
+  # 用假 OPS_ROOT + 打印 $PWD 的 wrangler stub 验证每个目标在自己的目录执行。
+  # ------------------------------------------------------------------
+  WRTMP=$(mktemp -d)
+  mkdir -p "$WRTMP/apps/api/node_modules/.bin" "$WRTMP/apps/web" "$WRTMP/infra/updates"
+  printf '#!/bin/sh\npwd\n' > "$WRTMP/apps/api/node_modules/.bin/wrangler"
+  chmod +x "$WRTMP/apps/api/node_modules/.bin/wrangler"
+  wr_cwd() { # $1=target $2=期望后缀
+    out=$(sh -c "OPS_ROOT='$WRTMP'; . ops/lib/common.sh; OPS_ROOT='$WRTMP'; wrangler_run $1 whoami" 2>/dev/null | tail -1)
+    case "$out" in *"$2") return 0 ;; *) return 1 ;; esac
+  }
+  expect_ok "wrangler_run api 在 apps/api 执行"          wr_cwd api /apps/api
+  expect_ok "wrangler_run web 在 apps/web 执行"          wr_cwd web /apps/web
+  expect_ok "wrangler_run updates 在 infra/updates 执行" wr_cwd updates /infra/updates
+  rm -rf "$WRTMP"
+
+  # ------------------------------------------------------------------
   # 25 MiB 静态文件限制（common.sh 函数级测试）
   # ------------------------------------------------------------------
   if grep -q 'assert_static_assets_within_limit' ops/lib/common.sh 2>/dev/null; then

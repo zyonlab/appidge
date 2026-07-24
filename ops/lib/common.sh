@@ -224,11 +224,16 @@ check_tools() {
 }
 
 wrangler_run() { # $1 = api|web|updates，其余为 wrangler 参数（updates/web 无自带依赖，共用 api 的 wrangler）
+  # 注意：必须直接调 api workspace 的 wrangler 二进制，并靠 cd 决定配置目录。
+  # 不能用 `pnpm --dir apps/api exec`：--dir 会把 cwd 拉回 apps/api，
+  # 使 web/updates 的 deploy 与 dry-run 实际作用于 api Worker（已有回归测试覆盖）。
   _dir=$1; shift
+  _wrangler="$OPS_ROOT/apps/api/node_modules/.bin/wrangler"
+  [ -x "$_wrangler" ] || ops_die "wrangler_run: 缺少 $_wrangler（先在仓库根 pnpm install）"
   case "$_dir" in
-    api)     ( cd "$OPS_ROOT/apps/api"      && pnpm --dir "$OPS_ROOT/apps/api" exec wrangler "$@" ) ;;
-    web)     ( cd "$OPS_ROOT/apps/web"      && pnpm --dir "$OPS_ROOT/apps/api" exec wrangler "$@" ) ;;
-    updates) ( cd "$OPS_ROOT/infra/updates" && pnpm --dir "$OPS_ROOT/apps/api" exec wrangler "$@" ) ;;
+    api)     ( cd "$OPS_ROOT/apps/api"      && "$_wrangler" "$@" ) ;;
+    web)     ( cd "$OPS_ROOT/apps/web"      && "$_wrangler" "$@" ) ;;
+    updates) ( cd "$OPS_ROOT/infra/updates" && "$_wrangler" "$@" ) ;;
     *) ops_die "wrangler_run: 未知目录 $_dir" ;;
   esac
 }

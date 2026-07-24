@@ -405,9 +405,11 @@ cmd_smoke() {
       ok "$1"
     fi
   }
+  # 单页信息架构：下载/定价/FAQ 是首页锚点，购买与下载 CTA 都在首页断言。
   ck "web 首页" "https://$WEB_HOST/" ""
-  ck "web /pricing" "https://$WEB_HOST/pricing" "$(url_host "$PUBLIC_POLAR_CHECKOUT_URL")"
-  ck "web /download" "https://$WEB_HOST/download" "$PUBLIC_DOWNLOAD_URL"
+  ck "web 首页购买 CTA" "https://$WEB_HOST/" "$(url_host "$PUBLIC_POLAR_CHECKOUT_URL")"
+  ck "web 首页下载 CTA" "https://$WEB_HOST/" "$PUBLIC_DOWNLOAD_URL"
+  ck "web 法务页" "https://$WEB_HOST/refund" ""
   ck "web canonical 属于本环境" "https://$WEB_HOST/" "https://$WEB_HOST"
   ck "api /healthz" "https://$API_HOST/healthz" '"ok"'
   hz=$(curl -fsS -m 30 "https://$API_HOST/healthz" 2>/dev/null || true)

@@ -69,16 +69,22 @@ const structuredData = jsonld ?? defaultJsonld;
     <meta property="og:url" content={canonical} />
     <meta property="og:locale" content={OG_LOCALE[locale]} />
 
+    <meta property="og:image" content={new URL('/og.png', SITE_URL).href} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
     <!-- Twitter / X card -->
-    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={fullTitle} />
     <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={new URL('/og.png', SITE_URL).href} />
 
     <link rel="sitemap" href="/sitemap-index.xml" />
-    <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23171310'/%3E%3Crect x='9' y='9' width='14' height='14' rx='3' fill='%23e7723b'/%3E%3C/svg%3E"
-    />
+    {/* 品牌图标（白鸽衔标）：ico 兜底 + 32px png + iOS 触摸图标。theme-color 取品牌橙。 */}
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#FF6B2C" />
 
     <script is:inline type="application/ld+json" set:html={JSON.stringify(structuredData)} />
   </head>

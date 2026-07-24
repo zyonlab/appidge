@@ -126,21 +126,12 @@ button:focus-visible {
   flex: none;
 }
 
+/* 品牌图标：真实 app 图标(白鸽衔标,自带圆角与品牌橙底),不再用 CSS 拟形 */
 .brand-mark {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  width: 26px;
+  height: 26px;
   flex: none;
-  background: var(--control);
-  position: relative;
-}
-
-.brand-mark::after {
-  content: "";
-  position: absolute;
-  inset: 6px;
-  background: var(--primary);
-  border-radius: 2.5px;
+  display: block;
 }
 
 .site-nav ul {

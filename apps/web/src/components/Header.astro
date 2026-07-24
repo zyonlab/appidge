@@ -27,7 +27,7 @@ const switchPath = path === '/404' ? '/' : path;
 <header class="site-header">
   <div class="container">
     <a class="brand" href={localePath(locale, '/')} aria-label={SITE_NAME}>
-      <span class="brand-mark" aria-hidden="true"></span>{SITE_NAME}
+      <img class="brand-mark" src="/icon-64.png" alt="" width="26" height="26" />{SITE_NAME}
     </a>
     <nav class="site-nav" aria-label={locale === 'zh' ? '主导航' : 'Main navigation'}>
       <ul>

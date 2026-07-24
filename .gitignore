@@ -43,3 +43,6 @@ apps/api/.mf/
 
 # Sparkle 更新服务静态资源（构建产物：appcast + DMG，勿提交）
 infra/updates/public/
+
+# 品牌资源源文件包(26MB 位图,不入库;产物已拷贝至 App/Assets.xcassets 与 apps/web/public)
+Appidge-complete-assets-head-right/

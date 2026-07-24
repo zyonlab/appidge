@@ -6,6 +6,7 @@
 #
 # commands: show-config preflight test plan migrate-api deploy-api deploy-web
 #           build-macos prepare-updates publish-updates smoke release-manifest
+#           release —— 以上发布链一键串行（fail-fast;需 --apply + --build-number）
 # options : --remote --apply --confirm-production --build-number <正整数>
 #
 # 安全模型（fail closed）：
@@ -37,6 +38,20 @@ EOF
 
 [ $# -ge 1 ] || { usage >&2; exit 2; }
 CMD=$1; shift
+cmd_release() { # 一键发布链：migrate→deploy api/web→出包→appcast→发布→smoke→manifest
+  require_build_number
+  [ "$APPLY" = 1 ] || ops_die "release 是远端写命令,需显式 --apply（production 另需三重保护）"
+  cmd_migrate_api
+  cmd_deploy_api
+  cmd_deploy_web
+  cmd_build_macos
+  cmd_prepare_updates
+  cmd_publish_updates
+  cmd_smoke
+  cmd_release_manifest
+  ops_note "release $OPS_ENV build=$BUILD_NUMBER 全链完成"
+}
+
 case "$CMD" in
   -h|--help|help) usage; exit 0 ;;
 esac
@@ -64,7 +79,7 @@ done
 # 生产写保护最先执行：写意图命令 + --apply 时立即校验三重保护（在读取配置/联网之前）。
 # ---------------------------------------------------------------------------
 case "$CMD" in
-  migrate-api|deploy-api|deploy-web|publish-updates)
+  migrate-api|deploy-api|deploy-web|publish-updates|release)
     if [ "$APPLY" = 1 ]; then guard_remote_write "$ENV_ARG" "$APPLY" "$CONFIRM"; fi
     ;;
 esac
@@ -494,5 +509,6 @@ case "$CMD" in
   publish-updates)  cmd_publish_updates ;;
   smoke)            cmd_smoke ;;
   release-manifest) cmd_release_manifest ;;
+  release)          cmd_release ;;
   *) echo "未知命令：$CMD" >&2; usage >&2; exit 2 ;;
 esac

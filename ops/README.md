@@ -44,6 +44,14 @@ ops/bin/appidge-ops test staging               # config 测试 + pnpm check + ch
 
 ## 发布（staging）
 
+一键（推荐;fail-fast,任一步失败即停）：
+
+```sh
+ops/bin/appidge-ops release staging --apply --build-number <N>
+```
+
+分步（排查/只做某一步时）：
+
 ```sh
 ops/bin/appidge-ops migrate-api staging --apply
 ops/bin/appidge-ops deploy-api  staging --apply

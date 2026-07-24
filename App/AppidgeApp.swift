@@ -72,6 +72,10 @@ struct AppidgeApp: App {
     @State private var reboundAfterUpgrade = false
     /// 升级后卡在旧 provider(运行≠包内【持续】=死锁)时是否已做过【一次】有界重启;见 maybeHealStaleBinding。
     @State private var mismatchHealAttempted = false
+    /// 未购买（试用中/已到期）时的启动弹窗是否正在展示（Proxifier 式每次启动提示）。
+    @State private var showTrialPrompt = false
+    /// 本次启动是否已评估过启动弹窗（一次为限：相位一旦落到试用/到期就弹一次，不反复打扰）。
+    @State private var trialPromptEvaluated = false
     // 界面语言不在这里做 locale 环境覆盖了——改由 `LanguageBootstrap` 在启动早期对齐 AppleLanguages
     // + 切换时重启生效(见 AppDelegate.applicationWillFinishLaunching / SettingsView 的语言 Picker)。
     @Environment(\.scenePhase) private var scenePhase
@@ -192,6 +196,10 @@ struct AppidgeApp: App {
                 // 恢复之前(状态还空);这次确保扩展拿到的是恢复后的最新全量(规则+代理+路由+UDP+
                 // 排除名单)。effect 已串行化,这次 resync 的推送排在恢复推送之后、最终胜出。
                 store.dispatch(.resyncExtension)
+                // 试用配置注入点：把 Info.plist 的 `TrialDurationDays` 交给 Core 的试用配置入口，
+                // 供 Core 在授权恢复时计算 `.trial(daysLeft:)`。Core agent 落地配置 action 后启用下一行
+                // （签名以 Core 实际为准做最小适配）；在此之前 App 侧已能读到天数（AppLinks.trialDurationDays）。
+                // store.dispatch(.trialConfigured(durationDays: AppLinks.trialDurationDays)) // ← 待 Core 落地
                 // 授权：从 Keychain 恢复上次的授权记录（onAction 里据此决定是否需要联网校验）。
                 // 授权服务不可用绝不影响上面的网络接管——两条路径完全独立。
                 store.dispatch(.licenseLoadRequested)
@@ -219,6 +227,20 @@ struct AppidgeApp: App {
                         TransparentProxyController.start()
                     }
                 }
+                // 相位若在装配时已落到试用/到期（快速恢复），此处评估一次；否则靠下面的 onChange。
+                maybePresentTrialPrompt(TrialState.from(store.state.licensePhase))
+            }
+            // 未购买（试用中/已到期）时的每次启动弹窗。相位由 Core 在授权恢复后异步落定，故用
+            // onChange 捕获；已授权/吊销则收起。授权 UI 故障绝不阻塞主窗口——弹窗可继续或输入凭证。
+            .sheet(isPresented: $showTrialPrompt) {
+                TrialPromptView(
+                    store: store,
+                    trial: TrialState.from(store.state.licensePhase),
+                    onContinue: { showTrialPrompt = false }
+                )
+            }
+            .onChange(of: TrialState.from(store.state.licensePhase)) { _, newValue in
+                maybePresentTrialPrompt(newValue)
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
@@ -231,6 +253,22 @@ struct AppidgeApp: App {
                 persistCurrentConfiguration()
             }
         }
+        .commands {
+            // App 菜单：关于 / 管理许可证（主动授权入口）+ 帮助菜单法务链接（见 AppMenuCommands）。
+            AppMenuCommands(store: store)
+        }
+
+        // 「关于 Appidge」窗口：版本 + 构建号 + 检查更新 + 四条法务链接 + 购买。
+        Window("关于 Appidge", id: AppWindowID.about) {
+            AboutView(store: store, updater: updaterController.updater)
+        }
+        .windowResizability(.contentSize)
+
+        // 「管理许可证」窗口：用户主动打开的授权入口（试用态展示 + 凭证激活 + 购买，复用设置面板逻辑）。
+        Window("管理许可证", id: AppWindowID.manageLicense) {
+            ManageLicenseView(store: store)
+        }
+        .windowResizability(.contentSize)
 
         Settings {
             SettingsView(store: store)
@@ -287,6 +325,25 @@ struct AppidgeApp: App {
         guard sawExtensionMismatch, !reboundAfterUpgrade else { return }
         reboundAfterUpgrade = true
         TransparentProxyController.restart()
+    }
+
+    /// 未购买时的启动弹窗调度：相位落到试用/到期就弹一次（一次为限，Proxifier 式每次启动提示）；
+    /// 落到「非试用」（已购买/吊销/未激活门）则收起弹窗。相位由 Core 在授权恢复后异步落定，
+    /// 故此方法既在装配尾部评估一次、又挂在 `onChange` 上捕获后续落定。授权 UI 绝不阻塞主功能。
+    @MainActor
+    private func maybePresentTrialPrompt(_ state: TrialState) {
+        guard !trialPromptEvaluated else {
+            // 已评估过：若已离开试用（激活/吊销等），收起可能仍开着的弹窗。
+            if state == .notInTrial { showTrialPrompt = false }
+            return
+        }
+        switch state {
+        case .trial, .expired:
+            trialPromptEvaluated = true
+            showTrialPrompt = true
+        case .notInTrial:
+            break // 尚未落定（或本就已购买）——等 onChange 再评估。
+        }
     }
 
     /// 启动时把上次保存的配置（扫描到的目录、分配过规则的进程、是否已完成引导）

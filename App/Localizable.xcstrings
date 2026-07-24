@@ -2,6 +2,226 @@
   "sourceLanguage": "zh-Hans",
   "version": "1.0",
   "strings": {
+    "关于 Appidge": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About Appidge"
+          }
+        }
+      }
+    },
+    "关于 Appidge…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About Appidge…"
+          }
+        }
+      }
+    },
+    "管理许可证": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manage License"
+          }
+        }
+      }
+    },
+    "管理许可证…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manage License…"
+          }
+        }
+      }
+    },
+    "版本 %@（构建 %@）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version %@ (Build %@)"
+          }
+        }
+      }
+    },
+    "按进程接管网络去向的 macOS 透明代理。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A macOS transparent proxy that routes traffic per process."
+          }
+        }
+      }
+    },
+    "退款政策": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refund Policy"
+          }
+        }
+      }
+    },
+    "隐私政策": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy Policy"
+          }
+        }
+      }
+    },
+    "服务条款": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terms of Service"
+          }
+        }
+      }
+    },
+    "数据使用": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data Usage"
+          }
+        }
+      }
+    },
+    "试用中 — 剩 %lld 天": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trial — %lld days left"
+          }
+        }
+      }
+    },
+    "试用 · 剩 %lld 天": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trial · %lld days left"
+          }
+        }
+      }
+    },
+    "剩 %lld 天 · 购买": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld days left · Buy"
+          }
+        }
+      }
+    },
+    "试用已结束": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trial ended"
+          }
+        }
+      }
+    },
+    "继续试用": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue trial"
+          }
+        }
+      }
+    },
+    "输入许可证…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter License…"
+          }
+        }
+      }
+    },
+    "购买后可解除试用限制并支持后续更新。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buy a license to remove trial limits and support future updates."
+          }
+        }
+      }
+    },
+    "试用期已结束。购买许可证后可继续使用全部功能。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your trial has ended. Buy a license to keep using all features."
+          }
+        }
+      }
+    },
+    "试用期已结束。购买许可证后可继续使用全部功能，或粘贴已购买的许可证密钥。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your trial has ended. Buy a license to keep using all features, or paste a license key you already own."
+          }
+        }
+      }
+    },
+    "试用中，可使用全部功能。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trial active — you have full access."
+          }
+        }
+      }
+    },
+    "试用期内可使用全部功能；购买许可证解除限制并支持后续更新。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You have full access during the trial. Buy a license to remove limits and support future updates."
+          }
+        }
+      }
+    },
+    "点按管理许可证或购买。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Click to manage your license or buy."
+          }
+        }
+      }
+    },
     "通用": {
       "localizations": {
         "en": {

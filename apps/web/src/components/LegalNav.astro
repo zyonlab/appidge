@@ -4,7 +4,7 @@ import { localePath, ui, type Locale } from '../i18n';
 
 interface Props {
   locale: Locale;
-  current: 'refund' | 'privacy' | 'terms';
+  current: 'refund' | 'privacy' | 'terms' | 'data-usage';
 }
 
 const { locale, current } = Astro.props;
@@ -14,6 +14,7 @@ const items = [
   { key: 'refund', path: '/refund', label: t.refund },
   { key: 'privacy', path: '/privacy', label: t.privacy },
   { key: 'terms', path: '/terms', label: t.terms },
+  { key: 'data-usage', path: '/data-usage', label: t.dataUsage },
 ] as const;
 ---
 

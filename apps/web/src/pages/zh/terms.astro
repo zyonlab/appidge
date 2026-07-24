@@ -1,7 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import LegalNav from '../../components/LegalNav.astro';
-import DraftNotice from '../../components/DraftNotice.astro';
 import { SUPPORT_EMAIL } from '../../config/site';
 
 const description =
@@ -19,7 +18,6 @@ const description =
         <span><b>最后更新</b> 2026-07-24</span>
         <span><b>适用产品</b> Appidge macOS 应用及相关服务</span>
       </div>
-      <DraftNotice locale="zh" updated="2026-07-24" />
 
       <p class="lede">
         使用或购买 Appidge，即表示你同意本条款。请重点阅读第 2 条（产品性质）、
@@ -59,7 +57,7 @@ const description =
 
       <h2><span class="num">3</span>许可授予与试用</h2>
       <ul>
-        <li>软件可免费下载试用；试用范围与期限以应用内说明为准。</li>
+        <li>软件可免费下载试用，试用期为 <strong>7 天，自首次启动起算</strong>；具体剩余天数以应用内显示为准。</li>
         <li>
           购买后，你获得<strong>非独占、不可转让</strong>的许可，可在许可条款允许的设备数量内激活使用；
           具体激活上限以结账页与产品说明为准。

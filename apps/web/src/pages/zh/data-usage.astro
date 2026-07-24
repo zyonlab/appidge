@@ -1,0 +1,106 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import LegalNav from '../../components/LegalNav.astro';
+import { SUPPORT_EMAIL } from '../../config/site';
+
+const description =
+  'Appidge 数据使用说明：哪些数据只留在本机、激活许可与 7 天试用会发送什么、更新检查，以及内置的强制路由规则（应用自身/回环排除、Apple 签名基础设施强制直连、上游放行）。';
+---
+
+<BaseLayout title="数据使用" description={description} path="/data-usage" locale="zh">
+  <div class="doc">
+    <div class="container doc-layout">
+      <LegalNav locale="zh" current="data-usage" />
+      <article class="prose doc-main">
+        <h1>数据使用</h1>
+        <div class="doc-meta">
+          <span><b>生效日期</b> 2026-07-24</span>
+          <span><b>最后更新</b> 2026-07-24</span>
+          <span><b>适用范围</b> appidge.com 网站与 Appidge macOS 应用</span>
+        </div>
+
+        <p class="lede">
+          一份大白话的数据清单。一句话概括：<strong>你的规则和流量都留在你的 Mac 上，
+          唯一离开本机的只有许可校验和更新检查</strong>——这页把这两件事到底发了什么讲清楚。
+        </p>
+
+        <h2><span class="num">1</span>本网站</h2>
+        <p>
+          appidge.com 是纯静态网站：<strong>无 Cookie、无第三方追踪、不做用户画像</strong>。
+          托管服务商（Cloudflare）为提供服务与安全防护，可能按其政策短暂处理访问日志（如 IP）；
+          我们不基于这些日志识别你个人。
+        </p>
+
+        <h2><span class="num">2</span>只留在你 Mac 上的数据</h2>
+        <ul>
+          <li>你的规则、被接管进程列表、每条连接的详情都<strong>只在本机</strong>存储和处理，
+            不上传给我们。</li>
+          <li>你的网络流量在本机转发给你配置的代理或直连，<strong>不经过我们的任何服务器</strong>。</li>
+          <li>没有内置崩溃上报或使用统计。若未来加入，将默认征求同意并先更新本页。</li>
+        </ul>
+
+        <h2><span class="num">3</span>许可激活与 7 天试用</h2>
+        <p>激活或校验许可时，应用只向授权服务发送校验所必需的最小信息：</p>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>数据</th><th>用途</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>许可证密钥</td>
+                <td>验证购买有效性</td>
+                <td>服务端以脱敏形式记录，不用于其他目的</td>
+              </tr>
+              <tr>
+                <td>安装标识</td>
+                <td>统计激活设备数</td>
+                <td>隐私友好的随机值——<strong>不是</strong>你的邮箱、主机名或硬件序列号</td>
+              </tr>
+              <tr>
+                <td>应用版本号</td>
+                <td>兼容性判断</td>
+                <td>—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          <strong>7 天试用完全在你 Mac 本地记录</strong>——首次启动时间存在 macOS 钥匙串和
+          一个本地文件里，<strong>不上报任何服务器</strong>。许可信息（密钥、安装标识、上次校验
+          时间）存在钥匙串，不落明文文件。支付数据由收款方 Creem 处理，详见<a href="/zh/privacy">隐私政策</a>。
+        </p>
+
+        <h2><span class="num">4</span>更新检查</h2>
+        <p>
+          应用会通过 Sparkle 定期向更新服务器（<code>updates.appidge.com</code>）检查新版本。
+          该请求用于返回更新信息，不含可识别你个人身份的内容；服务器访问日志的处理同第 1 节。
+          可在应用设置中关闭自动检查。
+        </p>
+
+        <h2><span class="num">5</span>我们为你内置的强制路由规则</h2>
+        <p>
+          为了正确性与可靠性，有少数连接<strong>无论你的规则怎么写</strong>都固定走某条路。
+          出于透明，这里完整列出：
+        </p>
+        <ul>
+          <li><strong>排除应用自身与代理回环</strong>——Appidge 自己的流量、以及你的代理客户端
+            自身的出站都强制直连放行，避免绕回自己形成死循环、把你的网络弄断。</li>
+          <li><strong>Apple 签名/公证基础设施强制直连</strong>——六个 Apple 域名
+            （<code>timestamp.apple.com</code>、<code>ocsp.apple.com</code>、
+            <code>ocsp2.apple.com</code>、<code>crl.apple.com</code>、<code>valid.apple.com</code>、
+            <code>appstoreconnect.apple.com</code>）始终直连。它们负责代码签名时间戳与证书校验，
+            走抖动代理会打断签名与 Gatekeeper；强制直连保证签名正常。这不影响其他 Apple 域名——
+            <code>www.apple.com</code> 之类仍按你的规则走。</li>
+          <li><strong>更新通道直连</strong>——从 <code>updates.appidge.com</code> 下载不经过授权服务。</li>
+        </ul>
+        <p>这些内置规则纯粹为了让软件正常工作，它们本身不向任何地方发送额外数据。</p>
+
+        <h2><span class="num">6</span>你的权利与联系</h2>
+        <p>
+          依适用法律，你可请求访问、更正或删除我们持有的与你相关的数据——联系
+          <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>。支付环节的数据请求可能需同时向
+          Creem 提出，我们会协助对接。本页如有重大变更将更新并标注新的生效日期。
+        </p>
+      </article>
+    </div>
+  </div>
+</BaseLayout>

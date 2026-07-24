@@ -56,6 +56,7 @@ export const ui = {
       refund: '退款政策',
       privacy: '隐私政策',
       terms: '服务条款',
+      dataUsage: '数据使用',
     },
     footer: {
       blurb:
@@ -65,6 +66,7 @@ export const ui = {
       legal: '法律',
       privacy: '隐私政策',
       terms: '服务条款',
+      dataUsage: '数据使用',
       meta: '结账由 Creem（Merchant of Record）处理 · 本产品不提供 VPN 或代理节点服务',
       trademark:
         'Proxifier、Clash、Surge 及本站提及的其他名称均为其各自所有者的商标，仅用于说明兼容性或类别，与本产品无关联、亦未获其背书。',
@@ -87,6 +89,7 @@ export const ui = {
       refund: 'Refund Policy',
       privacy: 'Privacy Policy',
       terms: 'Terms of Service',
+      dataUsage: 'Data Usage',
     },
     footer: {
       blurb:
@@ -96,6 +99,7 @@ export const ui = {
       legal: 'Legal',
       privacy: 'Privacy Policy',
       terms: 'Terms of Service',
+      dataUsage: 'Data Usage',
       meta: 'Checkout handled by Creem (Merchant of Record) · This product provides no VPN or proxy node service',
       trademark:
         'Proxifier, Clash, Surge, and other names mentioned on this site are trademarks of their respective owners, used only to indicate compatibility or category. Appidge is not affiliated with or endorsed by any of them.',

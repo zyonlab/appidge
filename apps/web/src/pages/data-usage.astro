@@ -1,0 +1,125 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import LegalNav from '../components/LegalNav.astro';
+import { SUPPORT_EMAIL } from '../config/site';
+
+const description =
+  'Appidge data usage: what stays local, what the app sends to activate a license or run the 7-day trial, update checks, and the built-in forced routing rules (self/loopback exclusion, Apple signing infrastructure direct-connect, upstream pass-through).';
+---
+
+<BaseLayout title="Data Usage" description={description} path="/data-usage" locale="en">
+  <div class="doc">
+    <div class="container doc-layout">
+      <LegalNav locale="en" current="data-usage" />
+      <article class="prose doc-main">
+        <h1>Data Usage</h1>
+        <div class="doc-meta">
+          <span><b>Effective</b> 2026-07-24</span>
+          <span><b>Last updated</b> 2026-07-24</span>
+          <span><b>Covers</b> the appidge.com website and the Appidge macOS app</span>
+        </div>
+
+        <p class="lede">
+          A plain-language account of what data Appidge touches. Short version:
+          <strong>your rules and traffic stay on your Mac; the only things that leave it are
+          license checks and update checks</strong>, and this page lists exactly what those are.
+        </p>
+
+        <h2><span class="num">1</span>The website</h2>
+        <p>
+          appidge.com is a fully static site: <strong>no cookies, no third-party tracking, no
+          profiling</strong>. Our host (Cloudflare) may briefly process access logs (such as IP
+          addresses) under its own policies to serve and protect the site; we don't use those
+          logs to identify you.
+        </p>
+
+        <h2><span class="num">2</span>What stays on your Mac</h2>
+        <ul>
+          <li>Your rules, the list of intercepted processes, and per-connection details are stored
+            and processed <strong>locally only</strong> — they are never uploaded to us.</li>
+          <li>Your network traffic is forwarded on your Mac to the proxy you configured, or
+            directly. <strong>It never passes through our servers.</strong></li>
+          <li>There is no built-in crash reporting or usage analytics. If that ever changes, it
+            will be opt-in and this page will be updated first.</li>
+        </ul>
+
+        <h2><span class="num">3</span>License activation &amp; the 7-day trial</h2>
+        <p>
+          When you activate or validate a license, the app sends our licensing service only what
+          the check requires:
+        </p>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Data</th><th>Purpose</th><th>Notes</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>License key</td>
+                <td>Verify the purchase</td>
+                <td>Recorded server-side in redacted form; used for nothing else</td>
+              </tr>
+              <tr>
+                <td>Install identifier</td>
+                <td>Count activated devices</td>
+                <td>A privacy-friendly random value — <strong>not</strong> your email, hostname,
+                  or hardware serial number</td>
+              </tr>
+              <tr>
+                <td>App version</td>
+                <td>Compatibility</td>
+                <td>—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          The <strong>7-day trial is tracked entirely on your Mac</strong> — the first-launch time
+          lives in the macOS Keychain and a local file, and is <strong>not sent to any
+          server</strong>. License data (key, install identifier, last check time) is stored in
+          the Keychain, never in plain-text files. Payment data is handled by Creem, the Merchant
+          of Record — see the <a href="/privacy">Privacy Policy</a>.
+        </p>
+
+        <h2><span class="num">4</span>Update checks</h2>
+        <p>
+          The app periodically asks our update server (<code>updates.appidge.com</code>) for new
+          versions via Sparkle. The request returns update information and contains nothing that
+          identifies you personally; server access logs are handled as in section 1. Automatic
+          checks can be turned off in the app's settings.
+        </p>
+
+        <h2><span class="num">5</span>Built-in routing rules we apply for you</h2>
+        <p>
+          For correctness and reliability, a few connections are always routed a fixed way,
+          <strong>regardless of your rules</strong>. In the interest of transparency, here they
+          are in full:
+        </p>
+        <ul>
+          <li><strong>Appidge itself and proxy loopback are excluded</strong> — the app's own
+            traffic and your proxy client's own outbound are passed through directly, so nothing
+            loops back on itself and breaks your connection.</li>
+          <li><strong>Apple signing &amp; notarization infrastructure is forced direct</strong> —
+            six Apple domains (<code>timestamp.apple.com</code>, <code>ocsp.apple.com</code>,
+            <code>ocsp2.apple.com</code>, <code>crl.apple.com</code>, <code>valid.apple.com</code>,
+            <code>appstoreconnect.apple.com</code>) always connect directly. These handle code
+            signing timestamps and certificate checks that break when sent through a flaky proxy;
+            forcing them direct keeps signing and Gatekeeper working. It does not affect other
+            Apple domains — <code>www.apple.com</code> and the like still follow your rules.</li>
+          <li><strong>The update channel goes direct</strong> — downloads from
+            <code>updates.appidge.com</code> don't pass through the licensing service.</li>
+        </ul>
+        <p>
+          These built-in rules exist purely to keep the software working; none of them send any
+          additional data anywhere.
+        </p>
+
+        <h2><span class="num">6</span>Your rights &amp; contact</h2>
+        <p>
+          Under applicable law you may request access to, correction of, or deletion of data we
+          hold about you — email <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>. Requests
+          about payment data may also need to go to Creem; we'll help you connect. Material
+          changes to this page will be posted here with a new effective date.
+        </p>
+      </article>
+    </div>
+  </div>
+</BaseLayout>

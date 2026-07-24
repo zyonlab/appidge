@@ -75,10 +75,12 @@ const routes = {
   '/refund': 'refund/index.html',
   '/privacy': 'privacy/index.html',
   '/terms': 'terms/index.html',
+  '/data-usage': 'data-usage/index.html',
   '/zh/': 'zh/index.html',
   '/zh/refund': 'zh/refund/index.html',
   '/zh/privacy': 'zh/privacy/index.html',
   '/zh/terms': 'zh/terms/index.html',
+  '/zh/data-usage': 'zh/data-usage/index.html',
 };
 for (const [route, file] of Object.entries(routes)) {
   ok(existsSync(join(dist, file)), `缺少路由产物 ${route} (${file})`);
@@ -185,12 +187,15 @@ for (const file of files) {
   }
 }
 
-// ---- 7. 法律页草稿标记（英文根路径用英文标记，/zh 用中文标记）----
-for (const legal of ['refund/index.html', 'privacy/index.html', 'terms/index.html']) {
-  ok(readHtml(legal).includes('pending legal review'), `${legal} 缺少草稿/待法务审核标记`);
-}
-for (const legal of ['zh/refund/index.html', 'zh/privacy/index.html', 'zh/terms/index.html']) {
-  ok(readHtml(legal).includes('待法务审核'), `${legal} 缺少草稿/待法务审核标记`);
+// ---- 7. 法律页已正式生效：不得再出现草稿/待审核字样（DraftNotice 已移除）----
+const legalPages = [
+  'refund/index.html', 'privacy/index.html', 'terms/index.html', 'data-usage/index.html',
+  'zh/refund/index.html', 'zh/privacy/index.html', 'zh/terms/index.html', 'zh/data-usage/index.html',
+];
+for (const legal of legalPages) {
+  const h = readHtml(legal);
+  ok(!h.includes('pending legal review'), `${legal} 仍含英文草稿标记（应已移除）`);
+  ok(!h.includes('待法务审核'), `${legal} 仍含中文草稿标记（应已移除）`);
 }
 
 // ---- 8. 可访问性结构断言 ----

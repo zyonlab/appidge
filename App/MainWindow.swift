@@ -13,6 +13,8 @@ struct MainWindow: View {
     /// 所以主窗口在(可能已开着的)时也会跟着切 tab。`@Bindable` 让 Picker 能双向绑定其属性。
     @Bindable var tabSelection: MainTabSelection
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// 试用细横幅点按时打开「管理许可证」窗口。
+    @Environment(\.openWindow) private var openWindow
 
     @State private var filter = ""
     @State private var selection: Set<ConnectionLogEntry.ID> = []
@@ -41,10 +43,18 @@ struct MainWindow: View {
                     }
             }
             .safeAreaInset(edge: .top, spacing: 0) {
-                if let warning = store.state.loopWarning {
-                    LoopWarningBanner(signature: warning) { store.dispatch(.dismissLoopWarning) }
-                } else if let prompt = approvalPrompt {
-                    ExtensionApprovalBanner(text: prompt)
+                VStack(spacing: 0) {
+                    // 更紧急的告警（环 / 待批准）优先占位；试用细横幅是常驻信息，叠在其下。
+                    if let warning = store.state.loopWarning {
+                        LoopWarningBanner(signature: warning) { store.dispatch(.dismissLoopWarning) }
+                    } else if let prompt = approvalPrompt {
+                        ExtensionApprovalBanner(text: prompt)
+                    }
+                    // 试用中细横幅：「剩 N 天 · 购买」，点按打开管理许可证窗口。已授权/到期不显示
+                    //（到期时 isLicenseActive 为假、主窗口不构建）。菜单栏不加倒计时（保持克制）。
+                    if case .trial(let days) = TrialState.from(store.state.licensePhase) {
+                        TrialBanner(daysLeft: days) { openWindow(id: AppWindowID.manageLicense) }
+                    }
                 }
             }
             // 状态栏作为 VStack 同级子视图(而非 detail 的 .safeAreaInset)。用 bottom safeAreaInset 时,

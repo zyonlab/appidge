@@ -71,6 +71,11 @@ custom_domain = true
 [env.production.vars]
 MOCK_MODE = "false"
 CREEM_API_BASE = "https://api.creem.io"
+# ▼ 待填（Creem live）：非秘密产品标识，webhook product 白名单据此过滤。
+#   从哪拿：Creem Dashboard（live 模式）→ 目标产品 → product id（prod_ 前缀）。
+#   填哪　：替换下面整个 "REQUIRED_..." 字符串（本行）。Creem 无需 org/benefit id（与 Polar 不同）。
+#   配套：支付链接填 ops/environments/production.conf；上线清单 docs/prod-launch-checklist.md §5。
+#   占位/空 → appidge-ops preflight production fail-closed，禁止伪造。
 CREEM_PRODUCT_ID = "REQUIRED_CREEM_LIVE_PRODUCT_ID"
 RATE_LIMIT_MAX = "60"
 RATE_LIMIT_WINDOW_MS = "60000"

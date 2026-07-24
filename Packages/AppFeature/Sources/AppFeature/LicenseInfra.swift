@@ -194,7 +194,9 @@ public extension LicenseEffectHandler {
             keychain: KeychainLicenseStore(),
             clock: SystemClock(),
             config: LicenseBuildConfig.clientConfig,
-            openCheckout: openCheckout
+            openCheckout: openCheckout,
+            // 试用双锚点：Keychain + Application Support 文件（冗余防单点删除重置）。见 TrialInfra.swift。
+            trialAnchorStores: [KeychainTrialAnchorStore(), FileTrialAnchorStore()]
         )
     }
 }

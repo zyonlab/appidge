@@ -35,6 +35,10 @@
 		9D9A505955A978B0E3041B3E /* ProxyExtensionProviderUDP.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD55E37B6D821CA63EB00B0A /* ProxyExtensionProviderUDP.swift */; };
 		AB6CB382A5B383A530062CCA /* PacketCaptureWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A9AAC7350E301EB78C0187 /* PacketCaptureWriter.swift */; };
 		AD71F038E2B6324B5D280B7C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 956D1B4004113B63335A7518 /* SettingsView.swift */; };
+		4CDD1FD51CB44EE399109360 /* AppLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B81FD5891C3620C189CEE7A2 /* AppLinks.swift */; };
+		CFD3BB496CC7BFF4E741DFB4 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 337584E7E7EFC8B5AB284C4E /* AboutView.swift */; };
+		24300D291E090B82EBC80C26 /* AppMenuCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD605E784762BD3CF20333B3 /* AppMenuCommands.swift */; };
+		AC1B1455817830C25FEF50E8 /* TrialUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A150F43974A4AB0EEF91D4D1 /* TrialUI.swift */; };
 		B419714D1E5E144ED39353BB /* AppidgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AADB654447DCB49FB372FAE /* AppidgeApp.swift */; };
 		BF3C3EA1865EA2811E2CC3B8 /* ProxyServersPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F32B133633BBB992A13D17D /* ProxyServersPaneView.swift */; };
 		C4AE8EAE06FB99890379876B /* ExtDiag.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FE1FDE2601F854C4AB0FCB4 /* ExtDiag.swift */; };
@@ -102,6 +106,10 @@
 		8CAB3B3934E69313D52D6EE2 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		8FEAB61BFC897307C4C2B00D /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		956D1B4004113B63335A7518 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		B81FD5891C3620C189CEE7A2 /* AppLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLinks.swift; sourceTree = "<group>"; };
+		337584E7E7EFC8B5AB284C4E /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
+		AD605E784762BD3CF20333B3 /* AppMenuCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppMenuCommands.swift; sourceTree = "<group>"; };
+		A150F43974A4AB0EEF91D4D1 /* TrialUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrialUI.swift; sourceTree = "<group>"; };
 		98E5B5D192F55B2E76BC681B /* TCPFlowPump.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TCPFlowPump.swift; sourceTree = "<group>"; };
 		9C2DCBF93F75AB530471B830 /* ProfilesPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilesPaneView.swift; sourceTree = "<group>"; };
 		9F7A7B0EB0032EB32E342AC4 /* ConnectionsTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionsTable.swift; sourceTree = "<group>"; };
@@ -211,6 +219,10 @@
 				5F32B133633BBB992A13D17D /* ProxyServersPaneView.swift */,
 				F3502285178386167CBDC5B8 /* RulesEditorPaneView.swift */,
 				956D1B4004113B63335A7518 /* SettingsView.swift */,
+				B81FD5891C3620C189CEE7A2 /* AppLinks.swift */,
+				337584E7E7EFC8B5AB284C4E /* AboutView.swift */,
+				AD605E784762BD3CF20333B3 /* AppMenuCommands.swift */,
+				A150F43974A4AB0EEF91D4D1 /* TrialUI.swift */,
 				199BAC5919441EDC3576E476 /* StatusBar.swift */,
 				AF69302A0C9EBB787D6C4B95 /* SystemExtensionActivator.swift */,
 				6DCF5FB636E2A7088A1D6CDF /* TrafficFormat.swift */,
@@ -383,6 +395,10 @@
 				BF3C3EA1865EA2811E2CC3B8 /* ProxyServersPaneView.swift in Sources */,
 				439F0E52A0F140E10314798A /* RulesEditorPaneView.swift in Sources */,
 				AD71F038E2B6324B5D280B7C /* SettingsView.swift in Sources */,
+				4CDD1FD51CB44EE399109360 /* AppLinks.swift in Sources */,
+				CFD3BB496CC7BFF4E741DFB4 /* AboutView.swift in Sources */,
+				24300D291E090B82EBC80C26 /* AppMenuCommands.swift in Sources */,
+				AC1B1455817830C25FEF50E8 /* TrialUI.swift in Sources */,
 				02BEB1FC0CB43D222CCE48DB /* StatusBar.swift in Sources */,
 				98D1829068AA9598B8F08A3B /* SystemExtensionActivator.swift in Sources */,
 				13292EF7F746994DDBF9B5FE /* TrafficFormat.swift in Sources */,

@@ -105,12 +105,18 @@ struct AppidgeApp: App {
             guard let checkoutURL = URL(string: url) else { return }
             Task { @MainActor in NSWorkspace.shared.open(checkoutURL) }
         })
-        let store = Store(effectHandler: { effect in
-            await Self.handleEffect(
-                effect, transport: transport, connectionLogFileStore: connectionLogFileStore,
-                processIdentityResolver: processIdentityResolver, licenseHandler: licenseHandler
-            )
-        })
+        // 试用时长由构建期注入（Info.plist `TrialDurationDays`，staging 可调小便于调试；缺失回落 7）。
+        let store = Store(
+            initialState: Core.AppState(
+                trialConfig: TrialConfig(durationDays: AppLinks.trialDurationDays)
+            ),
+            effectHandler: { effect in
+                await Self.handleEffect(
+                    effect, transport: transport, connectionLogFileStore: connectionLogFileStore,
+                    processIdentityResolver: processIdentityResolver, licenseHandler: licenseHandler
+                )
+            }
+        )
         // XPC(重)连上扩展时全量重推当前配置。扩展升级/重启/掉线重连后是空规则起步的,不补推
         // 就一直空转(每条 flow 回落默认直连、什么都不接管)。[weak store] 断开 store→transport→
         // store 的保留环;dispatch 必须回到主 actor。
@@ -196,13 +202,12 @@ struct AppidgeApp: App {
                 // 恢复之前(状态还空);这次确保扩展拿到的是恢复后的最新全量(规则+代理+路由+UDP+
                 // 排除名单)。effect 已串行化,这次 resync 的推送排在恢复推送之后、最终胜出。
                 store.dispatch(.resyncExtension)
-                // 试用配置注入点：把 Info.plist 的 `TrialDurationDays` 交给 Core 的试用配置入口，
-                // 供 Core 在授权恢复时计算 `.trial(daysLeft:)`。Core agent 落地配置 action 后启用下一行
-                // （签名以 Core 实际为准做最小适配）；在此之前 App 侧已能读到天数（AppLinks.trialDurationDays）。
-                // store.dispatch(.trialConfigured(durationDays: AppLinks.trialDurationDays)) // ← 待 Core 落地
                 // 授权：从 Keychain 恢复上次的授权记录（onAction 里据此决定是否需要联网校验）。
                 // 授权服务不可用绝不影响上面的网络接管——两条路径完全独立。
                 store.dispatch(.licenseLoadRequested)
+                // 试用：读本地双锚点（Keychain + Application Support 文件）。reducer 仅在 license==nil
+                // 且相位 .unlicensed 时才据此进入 .trial/.trialExpired，故排在授权恢复之后。
+                store.dispatch(.trialLoadRequested)
                 // 周期性时钟推进：本地判定宽限耗尽/订阅到期（防时钟回拨），到期则每日联网校验一次。
                 Task { @MainActor in
                     while !Task.isCancelled {
@@ -445,7 +450,10 @@ struct AppidgeApp: App {
     ) async -> Core.Action? {
         switch effect {
         case .activateLicense, .validateLicense, .deactivateLicense,
-             .persistLicense, .clearPersistedLicense, .loadPersistedLicense, .openCheckout:
+             .persistLicense, .clearPersistedLicense, .loadPersistedLicense, .openCheckout,
+             .loadTrialAnchors, .persistTrialAnchors:
+            // 授权与试用锚点 effect 一并委托给注入了协议的 handler（网络/Keychain/文件锚点，
+            // 与转发路径完全独立）。
             return await licenseHandler.handle(effect)
         case .log:
             return nil

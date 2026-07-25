@@ -11,7 +11,8 @@ LICENSE_API_BASE_URL = https:/$()/api.appidge.com
 
 // App 内稳定购买入口指向官网定价页；真实 Polar Checkout 由官网部署配置持有，
 // 日后更换 checkout 无需重新发布 macOS App。
-LICENSE_CHECKOUT_URL = https:/$()/appidge.com/pricing
+// 单页信息架构下 /pricing 独立页已撤，落地页是首页 #pricing 锚点（直接写 /pricing 会 404）。
+LICENSE_CHECKOUT_URL = https:/$()/appidge.com/#pricing
 
 // Sparkle 自动升级 appcast feed 地址。
 // 默认 = prod,保持当前发布行为不变。

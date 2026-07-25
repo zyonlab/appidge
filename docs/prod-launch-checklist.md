@@ -59,7 +59,7 @@
 | PUBLIC_DOWNLOAD_URL | https://updates.appidge.com/appidge-latest.dmg | [已备] | web 下载 CTA |
 | PUBLIC_POLAR_CHECKOUT_URL | REQUIRED_CREEM_LIVE_CHECKOUT_URL | **[待填]** | web 购买 CTA（见 §5） |
 | LICENSE_API_BASE_URL | https://api.appidge.com | [已备] | Info.plist LicenseAPIBaseURL |
-| LICENSE_CHECKOUT_URL | https://appidge.com/pricing | [已备] | Info.plist LicenseCheckoutURL（App 内购买跳官网定价页） |
+| LICENSE_CHECKOUT_URL | https://appidge.com/#pricing | [已备] | Info.plist LicenseCheckoutURL（App 内购买跳官网定价锚点；单页 IA 下 `/pricing` 独立页已撤，用锚点避免 404） |
 | SPARKLE_FEED_URL | https://updates.appidge.com/appcast.xml | [已备] | Info.plist SUFeedURL |
 | SITE_BASE_URL | https://appidge.com | [已备] | Info.plist SiteBaseURL |
 | TRIAL_DURATION_DAYS | 7 | [已备] | Info.plist TrialDurationDays（prod 强制 =7） |

@@ -28,16 +28,23 @@ set +a
 
 # 公开的 Release 授权/更新配置。显式作为 xcodebuild setting 注入，避免本地 xcconfig 被
 # 手工操作留空后仍产出一个无法激活/购买/升级的包。正常入口是 ops/bin/appidge-ops build-macos，
-# 它会从 ops/environments/<env>.conf 导出这三个 URL 与 APPIDGE_ENVIRONMENT。
+# 它会从 ops/environments/<env>.conf 导出下面这几个公开配置键与 APPIDGE_ENVIRONMENT。
+# 新增键必须同时补进：默认值、环境交叉校验、下方 xcodebuild archive 的显式注入——
+# 三处缺一，包就会静默拿到 AppConfig.xcconfig 里的 production 默认值
+# （ops/tests/test-config.sh 有针对「是否真的注入」的回归断言）。
 LICENSE_API_BASE_URL="${LICENSE_API_BASE_URL:-https://api.appidge.com}"
-LICENSE_CHECKOUT_URL="${LICENSE_CHECKOUT_URL:-https://appidge.com/pricing}"
+# App 内「购买」落到官网定价锚点（单页 IA 下 /pricing 独立页已撤，会 404）。
+LICENSE_CHECKOUT_URL="${LICENSE_CHECKOUT_URL:-https://appidge.com/#pricing}"
 SPARKLE_FEED_URL="${SPARKLE_FEED_URL:-https://updates.appidge.com/appcast.xml}"
+SITE_BASE_URL="${SITE_BASE_URL:-https://appidge.com}"
+TRIAL_DURATION_DAYS="${TRIAL_DURATION_DAYS:-7}"
 APPIDGE_ENVIRONMENT="${APPIDGE_ENVIRONMENT:-production}"
 
 url_host() { printf '%s' "$1" | /usr/bin/sed -e 's|^[a-z]*://||' -e 's|[/:].*$||'; }
 for pair in "LICENSE_API_BASE_URL=$LICENSE_API_BASE_URL" \
             "LICENSE_CHECKOUT_URL=$LICENSE_CHECKOUT_URL" \
-            "SPARKLE_FEED_URL=$SPARKLE_FEED_URL"; do
+            "SPARKLE_FEED_URL=$SPARKLE_FEED_URL" \
+            "SITE_BASE_URL=$SITE_BASE_URL"; do
   case "${pair#*=}" in
     https://*) ;;
     *) echo "${pair%%=*} 必须是 HTTPS URL：${pair#*=}" >&2; exit 1 ;;
@@ -53,9 +60,11 @@ case "$APPIDGE_ENVIRONMENT" in
       || { echo "staging 包 SPARKLE_FEED_URL 应指向 updates-staging.appidge.com：$SPARKLE_FEED_URL" >&2; exit 1; }
     [ "$(url_host "$LICENSE_CHECKOUT_URL")" = "staging.appidge.com" ] \
       || { echo "staging 包 LICENSE_CHECKOUT_URL 应指向 staging.appidge.com：$LICENSE_CHECKOUT_URL" >&2; exit 1; }
+    [ "$(url_host "$SITE_BASE_URL")" = "staging.appidge.com" ] \
+      || { echo "staging 包 SITE_BASE_URL 应指向 staging.appidge.com：$SITE_BASE_URL" >&2; exit 1; }
     ;;
   production)
-    for u in "$LICENSE_API_BASE_URL" "$LICENSE_CHECKOUT_URL" "$SPARKLE_FEED_URL"; do
+    for u in "$LICENSE_API_BASE_URL" "$LICENSE_CHECKOUT_URL" "$SPARKLE_FEED_URL" "$SITE_BASE_URL"; do
       case "$u" in
         *staging*|*sandbox*|*localhost*|*.invalid*)
           echo "production 包 URL 不得包含 staging/sandbox/localhost/.invalid：$u" >&2; exit 1 ;;
@@ -65,8 +74,17 @@ case "$APPIDGE_ENVIRONMENT" in
       || { echo "production 包 LICENSE_API_BASE_URL 应指向 api.appidge.com：$LICENSE_API_BASE_URL" >&2; exit 1; }
     [ "$(url_host "$SPARKLE_FEED_URL")" = "updates.appidge.com" ] \
       || { echo "production 包 SPARKLE_FEED_URL 应指向 updates.appidge.com：$SPARKLE_FEED_URL" >&2; exit 1; }
+    [ "$(url_host "$SITE_BASE_URL")" = "appidge.com" ] \
+      || { echo "production 包 SITE_BASE_URL 应指向 appidge.com：$SITE_BASE_URL" >&2; exit 1; }
+    # 试用时长是合规承诺（官网 terms 写死 7 天）：production 包不接受被调小的调试值。
+    [ "$TRIAL_DURATION_DAYS" = "7" ] \
+      || { echo "production 包 TRIAL_DURATION_DAYS 必须为 7（官网条款承诺）：$TRIAL_DURATION_DAYS" >&2; exit 1; }
     ;;
   *) echo "APPIDGE_ENVIRONMENT 只支持 staging|production：$APPIDGE_ENVIRONMENT" >&2; exit 1 ;;
+esac
+
+case "$TRIAL_DURATION_DAYS" in
+  ''|*[!0-9]*|0) echo "TRIAL_DURATION_DAYS 必须是正整数：$TRIAL_DURATION_DAYS" >&2; exit 1 ;;
 esac
 
 # build 号必须由调用方显式提供（正整数）。本脚本不再自增、不再修改 tracked 工程文件；
@@ -219,7 +237,9 @@ xcodebuild -scheme App -configuration Release archive -archivePath "$ARCHIVE_PAT
   CURRENT_PROJECT_VERSION="$APPIDGE_BUILD_NUMBER" \
   LICENSE_API_BASE_URL="$LICENSE_API_BASE_URL" \
   LICENSE_CHECKOUT_URL="$LICENSE_CHECKOUT_URL" \
-  SPARKLE_FEED_URL="$SPARKLE_FEED_URL"
+  SPARKLE_FEED_URL="$SPARKLE_FEED_URL" \
+  SITE_BASE_URL="$SITE_BASE_URL" \
+  TRIAL_DURATION_DAYS="$TRIAL_DURATION_DAYS"
 
 assert_tracked_config_unchanged
 

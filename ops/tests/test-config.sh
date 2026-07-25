@@ -105,10 +105,41 @@ expect_fail "archive 脚本不再 sed -i 自增 CURRENT_PROJECT_VERSION" \
   grep -E 'sed -i.*CURRENT_PROJECT_VERSION' scripts/archive-and-notarize.sh
 expect_ok "archive 脚本要求 APPIDGE_BUILD_NUMBER" \
   grep -q 'APPIDGE_BUILD_NUMBER' scripts/archive-and-notarize.sh
-expect_ok "archive 脚本显式注入 SPARKLE_FEED_URL" \
-  grep -q 'SPARKLE_FEED_URL' scripts/archive-and-notarize.sh
 expect_ok "archive 脚本显式传 CURRENT_PROJECT_VERSION 给 xcodebuild" \
   grep -q 'CURRENT_PROJECT_VERSION=' scripts/archive-and-notarize.sh
+
+# 回归：仅「文件里出现过这个变量名」不足以证明它真被注入进 xcodebuild——
+# SITE_BASE_URL / TRIAL_DURATION_DAYS 曾被 ops 导出并断言，却从未传给 xcodebuild，
+# 导致 staging 包静默拿到 AppConfig.xcconfig 里的 production 默认值。断言注入本身。
+archive_xcodebuild_block() {
+  awk '/^xcodebuild -scheme App .*archive/ {inb=1} inb {print} inb && !/\\$/ {inb=0}' \
+    scripts/archive-and-notarize.sh
+}
+for k in LICENSE_API_BASE_URL LICENSE_CHECKOUT_URL SPARKLE_FEED_URL SITE_BASE_URL TRIAL_DURATION_DAYS; do
+  archive_xcodebuild_block | grep -q "^  *$k=" \
+    && t_pass "archive 脚本把 $k 传给 xcodebuild archive" \
+    || t_fail "archive 脚本把 $k 传给 xcodebuild archive"
+done
+
+# 回归：appcast build 号检查必须兼容 generate_appcast 实际产出的元素形式
+# <sparkle:version>N</sparkle:version>；只认属性形式会让发布链在自己刚生成的 feed 上误报
+# （882b02d 已为 feed_max_build 修过同一处，check_appcast_consistency / smoke 当时漏改）。
+expect_fail "appcast build 检查不再只认属性形式 sparkle:version=\"N\"" \
+  grep -nE 'grep -q "sparkle:version=\\\\"\$BUILD_NUMBER' ops/bin/appidge-ops
+expect_ok "appcast build 检查兼容元素形式 <sparkle:version>N</>" \
+  grep -q '<sparkle:version>\$2</sparkle:version>' ops/bin/appidge-ops
+
+# 回归：prepare-updates 必须可重复执行（CLAUDE.md §5.6）。上一次留下的 appidge-latest.dmg
+# 会让 generate_appcast 报 "Duplicate update archives" —— 生成前必须先清掉。
+expect_ok "prepare-updates 生成 appcast 前清理上一次的 appidge-latest.dmg" \
+  grep -q 'rm -f "\$RELEASE_DIR/appidge-latest.dmg"' ops/bin/appidge-ops
+
+# 回归：App 内购买入口默认值不得指向已撤的 /pricing 独立页（会 404）。
+expect_fail "archive 脚本默认 LICENSE_CHECKOUT_URL 不是会 404 的 /pricing" \
+  grep -E 'LICENSE_CHECKOUT_URL="\$\{LICENSE_CHECKOUT_URL:-https://appidge\.com/pricing\}"' \
+    scripts/archive-and-notarize.sh
+expect_fail "AppConfig.xcconfig 默认 LICENSE_CHECKOUT_URL 不是会 404 的 /pricing" \
+  grep -E '^LICENSE_CHECKOUT_URL *=.*/pricing$' Config/AppConfig.xcconfig
 expect_fail "verify-staging-update.sh 默认 feed 不再是 production updates 域" \
   grep -E 'FEED="?https://updates\.appidge\.com' scripts/verify-staging-update.sh
 
@@ -211,11 +242,11 @@ if [ -f "$SC" ]; then
       t_pass "staging checkout 是 Creem test 支付链接" ;;
     *) t_fail "staging checkout 是 Creem test 支付链接" ;;
   esac
-  case "$(conf_get "$SC" LICENSE_CHECKOUT_URL)" in
-    https://www.creem.io/test/*|https://creem.io/test/*)
-      t_pass "staging LICENSE_CHECKOUT_URL 是 Creem test 支付链接" ;;
-    *) t_fail "staging LICENSE_CHECKOUT_URL 是 Creem test 支付链接" ;;
-  esac
+  # App 内「购买」走官网锚点（保留 App→官网间接层：换支付链接不必重发 App）。
+  # 单页信息架构下 /pricing 已撤（aef5a5d），落地页是首页 #pricing 锚点。
+  [ "$(conf_get "$SC" LICENSE_CHECKOUT_URL)" = 'https://staging.appidge.com/#pricing' ] \
+    && t_pass "staging LICENSE_CHECKOUT_URL = staging.appidge.com/#pricing" \
+    || t_fail "staging LICENSE_CHECKOUT_URL = staging.appidge.com/#pricing"
 fi
 
 # production conf 专项：不得包含 staging/sandbox/localhost/.invalid/PLACEHOLDER

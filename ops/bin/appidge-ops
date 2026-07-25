@@ -294,6 +294,12 @@ feed_max_build() { # $1=feed url → 输出 feed 内最大 sparkle:version；查
     | grep -oE '[0-9]+' | sort -n | tail -1
 }
 
+appcast_has_build() { # $1=appcast 文本或文件内容，$2=build 号
+  # 同 feed_max_build：兼容属性 sparkle:version="66" 与元素 <sparkle:version>66</sparkle:version>。
+  # generate_appcast 实际产出的是元素形式，只认属性形式会让发布链在自己刚生成的 feed 上误报。
+  printf '%s' "$1" | grep -qE "sparkle:version=\"$2\"|<sparkle:version>$2</sparkle:version>"
+}
+
 cmd_build_macos() {
   print_header
   require_build_number
@@ -372,7 +378,7 @@ check_appcast_consistency() { # $1=目录（含 appcast.xml 与 dmg）
   if grep -q "://$other_host/" "$ac"; then
     ops_die "appcast 指向另一环境 host：${other_host}（拒绝）"
   fi
-  grep -q "sparkle:version=\"$BUILD_NUMBER\"" "$ac" || ops_die "appcast 缺 build $BUILD_NUMBER 条目"
+  appcast_has_build "$(cat "$ac")" "$BUILD_NUMBER" || ops_die "appcast 缺 build $BUILD_NUMBER 条目"
   grep -q 'sparkle:edSignature="' "$ac" || ops_die "appcast 缺 EdDSA 签名"
   dmg_in_dir=$(ls "$d"/appidge-*-"$BUILD_NUMBER".dmg 2>/dev/null | head -1 || true)
   [ -n "$dmg_in_dir" ] || ops_die "目录缺版本 DMG：$d"
@@ -391,6 +397,9 @@ cmd_prepare_updates() {
   cp "$RELEASE_DMG" "$RELEASE_DIR/"
   GEN=$(find_generate_appcast) || ops_die "找不到 Sparkle generate_appcast（DerivedData/SPM artifacts）——先在 Xcode 解析 Sparkle 包"
   ops_note "generate_appcast：$GEN"
+  # 可重复执行（CLAUDE.md §5.6）：上一次运行留下的 appidge-latest.dmg 与版本 DMG 内容相同，
+  # generate_appcast 会判定 "Duplicate update archives" 直接报错。生成前先清掉，生成后再重建。
+  rm -f "$RELEASE_DIR/appidge-latest.dmg"
   "$GEN" "$RELEASE_DIR" --download-url-prefix "https://$UPDATES_HOST/"
   cp "$RELEASE_DIR/appidge-$MARKETING_VERSION-$BUILD_NUMBER.dmg" "$RELEASE_DIR/appidge-latest.dmg"
   check_appcast_consistency "$RELEASE_DIR"
@@ -443,9 +452,14 @@ cmd_smoke() {
   ck "updates appcast" "https://$UPDATES_HOST/appcast.xml" "url=\"https://$UPDATES_HOST/"
   other_host=$([ "$OPS_ENV" = staging ] && echo "updates.appidge.com" || echo "updates-staging.appidge.com")
   ac=$(curl -fsS -m 30 "https://$UPDATES_HOST/appcast.xml" 2>/dev/null || true)
-  printf '%s' "$ac" | grep -q "://$other_host/" && fail_add "appcast 交叉指向 $other_host" || ok "feed 不交叉"
+  # 取不到 feed 时不得报 ✅：空 body 天然「不含另一环境 host」，会把抓取失败伪装成交叉检查通过。
+  if [ -z "$ac" ]; then
+    fail_add "appcast 抓取失败，环境交叉检查未执行（${UPDATES_HOST}）"
+  else
+    printf '%s' "$ac" | grep -q "://$other_host/" && fail_add "appcast 交叉指向 $other_host" || ok "feed 不交叉"
+  fi
   if [ -n "$BUILD_NUMBER" ]; then
-    printf '%s' "$ac" | grep -q "sparkle:version=\"$BUILD_NUMBER\"" \
+    appcast_has_build "$ac" "$BUILD_NUMBER" \
       && ok "appcast 含 build $BUILD_NUMBER" || fail_add "appcast 缺 build $BUILD_NUMBER"
   fi
   curl -fsSI -m 60 "https://$UPDATES_HOST/appidge-latest.dmg" >/dev/null 2>&1 \

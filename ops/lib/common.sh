@@ -137,15 +137,18 @@ validate_config_urls() { # 依赖 load_environment 已执行
           [ "$h" = "updates.appidge.com" ] || fail_add "production $k host 应为 updates.appidge.com（环境交叉）：$h"
         fi ;;
       LICENSE_CHECKOUT_URL)
+        # App 内「购买」指向本环境官网的定价锚点，绝不直连支付商：
+        # 保留 App→官网间接层，换 checkout 链接无需重发 macOS App。
+        # 单页信息架构下 /pricing 独立页已撤（aef5a5d），落地页是首页 #pricing 锚点。
         if [ "$_env" = staging ]; then
-          # staging 的 App 内「购买」直达 Creem test 支付链接
-          case "$v" in
-            https://www.creem.io/test/*|https://creem.io/test/*) ;;
-            *) fail_add "staging $k 应是 Creem test 支付链接（https://www.creem.io/test/...）：$v" ;;
-          esac
+          [ "$h" = "staging.appidge.com" ] || fail_add "staging $k host 应为 staging.appidge.com（环境交叉）：$v"
         else
-          [ "$h" = "appidge.com" ] || fail_add "production $k 应指向 appidge.com/pricing：$v"
-        fi ;;
+          [ "$h" = "appidge.com" ] || fail_add "production $k host 应为 appidge.com：$v"
+        fi
+        case "$v" in
+          *'/#pricing') ;;
+          *) fail_add "$_env $k 应落到官网定价锚点 /#pricing（/pricing 独立页已撤，会 404）：$v" ;;
+        esac ;;
       PUBLIC_POLAR_CHECKOUT_URL)
         if [ "$_env" = staging ]; then
           case "$v" in

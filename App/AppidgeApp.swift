@@ -158,6 +158,9 @@ struct AppidgeApp: App {
                 }
             }
             .task {
+                // 性能埋点（临时诊断版）：装钩子 + 起主线程响应性采样。
+                // 输出 ~/Library/Application Support/appidge/perf.jsonl，见 PerfDiag。
+                PerfDiag.install()
                 // 退出强制存盘钩子:捕获 store,同步落地最新配置(见 AppTermination / applicationWillTerminate)。
                 AppTermination.persist = { [store] in
                     FilePersistenceStore().saveSynchronously(PersistedConfiguration(from: store.state))
@@ -494,7 +497,10 @@ struct AppidgeApp: App {
     @MainActor
     private func persistCurrentConfiguration() {
         // 配置 JSON **同步立即**落盘——改动一发生就在磁盘上,crash / 强杀不丢(退出钩子同一条路径)。
-        FilePersistenceStore().saveSynchronously(PersistedConfiguration(from: store.state))
+        // 埋点确认这个「代价可忽略」是否成立：directoryScanned 会一次带来几百条目录项，那次不小。
+        PerfDiag.measure(.persistConfiguration) {
+            FilePersistenceStore().saveSynchronously(PersistedConfiguration(from: store.state))
+        }
         // 密码进 Keychain:只有代理增改才变化,异步保存不拖住 JSON 的即时落地。
         let servers = Array(store.state.proxyServers.values)
         let credentialStore = credentialStore

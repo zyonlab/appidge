@@ -40,15 +40,40 @@ struct PendingRebootActivationTests {
         #expect(state.staleBindingHealDecision(memo: .initial) == .reactivateExtension)
     }
 
-    @Test("非待重启态的版本不匹配，仍走原来的有界强制重启")
-    func normalMismatchStillForcesRestart() {
+    /// 回归（真机 75→77 实测）：升级后 activation 报的是 `.completed`（UI 显示「已接管」，
+    /// **不是**待重启态），但系统跑的仍是旧 provider —— 运行 75 / 已安装 77 长期卡住。
+    ///
+    /// 上一版把「重新提交 activation」这个**唯一能换版本的手段**绑在了 `isPendingReboot` 这个
+    /// *症状*上，于是这条路径落到 `.scheduleForcedRestart`，只重启隧道 —— 而隧道重启用的是
+    /// 版本无关的 `providerBundleIdentifier`，**改不了系统注册哪个版本**，自愈跑了也白跑。
+    ///
+    /// 判据必须是**版本不匹配本身**：它就是「系统在跑旧 provider」的事实真相，
+    /// 与 activation 报了什么无关。
+    @Test("回归·activation 报完成但版本仍不匹配 → 也必须重新提交 activation，而不是只重启隧道")
+    func mismatchReactivatesEvenWhenActivationReportedCompleted() {
+        var state = AppState()
+        state.hasCompletedOnboarding = true
+        state.licensePhase = .licensed
+        state.extensionActivation = .active      // 不是 .activePendingReboot
+        state.runningExtensionVersion = "75"
+        state.bundledExtensionVersion = "77"
+        #expect(state.staleBindingHealDecision(memo: .initial) == .reactivateExtension)
+    }
+
+    @Test("重新提交 activation 后仍不匹配 → 退回有界强制重启作第二手，仍各一次为限")
+    func fallsBackToForcedRestartAfterReactivate() {
         var state = AppState()
         state.hasCompletedOnboarding = true
         state.licensePhase = .licensed
         state.extensionActivation = .active
-        state.runningExtensionVersion = "69"
-        state.bundledExtensionVersion = "70"
-        #expect(state.staleBindingHealDecision(memo: .initial) == .scheduleForcedRestart)
+        state.runningExtensionVersion = "75"
+        state.bundledExtensionVersion = "77"
+
+        var memo = StaleBindingHealMemo.initial
+        memo.recordDecision(state.staleBindingHealDecision(memo: memo))   // reactivate
+        #expect(state.staleBindingHealDecision(memo: memo) == .scheduleForcedRestart)
+        memo.recordDecision(state.staleBindingHealDecision(memo: memo))   // forced restart
+        #expect(state.staleBindingHealDecision(memo: memo) == .none)      // 之后交给手动「重启接管」
     }
 
     @Test("待重启态下会话监督不误判：接管在跑就不重复起会话")

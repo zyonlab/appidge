@@ -31,17 +31,22 @@ struct StaleBindingHealTests {
         #expect(state.staleBindingHealDecision(memo: .initial) == .none)
     }
 
-    @Test("运行 != 包内 → 安排一次有界强制重启（逼 NE 换到最新 provider）")
-    func mismatchSchedulesForcedRestart() {
+    /// 首选是**重新提交 activation**——那是唯一能让系统换到新 provider 的手段；重启隧道用的是
+    /// 版本无关的 providerBundleIdentifier，改不了版本（真机 75→77 实测坐实，见
+    /// PendingRebootActivationTests）。强制重启退居第二手。
+    @Test("运行 != 包内 → 先重新提交 activation（唯一能换版本的手段）")
+    func mismatchReactivatesFirst() {
         let state = activeState(running: "63", bundled: "66")
-        #expect(state.staleBindingHealDecision(memo: .initial) == .scheduleForcedRestart)
+        #expect(state.staleBindingHealDecision(memo: .initial) == .reactivateExtension)
     }
 
-    @Test("强制重启只做一次——防旧 bug 无限环，仍留手动「重启接管」兜底")
-    func forcedRestartOnlyOnce() {
+    @Test("两手各一次为限——防旧 bug 无限环，用尽后留手动「重启接管」兜底")
+    func eachRemedyOnlyOnce() {
         let state = activeState(running: "63", bundled: "66")
         var memo = StaleBindingHealMemo.initial
-        memo.recordDecision(state.staleBindingHealDecision(memo: memo))
+        memo.recordDecision(state.staleBindingHealDecision(memo: memo))   // reactivate
+        #expect(state.staleBindingHealDecision(memo: memo) == .scheduleForcedRestart)
+        memo.recordDecision(state.staleBindingHealDecision(memo: memo))   // forced restart
         #expect(state.staleBindingHealDecision(memo: memo) == .none)
     }
 
@@ -77,7 +82,7 @@ struct StaleBindingHealTests {
         // 模拟：扩展在 onAction 接线前就报了版本，state 已写入 running=63，
         // 但当时没有任何观察者触发自愈。App 层稍后补评估一次 —— 必须仍然判出要自愈。
         let state = activeState(running: "63", bundled: "66")
-        #expect(state.staleBindingHealDecision(memo: .initial) == .scheduleForcedRestart)
+        #expect(state.staleBindingHealDecision(memo: .initial) == .reactivateExtension)
     }
 
     @Test("回归·相位晚落定：相位还没落定时不动作，落定为试用后重新评估即自愈")
@@ -89,7 +94,7 @@ struct StaleBindingHealTests {
 
         // 相位落定为试用后重新评估 —— 必须能自愈，而不是永久错过。
         let settled = activeState(running: "63", bundled: "66")
-        #expect(settled.staleBindingHealDecision(memo: .initial) == .scheduleForcedRestart)
+        #expect(settled.staleBindingHealDecision(memo: .initial) == .reactivateExtension)
     }
 
     @Test("未完成引导时不动作——还没有会话可绑")
@@ -114,6 +119,6 @@ struct StaleBindingHealTests {
         memo.recordDecision(pending.staleBindingHealDecision(memo: memo))
 
         let settled = activeState(running: "63", bundled: "66")
-        #expect(settled.staleBindingHealDecision(memo: memo) == .scheduleForcedRestart)
+        #expect(settled.staleBindingHealDecision(memo: memo) == .reactivateExtension)
     }
 }

@@ -80,10 +80,15 @@ extension AppState {
         guard runningExtensionVersion != nil, bundledExtensionVersion != nil else { return .none }
 
         if extensionNeedsRebind {
-            // 系统已明说新版本要重启电脑才生效：重启隧道改不了扩展版本，只能重新提交 activation。
-            if extensionActivation.isPendingReboot {
-                return memo.reactivateAttempted ? .none : .reactivateExtension
-            }
+            // **判据是版本不匹配本身，不是 activation 报了什么**。
+            // 曾经把「重新提交 activation」绑在 `isPendingReboot` 上，结果真机 75→77 升级时
+            // activation 报的是 `.completed`（UI 显示「已接管」），系统却仍在跑旧 provider ——
+            // 于是落到只重启隧道那条，而隧道重启用的是版本无关的 providerBundleIdentifier，
+            // **改不了系统注册哪个版本**，自愈跑了也白跑。
+            //
+            // 不匹配就是「系统在跑旧 provider」的事实真相：先重新提交 activation（唯一能换版本的
+            // 手段），不行再退回有界强制重启作第二手，各一次为限，之后留手动「重启接管」兜底。
+            if !memo.reactivateAttempted { return .reactivateExtension }
             return memo.forcedRestartAttempted ? .none : .scheduleForcedRestart
         }
         // 版本已一致：只有「曾经见过不匹配」才需要补一次重绑；正常启动不该无谓重启接管。

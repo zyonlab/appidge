@@ -2,7 +2,7 @@
 
 你是本仓库的 lead engineer。收到一个简短目标后，负责调查、拆分、并行委派、集成、验证和交付；不要只给方案。显式用户指令优先于本文件，缺少真实凭证或必须由人完成的系统操作时，推进到可验证的最远边界，再准确报告人工闸门，禁止伪造成功。
 
-本阶段目标是：**保持现有 macOS 透明代理稳定的前提下，将仓库渐进扩展成 polyglot monorepo，并完成官网、Polar 商业授权、退款事件闭环和 Sparkle 静态更新链路。**
+本阶段目标是：**保持现有 macOS 透明代理稳定的前提下，将仓库渐进扩展成 polyglot monorepo，并完成官网、Creem 商业授权、退款事件闭环和 Sparkle 静态更新链路。**
 
 ---
 
@@ -12,7 +12,7 @@
 - `Packages/` 包含 Core、IPCContract、EngineKit、AppFeature、ArchitectureTests；依赖方向、Swift 6 并发隔离、单向数据流和 fail-open 行为必须保持。
 - Network Extension、Developer ID 签名、公证、DMG 产物和系统扩展升级重绑已有真实实现。任何商业化改动都不能导致网络转发、loop 排除、活动进程、规则即时生效或系统扩展升级回归。
 - 产品核心语义：全接管进程网络；按用户规则判断目的地；自动处理代理软件 loop；配置过代理时默认走代理；活动页显示当前接管进程；用户点击进程可立即修改访问规则；规则按时间倒排，较新的相同规则覆盖旧规则。
-- `docs/polar-integration.md` 是当前 Polar 集成基线，但所有时效性 API 行为在实现前仍要以 Polar 官方文档和 sandbox 实测为准。
+- `docs/creem-integration.md` 是当前 Creem 集成基线（含 2026-07 test 模式全链路实测结论）；`docs/polar-integration.md` 已废弃，只作历史参考。所有时效性 API 行为在实现前仍要以 docs.creem.io 官方文档和 test 模式实测为准。
 - Sparkle 集成目前在 `feat/sparkle-autoupdate` 分支；该分支落后主线。只移植 Sparkle 专属改动或先 rebase 后解决冲突，**禁止整目录覆盖、禁止盲目合并旧分支**。
 - 当前分支已移除过时的架构期 `AGENTS.md`、`CRITERIA.md`、`PROGRESS.md`。不要重新创建它们，也不要把它们作为开工依赖。
 - 保留大写 `Packages/`。不要创建小写 `packages/`，默认 macOS 大小写不敏感文件系统会产生冲突。
@@ -21,8 +21,8 @@
 
 - 不把现有 macOS 工程搬到 `apps/macos`；这会无谓破坏 Xcode 相对路径、签名、公证和系统扩展 embed。
 - 不使用 Bazel、Nx 或 Lerna；当前规模采用 pnpm workspace + Turborepo 即可。
-- 不把 Polar access token、Webhook secret、Cloudflare token、Apple/Sparkle 私钥放进客户端、源码、日志或 git。
-- 不在 v1 暴露公开自动退款接口，不让客户端直接调用 Polar 的密钥型 API。
+- 不把 Creem API key、Webhook secret、Cloudflare token、Apple/Sparkle 私钥放进客户端、源码、日志或 git。
+- 不在 v1 暴露公开自动退款接口，不让客户端直接调用 Creem 的密钥型 API。
 - 不用 Worker 中转 DMG 大文件下载；更新包走 Pages 或 R2 自定义域名。
 - 不借商业化改造重写已工作的路由/转发架构，不做无关重构或依赖升级。
 
@@ -31,7 +31,7 @@
 ## 2. 每次 session 开工顺序
 
 1. 运行 `git status --short`、`git branch --show-current`、`git log -10 --oneline`；保护用户未提交改动，不 reset、不覆盖。
-2. 读取本文件、`docs/polar-integration.md`、相关源码和现有 CI/发布脚本。不要凭记忆假设当前实现。
+2. 读取本文件、`docs/creem-integration.md`、相关源码和现有 CI/发布脚本。不要凭记忆假设当前实现。
 3. 只让需要某类秘密的 Agent 获得最小权限：
    - Web/API 纯开发不得读取 Apple 签名 `.env`。
    - macOS 构建需要 `.env` 时，只校验变量存在，不打印值，并运行 `./scripts/gen-signing-xcconfig.sh`。
@@ -40,7 +40,7 @@
    - Swift 改动前至少跑相关 package tests；涉及 App/Extension/Xcode 工程时跑完整 Swift tests 和 Debug build。
    - Web workspace 建立后跑 `pnpm install --frozen-lockfile` 与现有 `pnpm check`。
 5. 为本轮任务写一个短执行图，明确依赖、可并行项、Agent 文件所有权和验收命令；能推进就直接推进，不因非关键偏好停下来问。
-6. 只有真实外部状态会被改变时才需要当前任务授权：生产部署、Polar 真实退款、提交真实订单、push/PR、密钥轮换。未授权时做到本地验证或 dry-run。
+6. 只有真实外部状态会被改变时才需要当前任务授权：生产部署、Creem 真实退款、提交真实订单、push/PR、密钥轮换。未授权时做到本地验证或 dry-run。
 
 所有详细日志写入临时文件，聊天和 Agent 汇报只保留结论、失败原因及最后几十行。严禁把 `.env`、profile 内容或 token 输出进日志。
 
@@ -90,18 +90,18 @@ appidge/
 ```text
 staging.appidge.com          appidge-web-staging      官网（Workers 静态资源）
 appidge.com / www             appidge-web-production   官网（Workers 静态资源）
-api-staging.appidge.com      appidge-api-staging      license facade + Polar sandbox webhook
-api.appidge.com              appidge-api-production   license facade + Polar live webhook
+api-staging.appidge.com      appidge-api-staging      license facade + Creem test webhook
+api.appidge.com              appidge-api-production   license facade + Creem live webhook
 updates-staging.appidge.com  appidge-updates-staging  DMG/appcast（Workers 静态资源；>25MiB 才迁 R2）
 updates.appidge.com          appidge-updates-production 同上，专属 production
 D1 ×2                        appidge-licensing-staging / appidge-licensing-production
-Polar Hosted Checkout        staging=sandbox，production=live；网站和 macOS App 直接打开
+Creem 支付链接                staging=test 链接，production=live 链接；网站和 macOS App 直接打开
 ```
 
 环境矩阵单一真相源：`ops/environments/*.conf`；部署/发布统一入口：`ops/bin/appidge-ops`
 （preflight fail-closed + production 三重保护），runbook 见 `ops/README.md`。
 
-Cloudflare 免费层是 MVP 目标，不是可靠性假设。App 必须缓存最近一次有效授权并提供可测试的离线宽限，不能因为 Worker/Polar 临时不可用而立即锁死付费用户。
+Cloudflare 免费层是 MVP 目标，不是可靠性假设。App 必须缓存最近一次有效授权并提供可测试的离线宽限，不能因为 Worker/Creem 临时不可用而立即锁死付费用户。
 
 ---
 
@@ -114,7 +114,7 @@ Cloudflare 免费层是 MVP 目标，不是可靠性假设。App 必须缓存最
 - 优先为每个 Agent 创建独立 git worktree + 本地分支，例如 `feat/mono-workspace`、`feat/commerce-api`、`feat/website`、`feat/sparkle-release`、`feat/macos-license`。
 - 若环境不能使用 worktree，则严格执行下面的独占目录；两个 Agent 不得同时编辑同一文件。
 - 只有主 Agent 可以修改本 `CLAUDE.md`、更新总状态、合并/rebase 其他 Agent 的提交。
-- 子 Agent 不得自行 merge main、push、开 PR、部署或操作真实 Polar 交易。
+- 子 Agent 不得自行 merge main、push、开 PR、部署或操作真实 Creem 交易。
 - 每个 Agent 完成时必须提交：commit hash、改动文件、测试命令与结果、未决风险；没有测试证据不算完成。
 - Agent 遇到契约歧义先给主 Agent发一条最小问题，不得各自发明不兼容协议。
 
@@ -139,15 +139,15 @@ Cloudflare 免费层是 MVP 目标，不是可靠性假设。App 必须缓存最
 - 独占：`apps/web/`。
 - 建 Astro 静态站：首页、功能、下载、定价、FAQ、退款政策、隐私、条款。
 - 产品表达必须与第 1 节核心语义一致，不虚构测速、安全或兼容性声明。
-- “购买”使用可配置的 Polar Hosted Checkout Link；“下载”指向 `updates.appidge.com`。
+- “购买”使用可配置的 Creem 支付链接；“下载”指向 `updates.appidge.com`。
 - 默认无 cookie、无追踪、无 SSR；移动端、键盘导航、语义 HTML、对比度和 SEO 元数据必须达标。
 - 法律文本明确标记需要用户最终审核，不冒充法律意见。
 
-**Agent C · Worker/Polar**
+**Agent C · Worker/Creem**
 
 - 独占：`apps/api/`、`contracts/`、`infra/cloudflare/`。
 - 实现 license facade、Webhook 验签、D1 migration、测试 fixtures、Wrangler dev/dry-run。
-- 只调用 Polar sandbox API；没有 test secret 时用协议化 mock 跑完自动测试，并留下一个可执行、不会泄密的 sandbox smoke 脚本。
+- 只调用 Creem test API（`https://test-api.creem.io`，与生产完全隔离、key 独立）；没有 test secret 时用协议化 mock 跑完自动测试，并留下一个可执行、不会泄密的 sandbox smoke 脚本。
 - 不部署生产，不执行真实退款。
 
 **Agent D · Sparkle/Release**（若并发槽足够，否则在 A 完成后启动）
@@ -171,7 +171,7 @@ Cloudflare 免费层是 MVP 目标，不是可靠性假设。App 必须缓存最
 **Agent F · Integration/QA**
 
 - 独占：跨端 contract tests、smoke scripts、`docs/commercialization-status.md` 的证据草稿；不直接重写业务实现。
-- 验证 Polar sandbox、退款 Webhook、离线宽限、旧版本 Sparkle 升级、网站链接和 Cloudflare dry-run。
+- 验证 Creem test 模式、退款 Webhook、离线宽限、旧版本 Sparkle 升级、网站链接和 Cloudflare dry-run。
 - 发现缺陷先写最小复现测试，再交回对应 owner 修复。
 
 Wave 2 中 E 与 F 可并行，但 F 不得编辑 E 正在修改的 Swift 文件。
@@ -216,7 +216,8 @@ pnpm check:swift    # 只包装可重复的 Swift package tests，不缓存签�
 
 - 首页首屏应在一句话内说明“按进程控制网络去向”，随后解释全接管、目标地规则、loop 自动排除、活动进程即时改规则、最新规则覆盖。
 - CTA 分为“下载试用/下载 App”和“购买许可证”，不要把购买与下载混成一个不可逆操作。
-- Polar checkout URL、API base URL、下载 URL 使用构建期公开配置并校验，缺失时 build 失败，不偷偷使用错误生产地址。
+- Creem 支付链接、API base URL、下载 URL 使用构建期公开配置并校验，缺失时 build 失败，不偷偷使用错误生产地址。
+- ⚠️ 官网侧支付链接的环境变量名仍叫 `PUBLIC_POLAR_CHECKOUT_URL`（Polar 时期遗留），**值是 Creem 支付链接**。这是已登记的技术债（`docs/creem-integration.md §8`），改名牵动 `apps/web` 构建与 `check-site`——不要顺手改名，要改就整条链路一起改。
 - 站点所有内部链接和公开资源在 CI 做链接检查；生成 sitemap、robots、Open Graph 和基础 structured data。
 - 当前 DMG 较小，但产物域名仍固定为 `updates.appidge.com`，避免未来超过 Pages 单文件限制时修改客户端。
 
@@ -229,29 +230,29 @@ GET  /healthz
 POST /v1/licenses/activate
 POST /v1/licenses/validate
 POST /v1/licenses/deactivate
-POST /v1/webhooks/polar
+POST /v1/webhooks/creem
 ```
 
 要求：
 
 - `activate` 接收 `licenseKey`、`instanceName`、`appVersion`；标准化返回状态、`instanceId`、过期时间、激活数量/上限和 `validatedAt`。
-- `validate` 接收 `licenseKey`、`instanceId`、`appVersion`；先查本地 revoked 状态，再调用 Polar。
+- `validate` 接收 `licenseKey`、`instanceId`、`appVersion`；先查本地 revoked 状态，再调用 Creem。
 - `deactivate` 接收 `licenseKey`、`instanceId`；成功后返回统一状态。
-- 错误体稳定且不透传 Polar 内部响应：`invalid_request`、`invalid_license`、`activation_limit`、`expired`、`revoked`、`rate_limited`、`upstream_unavailable`、`internal_error`。
-- 请求体大小、Content-Type、字段长度、product ID 都有白名单验证。此 Worker 不是通用 Polar 代理。
+- 错误体稳定且不透传 Creem 内部响应：`invalid_request`、`invalid_license`、`activation_limit`、`expired`、`revoked`、`rate_limited`、`upstream_unavailable`、`internal_error`。
+- 请求体大小、Content-Type、字段长度、product ID 都有白名单验证。此 Worker 不是通用 Creem 代理。
 - API secret 只从 Worker secret binding 获取；任何响应、异常和日志都不能含 API key 或完整 license key。
 - CORS 只是一项浏览器策略，不是桌面客户端鉴权；必须另做请求限速、输入约束和滥用保护。
 
 ### 5.4 Webhook、D1 与退款
 
-- 按 **Standard Webhooks** 验签：signedContent = `{webhook-id}.{webhook-timestamp}.{原始请求字节}`，base64(HMAC-SHA256(secret, signedContent)) 与 `webhook-signature` 的 `v1,<sig>` 做恒定时间比较，并校验时间戳漂移防重放；验签成功后才解析 JSON。
-- 官方 payload 字段必须用 Polar sandbox 捕获的脱敏 fixture 证明，禁止猜测事件类型、order、license_key_id 字段名。
-- `webhook_events` 以真实事件 ID 唯一约束，重复投递返回成功但不重复执行副作用。
-- `entitlements` 以 Polar license_key_id 为主键，保存 order/customer/benefit 标识、license HMAC fingerprint、状态和时间戳；默认不保存完整 license key、原始支付 payload 或不必要的 PII。
-- 处理 `checkout.completed`、`refund.created`、`dispute.created`，订阅产品启用时再处理 subscription 生命周期。
-- v1 退款操作由用户在 Polar Dashboard 发起；官网只提供退款政策和联系入口。
-- 收到退款/拒付后本地 entitlement 标记 revoked。Polar 在退款/拒付/订阅取消时自动撤销 benefit grant 并触发 benefit_grant.revoked（携带 license_key_id，可 per-license 精确吊销），仍需 sandbox 实测坐实；无论上游行为如何，本地 deny 状态都要使后续 validate 返回 revoked。
-- 如果 webhook 无法直接映射 license，先通过官方服务端 API按 order/checkout 查询；仍无法可靠映射就报告阻塞，不要凭邮箱或模糊字段吊销。
+- 验签是 **Creem 自己的方案，不是 Standard Webhooks**（Polar 时期的写法已废弃，别混）：头 `creem-signature` = `hex(HMAC-SHA256(secret, 原始请求字节))`，恒定时间比较；验签成功后才解析 JSON。secret 按 Dashboard **字面值**使用——`whsec_` 前缀不剥离、不 base64 解码。
+- **没有 `webhook-id` / `webhook-timestamp` 头**，签名不含时间戳，无漂移窗口可校验；防重放只能靠 payload 顶层事件 ID（`id: "evt_..."`）在 `webhook_events` 的唯一约束幂等登记，重复投递返回成功但不重复执行副作用。
+- 事件信封为 `{ id, eventType, created_at, object }`，业务字段在 `object` 下。payload 字段必须用 Creem test 模式捕获的脱敏 fixture 证明（`contracts/fixtures/creem/*.json` 已是 2026-07-21 真实捕获），禁止按文档猜字段名。
+- `entitlements` 主键列名仍是 `license_key_id`（Polar 时期留下的历史名，未改名），值是 Creem LicenseEntity 的 `id`；`benefit_id` 列同为历史残留。保存 order/customer/product 标识、license HMAC fingerprint、状态和时间戳；默认不保存完整 license key、原始支付 payload 或不必要的 PII。
+- 处理 `checkout.completed`（审计，**不含 license key**，不建 entitlement）、`refund.created` / `dispute.created`（order tombstone + 按 order 尽力吊销）；其余事件登记后安全忽略。product 白名单：`CREEM_PRODUCT_ID` 不匹配的事件登记后忽略。
+- **吊销主路是 validate，不是 webhook**（2026-07-21/22 实测）：三种事件都不带 license key，且 license API 有 license 无 order，**无公共 join key**，无法用 webhook 精确吊销某个 license。且**退款不会自动 disable license**（真实退款后 validate 仍返回 active）。
+- ⇒ 运营流程：退款/拒付时在 Creem Dashboard 处理退款的**同时手动 disable 该 license**，App 每日 validate 即锁定（disabled → facade `revoked`）。webhook 落库仅作审计/对账。这条人工步骤是硬依赖，漏做等于退款后用户仍可用。
+- 本地 deny 优先于上游 active（`entitlements.status=revoked` → validate 直接返回 revoked）；运营可直接在 D1 写 revoked 作最后杠杆。不要凭邮箱或模糊字段吊销。
 
 D1 至少有迁移和索引测试，包含：重复 webhook、乱序事件、退款先于本地 checkout 记录、未知 product、处理失败后的安全重试。
 
@@ -268,12 +269,12 @@ licensed → deactivating → unlicensed
 ```
 
 - license key、instance ID、上次成功校验时间进入 Keychain，不存明文 plist/UserDefaults。
-- API base URL 由受控构建配置提供；生产客户端只调用 `api.appidge.com`，绝不直连带 `Bearer token` 的 Polar API。
+- API base URL 由受控构建配置提供；生产客户端只调用 `api.appidge.com`，绝不直连带 `x-api-key` 的 Creem API。
 - 激活实例名使用隐私友好且稳定的安装标识；不要默认把用户邮箱、真实主机名或硬件序列号发给服务端。
 - 默认每日校验；网络/5xx 采用退避重试。离线宽限配置集中管理，默认 7 天并有边界测试。
-- Worker/Polar 暂时不可用进入 grace，而不是立即 revoke；明确的 revoked/expired 才锁定付费能力。
+- Worker/Creem 暂时不可用进入 grace，而不是立即 revoke；明确的 revoked/expired 才锁定付费能力。
 - Keychain、时钟、API client 都是协议并可注入 mock；Core reducer 保持纯函数，Store 保持 `@MainActor`。
-- “购买许可证”只打开 Hosted Checkout Link；用户从 Polar 邮件/门户复制 license key 回 App 激活。v1 不做浏览器回跳自动灌 key。
+- “购买许可证”只打开支付链接（或官网定价页）；用户从确认邮件/客户门户复制 license key 回 App 激活。UI 文案不写死支付商名字（换 MoR 时不必改 UI 与译文）。v1 不做浏览器回跳自动灌 key。
 - License UI 改动不能阻塞用户查看诊断/帮助，也不能因授权服务故障造成系统网络黑洞。
 
 ### 5.6 Sparkle 与发布
@@ -311,7 +312,7 @@ archive-and-notarize.sh
 
 - 有效/无效 Webhook 签名、原始 body 改一字节即失败。
 - webhook 重放幂等、乱序安全、未知事件安全忽略。
-- activate/validate/deactivate 正常和 Polar 4xx/5xx/timeout 映射。
+- activate/validate/deactivate 正常和 Creem 4xx/5xx/timeout 映射；未知/缺失 status 一律按 transient 进宽限，绝不误翻 revoked。
 - refund/dispute 后本地 revoked 优先于上游 active。
 - 日志脱敏，完整 license/API key 不出现。
 - body 超限、错误 Content-Type、未知 product、畸形 JSON、限速路径。
@@ -353,7 +354,7 @@ archive-and-notarize.sh
 - [ ] CI 能按改动范围运行，main 集成闸门覆盖 Swift、Web、Worker。
 - [ ] Astro 官网包含下载、购买、退款、隐私、条款页面并在 Cloudflare preview 验证。
 - [ ] Hosted Checkout test flow 能完成购买并获得 license key。
-- [ ] Worker license facade 不泄露 Polar access token，契约测试和错误映射全绿。
+- [ ] Worker license facade 不泄露 Creem API key，契约测试和错误映射全绿。
 - [ ] Webhook HMAC、D1 幂等、refund/dispute revoke 有自动测试与 sandbox 证据。
 - [ ] macOS App 用 Keychain 保存授权信息，activate/validate/deactivate 与 7 天 grace 全绿。
 - [ ] Sparkle 公钥、feed、签名更新包和 R2 路径真实可验证，不含 TODO 私钥配置。
@@ -362,4 +363,4 @@ archive-and-notarize.sh
 - [ ] `pnpm check` 全绿，Worker dry-run/preview 成功，仓库 secret 扫描无泄漏。
 - [ ] `docs/commercialization-status.md` 给出部署、回滚、密钥轮换、退款操作和剩余人工闸门。
 
-若缺少 Polar/Cloudflare/Apple/Sparkle 真实凭证，代码和自动测试完成不等于上线完成；在状态文档中保持对应项未勾选，并给用户一条最短、可执行的解锁步骤。
+若缺少 Creem/Cloudflare/Apple/Sparkle 真实凭证，代码和自动测试完成不等于上线完成；在状态文档中保持对应项未勾选，并给用户一条最短、可执行的解锁步骤。

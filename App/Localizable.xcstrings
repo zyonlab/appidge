@@ -3202,16 +3202,6 @@
         }
       }
     },
-    "license key 无效：请核对是否从 Polar 邮件完整复制。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Invalid license key: check that you copied it in full from the Polar email."
-          }
-        }
-      }
-    },
     "暂时无法连接授权服务，请检查网络后重试。": {
       "localizations": {
         "en": {
@@ -3228,16 +3218,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "“Deactivate This Mac” frees an activation slot so you can activate on a new machine after switching. License info is stored in the system Keychain."
-          }
-        }
-      }
-    },
-    "购买后从 Polar 的确认邮件或客户门户复制 license key，粘贴到上方激活。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "After purchase, copy the license key from Polar's confirmation email or customer portal and paste it above to activate."
           }
         }
       }
@@ -3338,6 +3318,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Already purchased? Enter your license key here."
+          }
+        }
+      }
+    },
+    "购买后从确认邮件或客户门户复制 license key，粘贴到上方激活。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "After purchase, copy the license key from the confirmation email or customer portal and paste it above to activate."
+          }
+        }
+      }
+    },
+    "license key 无效：请核对是否从确认邮件完整复制。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invalid license key: check that you copied it in full from the confirmation email."
           }
         }
       }

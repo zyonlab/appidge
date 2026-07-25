@@ -29,7 +29,7 @@ public enum LicenseBuildConfig {
         return value.hasSuffix("/") ? String(value.dropLast()) : value
     }
 
-    /// 稳定购买入口（官网定价页或 Polar Hosted Checkout）。为空表示未配置——UI 隐藏入口。
+    /// 稳定购买入口（官网定价页或支付商托管结账页）。为空表示未配置——UI 隐藏入口。
     public static var checkoutURL: String {
         (Bundle.main.object(forInfoDictionaryKey: "LicenseCheckoutURL") as? String) ?? ""
     }
@@ -64,7 +64,7 @@ public struct SystemClock: LicenseClock {
     public var now: Date { Date() }
 }
 
-/// license facade 的 URLSession 客户端。**只**打自有 facade，绝不直连带 `Bearer token` 的 Polar。
+/// license facade 的 URLSession 客户端。**只**打自有 facade，绝不直连带 `Bearer token` 的支付商 API。
 /// HTTP 状态/错误体统一翻成 ``LicenseAPIError``：2xx 解码成功；有 facade 错误体 → `.facade`；
 /// 5xx 无体 → `.server`；网络/超时 → `.transport`；解析不了 → `.decoding`。
 public struct URLSessionLicenseAPIClient: LicenseAPIClient {

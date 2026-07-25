@@ -39,8 +39,8 @@ public enum Effect: Sendable, Equatable {
     case clearPersistedLicense(fallback: LicenseInfo?)
     /// 启动时从 Keychain 读回授权记录，结果经 `.licenseRestored` 回灌。
     case loadPersistedLicense
-    /// 打开官网定价页或 Polar Hosted Checkout（"购买许可证"）。URL 由 App 层构建期配置提供。
-    /// v1 不做浏览器回跳自动灌 key——用户从 Polar 邮件复制 key 回 App 激活。
+    /// 打开官网定价页或支付商托管结账页（"购买许可证"）。URL 由 App 层构建期配置提供。
+    /// v1 不做浏览器回跳自动灌 key——用户从确认邮件复制 key 回 App 激活。
     case openCheckout(url: String)
 
     // MARK: - 试用（Trial）副作用

@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - 稳定化状态（与 contracts/licensing.openapi.yaml 的 LicenseStatus 对齐）
 
-/// 服务端稳定化后的授权状态（不透传 Polar 原始枚举）。对齐 facade 契约的 `LicenseStatus`。
+/// 服务端稳定化后的授权状态（不透传支付商原始枚举）。对齐 facade 契约的 `LicenseStatus`。
 public enum LicenseStatus: String, Sendable, Equatable, Codable {
     case active
     case expired
@@ -13,7 +13,7 @@ public enum LicenseStatus: String, Sendable, Equatable, Codable {
 
 /// macOS 客户端授权状态机的相位（见 CLAUDE.md §5.5）。
 /// 授权能力仅在 ``AppState/isLicenseActive`` 为真时开放；只有 **明确的** `revoked`/`expired`
-/// 才锁定付费能力——Worker/Polar 暂时不可用一律进 `gracePeriod`，绝不因上游抖动黑掉能力。
+/// 才锁定付费能力——Worker/支付商暂时不可用一律进 `gracePeriod`，绝不因上游抖动黑掉能力。
 public enum LicensePhase: Sendable, Equatable {
     /// 未激活（从未激活 / 已停用 / 读不到本地记录）。
     case unlicensed
@@ -45,9 +45,9 @@ public enum LicensePhase: Sendable, Equatable {
 /// 客户端本地持久化的授权记录。**只存 Keychain**（licenseKey/instanceId/lastValidatedAt 等），
 /// 附带 `clockHighWater` 做时钟回拨保护。与线上 DTO ``LicenseResponse`` 分开：这里是客户端私有形态。
 public struct LicenseInfo: Sendable, Equatable, Codable {
-    /// 用户从 Polar 邮件/客户门户复制的 license key。仅存 Keychain。
+    /// 用户从确认邮件/客户门户复制的 license key。仅存 Keychain。
     public var licenseKey: String
-    /// Polar activation id，后续 validate/deactivate 必用。
+    /// 支付商侧 activation/instance id，后续 validate/deactivate 必用。
     public var instanceId: String
     /// 最近一次服务端返回的稳定化状态。
     public var status: LicenseStatus
@@ -192,7 +192,7 @@ public struct DeactivateResponse: Sendable, Equatable, Codable {
     }
 }
 
-/// facade 稳定错误码（契约 `Error.error` 枚举，不透传 Polar 内部响应）。
+/// facade 稳定错误码（契约 `Error.error` 枚举，不透传支付商内部响应）。
 public enum LicenseFacadeErrorCode: String, Sendable, Equatable, Codable {
     case invalidRequest = "invalid_request"
     case invalidLicense = "invalid_license"

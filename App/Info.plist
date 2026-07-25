@@ -32,7 +32,7 @@
 	     Release 默认值见 Config/AppConfig.xcconfig，本地开发可显式覆盖。 -->
 	<key>LicenseAPIBaseURL</key>
 	<string>$(LICENSE_API_BASE_URL)</string>
-	<!-- 稳定购买入口。Release 默认指向官网定价页，由官网再跳真实 Polar Checkout;
+	<!-- 稳定购买入口。Release 默认指向官网定价页，由官网再跳真实支付商结账页;
 	     构建期可用 LICENSE_CHECKOUT_URL 覆盖。 -->
 	<key>LicenseCheckoutURL</key>
 	<string>$(LICENSE_CHECKOUT_URL)</string>

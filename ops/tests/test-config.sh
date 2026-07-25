@@ -96,7 +96,23 @@ WEB_STG=$(jsonc_env_pattern apps/web/wrangler.jsonc staging)
 # ---------------------------------------------------------------------------
 # 3. [structure] 发布脚本卫生：无个人绝对路径、无 AppConfig 重写、无 pbxproj 自增
 # ---------------------------------------------------------------------------
-REL_SCRIPTS="scripts/release-staging.sh scripts/finish-release-staging.sh scripts/verify-staging-update.sh scripts/archive-and-notarize.sh"
+REL_SCRIPTS="scripts/release-staging.sh scripts/finish-release-staging.sh scripts/verify-staging-update.sh scripts/archive-and-notarize.sh scripts/reset-local-state.sh"
+
+# 本机状态清空脚本：破坏性，必须默认 dry-run（只有显式 --apply 才真删），且语法可解析。
+expect_ok "reset-local-state.sh 语法可解析" \
+  sh -n scripts/reset-local-state.sh
+expect_ok "reset-local-state.sh 默认 dry-run（无 --apply 时不删任何东西）" \
+  sh -c 'out=$(sh scripts/reset-local-state.sh 2>&1) || exit 1
+         printf "%s" "$out" | grep -q "dry-run" || exit 1
+         printf "%s" "$out" | grep -q "^  删除" && exit 1
+         exit 0'
+# 清空必须覆盖试用**双**锚点：只删一处仍会判定「已开始试用」，全新安装测试就是假的。
+expect_ok "reset-local-state.sh 覆盖试用双锚点（文件 + 钥匙串）" \
+  sh -c 'grep -q "trial-anchor.json" scripts/reset-local-state.sh &&
+         grep -q "com.appidge.trial" scripts/reset-local-state.sh'
+# 绝不允许整文件删系统级 NE 配置——那会连带毁掉其它 app（如 Proxifier）的 VPN 配置。
+expect_fail "reset-local-state.sh 不整文件删系统级 networkextension 配置" \
+  grep -E '^[^#]*rm .*com\.apple\.networkextension' scripts/reset-local-state.sh
 expect_fail "发布脚本不含 /Users/admin 个人绝对路径" \
   grep -l '/Users/admin' $REL_SCRIPTS
 expect_fail "release 脚本不再重写 Config/AppConfig.xcconfig" \

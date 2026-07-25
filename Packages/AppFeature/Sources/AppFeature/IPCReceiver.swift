@@ -1,5 +1,4 @@
 import Core
-import Dispatch
 import IPCContract
 
 /// 把 ``AppSideTransport`` 收到的扩展消息接进 ``Store``：`start()` 之后，每条
@@ -81,11 +80,7 @@ public final class IPCReceiver {
         guard !pendingConnectionEntries.isEmpty else { return }
         let batch = pendingConnectionEntries
         pendingConnectionEntries.removeAll(keepingCapacity: true)
-        let started = DispatchTime.now().uptimeNanoseconds
         store.dispatch(.connectionEventsReceived(batch))
-        // 这一段是**主线程**上的 reducer 工作（按 id 去重 + 环形缓冲维护 + 触发 SwiftUI 重算）。
-        // 埋点回调由 App 层注入，AppFeature 不反向依赖 App。
-        PerfHooks.onConnectionBatch?(DispatchTime.now().uptimeNanoseconds &- started, batch.count)
     }
 
     public func stop() async {
@@ -94,11 +89,4 @@ public final class IPCReceiver {
         flushPendingConnectionEntries()
         await transport.stopListening()
     }
-}
-
-/// 供 App 层注入的性能埋点钩子（AppFeature 不反向依赖 App，故用回调而非直接引用 App 的 PerfDiag）。
-/// **临时诊断用**：确认完性能瓶颈后与 App 侧 PerfDiag 一并移除。
-public enum PerfHooks {
-    /// (这批连接事件落进 Store 的耗时纳秒, 批大小)。nil = 未启用埋点，热路径零开销。
-    nonisolated(unsafe) public static var onConnectionBatch: ((UInt64, Int) -> Void)?
 }

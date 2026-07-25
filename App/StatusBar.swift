@@ -16,14 +16,10 @@ struct StatusBar: View {
     @Environment(\.openWindow) private var openWindow
 
     private var activeCount: Int {
-        PerfDiag.measure(.statusBarAggregates, items: store.state.connectionLog.count) {
-            store.state.connectionLog.reduce(into: 0) { if $1.phase == .opened { $0 += 1 } }
-        }
+        store.state.connectionLog.reduce(into: 0) { if $1.phase == .opened { $0 += 1 } }
     }
     private var totals: (up: Int64, down: Int64) {
-        PerfDiag.measure(.statusBarAggregates, items: store.state.processes.count) {
-            TrafficStatsAggregator.totals(Array(store.state.processes.values))
-        }
+        TrafficStatsAggregator.totals(Array(store.state.processes.values))
     }
 
     /// 状态栏那一格的呈现要素。`emphasized` = 是否给文字上色(否则用 primary)。

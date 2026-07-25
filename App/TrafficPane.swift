@@ -20,9 +20,7 @@ struct TrafficPane: View {
 
     /// 事件日志按时间倒序(最新在前),与连接表默认排序一致。
     private var events: [ConnectionLogEntry] {
-        PerfDiag.measure(.trafficPaneRows, items: store.state.connectionLog.count) {
-            store.state.connectionLog.sorted { $0.openedAt > $1.openedAt }
-        }
+        store.state.connectionLog.sorted { $0.openedAt > $1.openedAt }
     }
 
     var body: some View {

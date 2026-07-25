@@ -84,9 +84,7 @@ struct MenuBarView: View {
 
     /// 吞吐(上+下)最高的前 5 个进程,复用纯计算 `TrafficStatsAggregator.topByThroughput`。
     private var topProcesses: [MonitoredProcess] {
-        PerfDiag.measure(.menuBarAggregates, items: store.state.processes.count) {
-            TrafficStatsAggregator.topByThroughput(Array(store.state.processes.values), limit: 5)
-        }
+        TrafficStatsAggregator.topByThroughput(Array(store.state.processes.values), limit: 5)
     }
 
     private func upDown(_ up: Int64, _ down: Int64) -> String {

@@ -19,16 +19,14 @@ struct ConnectionsTable: View {
     /// 匹配范围对齐「应用」列**实际展示的内容**:显示名(`云梯`)+ 括号里的标识(`com.example.yunti`)
     /// ——之前只匹配显示名,搜 `yunti`/`com.example` 命不中。子串匹配(大小写不敏感)+ 目标主机。
     private var rows: [ConnectionLogEntry] {
-        PerfDiag.measure(.connectionsTableRows, items: store.state.connectionLog.count) {
-            let key = filter.trimmingCharacters(in: .whitespaces).lowercased()
-            var filtered = key.isEmpty
-                ? store.state.connectionLog
-                : store.state.connectionLog.filter { matches($0, key) }
-            if showActiveOnly {
-                filtered = filtered.filter { $0.phase == .opened }
-            }
-            return filtered.sorted(using: sortOrder)
+        let key = filter.trimmingCharacters(in: .whitespaces).lowercased()
+        var filtered = key.isEmpty
+            ? store.state.connectionLog
+            : store.state.connectionLog.filter { matches($0, key) }
+        if showActiveOnly {
+            filtered = filtered.filter { $0.phase == .opened }
         }
+        return filtered.sorted(using: sortOrder)
     }
 
     /// 一条连接是否命中过滤词:应用显示名、进程标识(应用列括号内容)、或目标主机任一含 `key`。

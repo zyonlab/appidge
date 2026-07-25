@@ -19,7 +19,8 @@
 |---|---|---|---|
 | 域名 | appidge.com / www | [待配置] | Cloudflare 账号加 zone + `deploy-web production` 自动建 DNS/证书 |
 | 域名 | api.appidge.com | [待配置] | `deploy-api production` 自动建 |
-| 域名 | updates.appidge.com | [待配置] | `publish-updates production` 自动建 |
+| 域名 | updates.appidge.com | [待配置] | `publish-updates production` 自动建（当前是孤儿 DNS 记录，背后无 Worker，见 §1） |
+| 更新服务 | updates-staging.appidge.com | **[已备]** | 2026-07-25 已部署 `appidge-updates-staging`，build 66 + appcast 上线，`smoke staging` 全绿 |
 | 公开配置 | PUBLIC_SITE_URL / API / DOWNLOAD / LICENSE_* / SPARKLE_FEED / SITE_BASE / TRIAL_DAYS | [已备] | `ops/environments/production.conf` |
 | 公开配置 | PUBLIC_POLAR_CHECKOUT_URL（Creem live 支付链接） | [待填] | `production.conf` |
 | Worker var | MOCK_MODE / CREEM_API_BASE / RATE_LIMIT / MAX_BODY | [已备] | `apps/api/wrangler.toml [env.production.vars]` |
@@ -44,9 +45,24 @@
 | updates.appidge.com | appidge-updates | `infra/updates/wrangler.jsonc` env.production.routes | `publish-updates production` |
 
 - **现状**：四条 route 均已在 tracked 配置里 **[已备]**；`preflight` 的拓扑校验已断言它们存在且不与 staging 交叉。
-- **[待配置] 解锁**：确认 `appidge.com` 在 Cloudflare 该账号名下（Dashboard → Websites 能看到 zone）。
-  DNS/证书由各自 deploy 命令自动完成，无需手动加 A/CNAME。首次自定义域生效有 10~30s 传播窗口
-  （`deploy-api` 内置 6 次 healthz 重试覆盖）。
+  `appidge.com` zone **已确认在本账号名下**（2026-07-25 核：NS = tricia/hayes.ns.cloudflare.com）。
+- **[待配置] 解锁**：DNS/证书由各自 deploy 命令自动完成，无需手动加 A/CNAME。
+
+> ⚠️ **2026-07-25 实测：production Worker 一个都还没部署过。**
+> 账号上只存在 `appidge-web-staging` / `appidge-api-staging` / `appidge-updates-staging` 三个；
+> `appidge-web` / `appidge-api` / `appidge-updates` 及其 `-production` 变体均 **不存在**，也无 Pages 项目。
+> 其中 `updates.appidge.com` 仍留着一条**孤儿 DNS 记录**（代理态 A 记录，背后无 Worker）：
+> 边缘缓存未过期时还能返回旧 build 63 的静态资源，缓存一过就是 530 / Cloudflare 1016 Origin DNS error。
+> 这不是故障，是「拆分前那次部署的残留」——`publish-updates production` 会重新绑定，无需手工清理。
+
+> ⚠️ **首次自定义域的证书传播远超 10~30s。** 2026-07-25 建 `updates-staging.appidge.com` 实测：
+> DNS 立刻生效，但 TLS 证书在各边缘节点上**分批**下发，约 **10 分钟**才做到 10 次连续成功；
+> 中间期表现为 `tlsv1 unrecognized name`（SNI 未识别）与 200 交替出现——
+> **单次探测通过不等于可用**，务必连续探测确认。
+>
+> 对发布链的影响：`deploy-api` 的健康检查是 6×8s ≈ 48s，**不足以覆盖首次建域**，
+> production 上线时 `api.appidge.com` 极可能在这一步误判失败并中断发布链。
+> 建议上线当天要么先单独把四个域建好等证书稳定、再跑发布链，要么临时放宽该重试窗口。
 
 ## 2. 公开环境变量（构建期注入 web / Info.plist）
 

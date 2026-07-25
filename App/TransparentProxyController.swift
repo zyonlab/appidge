@@ -35,6 +35,7 @@ enum TransparentProxyController {
 
     /// 请求会话运行。同步登记意图后由串行 worker 执行；调用方无需再包一层不受控的 `Task`。
     static func start() {
+        PerfDiag.milestone("session.start_called")
         request(.running)
     }
 
@@ -100,6 +101,9 @@ enum TransparentProxyController {
                 emit("session already \(statusName(mgr.connection.status))")
             default:
                 try mgr.connection.startVPNTunnel()
+                // 到这里为止是 app 能控制的部分；之后 provider.startProxy / setTunnelNetworkSettings
+                // 由系统调度，与 flow.first 的差值即「NE 会话建立」本身的耗时（天然成本，改不动）。
+                PerfDiag.milestone("session.tunnel_started")
                 emit("startVPNTunnel() called — provider.startProxy should now run")
             }
         } catch {

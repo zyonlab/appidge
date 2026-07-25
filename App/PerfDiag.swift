@@ -61,10 +61,50 @@ enum PerfDiag {
     @MainActor
     static func install() {
         guard isEnabled else { return }
+        lock.withLock {
+            windowStart = DispatchTime.now().uptimeNanoseconds
+            milestoneOrigin = DispatchTime.now().uptimeNanoseconds
+        }
+        milestone("app.task_start")
         PerfHooks.onConnectionBatch = { nanos, count in
+            // 第一批连接事件到达 = 用户「看到活动连接」的时刻，整条启动链的终点。
+            milestone("flow.first")
             record(.dispatchConnectionBatch, nanos: nanos, items: count)
         }
         startMainThreadSampler()
+    }
+
+    // MARK: - 启动里程碑
+
+    /// 已记录过的里程碑（每个只记首次）。
+    nonisolated(unsafe) private static var seenMilestones: Set<String> = []
+    /// 里程碑计时基准：`install()` 被调用的时刻（App 的 `.task` 最开头）。
+    nonisolated(unsafe) private static var milestoneOrigin: UInt64 = 0
+
+    /// 记一个启动里程碑（每个名字只记首次，重复调用无副作用）。
+    /// 用来回答「打开软件后活动连接为什么要等一会」——把启动到第一条 flow 之间的每一段拆开计时。
+    /// 里程碑总共不到十个，直接每个一行落盘，不必聚合。
+    static func milestone(_ name: String, note: String? = nil) {
+        guard isEnabled else { return }
+        let now = DispatchTime.now().uptimeNanoseconds
+        let shouldWrite: Bool = lock.withLock {
+            guard !seenMilestones.contains(name) else { return false }
+            seenMilestones.insert(name)
+            if milestoneOrigin == 0 { milestoneOrigin = now }
+            return true
+        }
+        guard shouldWrite else { return }
+        let origin = lock.withLock { milestoneOrigin }
+        let sinceOriginMs = Double(now &- origin) / 1_000_000
+        var line: [String: Any] = [
+            "milestone": name,
+            "t_ms": round(sinceOriginMs * 100) / 100
+        ]
+        if let note { line["note"] = note }
+        guard let data = try? JSONSerialization.data(withJSONObject: line, options: [.sortedKeys]) else { return }
+        var payload = data
+        payload.append(0x0A)
+        flushQueue.async { appendToFile(payload) }
     }
 
     /// 测量一段同步工作。`items` 给批量站点用（如一批连接事件的条数）。
@@ -120,7 +160,11 @@ enum PerfDiag {
         flushScheduled = false
         let snapshot = buckets
         let hitches = hitchSamples
-        let elapsedNanos = DispatchTime.now().uptimeNanoseconds &- windowStart
+        // ⚠️ 必须先把 windowStart 读进局部再取 now。写成 `now() &- windowStart` 时，Swift 先算左边，
+        // 而 windowStart 是**惰性初始化**的 static——首次访问才被赋成「当时的 now」，于是
+        // windowStart > 左边，UInt64 减法下溢，第一行 window_s 变成 1.8e10 秒（实测踩到）。
+        let start = windowStart
+        let elapsedNanos = DispatchTime.now().uptimeNanoseconds &- start
         buckets.removeAll(keepingCapacity: true)
         hitchSamples.removeAll(keepingCapacity: true)
         windowStart = DispatchTime.now().uptimeNanoseconds

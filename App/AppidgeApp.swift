@@ -192,6 +192,7 @@ struct AppidgeApp: App {
                 // 接线放在两次 restore 之后：restore 本身就是靠重放 processDiscovered/assignRule/
                 // addMatchRule 等"值得存盘"的 action 来灌回状态的,提前接线只会导致启动时又把刚读出来
                 // 的东西原样存回去一次——浪费一次磁盘 I/O,不是错误,但没必要。
+                PerfDiag.milestone("restore.done")   // 四个 await（IPC/配置/日志/档案/代理环境探测）完成
                 store.onAction = { action in
                     // 扩展 XPC 连上回报版本时,若与包内版本不一致 = 会话绑在旧 provider 上(反复热
                     // 升级的僵尸态)→ 自动重启会话重绑最新扩展,一次为限(见 maybeHealStaleBinding)。
@@ -251,8 +252,17 @@ struct AppidgeApp: App {
                 // 其余状态维持老路:已完成引导就重新提交激活(幂等,兼顾升级 replace),并直接
                 // 尝试起会话一次(不依赖 activate() 的 .completed 回调,旧版本它可能不回)。
                 SystemExtensionActivator.shared.checkStatus { state in
+                    // 埋点核心假设：启动时这个门大概率**进不来**——licensePhase 默认 .unlicensed，
+                    // 而授权/试用是下面 licenseLoadRequested/trialLoadRequested 异步落定的。
+                    // 若 note 是 gated，就坐实了「会话不是在这里起的，而是等相位落定后才起」。
+                    let passed = store.state.hasCompletedOnboarding && store.state.isLicenseActive
+                    PerfDiag.milestone(
+                        "checkstatus.cb",
+                        note: "state=\(state) onboarded=\(store.state.hasCompletedOnboarding) "
+                            + "licenseActive=\(store.state.isLicenseActive) → \(passed ? "start" : "gated")"
+                    )
                     if case .disabled = state { return }
-                    if store.state.hasCompletedOnboarding && store.state.isLicenseActive {
+                    if passed {
                         SystemExtensionActivator.shared.activate()
                         TransparentProxyController.start()
                     }
@@ -480,12 +490,15 @@ struct AppidgeApp: App {
             TransparentProxyController.stop()
             return
         }
+        PerfDiag.milestone("capability.sync")   // 相位落定 → 能力同步（会话实际多半在这条路起）
         SystemExtensionActivator.shared.checkStatus { state in
             guard store.state.isLicenseActive, store.state.hasCompletedOnboarding else {
                 TransparentProxyController.stop()
                 return
             }
             if case .disabled = state { return }
+            // 这里又做了一次 checkStatus 系统往返（启动时刚查过）——若这一段耗时明显，就该缓存。
+            PerfDiag.milestone("capability.sync.cb")
             SystemExtensionActivator.shared.activate()
             TransparentProxyController.start()
             // 相位（授权/试用）是异步从 Keychain 恢复后才落定的，落定前 isLicenseActive 为假、

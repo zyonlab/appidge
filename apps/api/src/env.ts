@@ -11,7 +11,7 @@ export interface Env {
   MAX_BODY_BYTES: string;
 
   // secrets（本地 .dev.vars / 线上 wrangler secret）——绝不记录原值
-  CREEM_API_KEY: string; // x-api-key 头（test 前缀 creem_test_）
+  CREEM_API_KEY: string; // x-api-key 头（test 形如 creem_test_<alnum>；live 只有一段 creem_<alnum>）
   CREEM_WEBHOOK_SECRET: string; // creem-signature HMAC 密钥（Dashboard 字面值，whsec_ 前缀不剥离）
   LICENSE_HMAC_PEPPER: string;
 }

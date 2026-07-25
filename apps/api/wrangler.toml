@@ -59,8 +59,8 @@ migrations_dir = "migrations"
 # ── production（正式）────────────────────────────────────────────────
 # 自定义域：api.appidge.com（custom_domain=true，wrangler 自动建 DNS+证书）。
 # MOCK_MODE 关，base 指向生产 Creem。secret 仍走 `wrangler secret put --env production`。
-# ⚠️ CREEM_PRODUCT_ID 是 REQUIRED_ 占位（database_id 已回填真实值）——appidge-ops preflight
-#    production 会 fail closed 并逐项列出；由用户提供真实 live product id 后才可部署（不猜测、不伪造）。
+# 2026-07-26：CREEM_PRODUCT_ID 与 D1 database_id 均已回填真实值，appidge-ops preflight
+# production 本地校验通过；仍缺的是三个 Worker secret（见上）与首次部署本身。
 [env.production]
 workers_dev = false
 
@@ -71,12 +71,9 @@ custom_domain = true
 [env.production.vars]
 MOCK_MODE = "false"
 CREEM_API_BASE = "https://api.creem.io"
-# ▼ 待填（Creem live）：非秘密产品标识，webhook product 白名单据此过滤。
-#   从哪拿：Creem Dashboard（live 模式）→ 目标产品 → product id（prod_ 前缀）。
-#   填哪　：替换下面整个 "REQUIRED_..." 字符串（本行）。Creem 无需 org/benefit id（与 Polar 不同）。
-#   配套：支付链接填 ops/environments/production.conf；上线清单 docs/prod-launch-checklist.md §5。
-#   占位/空 → appidge-ops preflight production fail-closed，禁止伪造。
-CREEM_PRODUCT_ID = "REQUIRED_CREEM_LIVE_PRODUCT_ID"
+# live 产品标识（非秘密），webhook product 白名单据此过滤。2026-07-26 由用户提供并回填。
+# 必须与 ops/environments/production.conf 的 PUBLIC_POLAR_CHECKOUT_URL 尾部 product id 一致。
+CREEM_PRODUCT_ID = "prod_3DHsihYJeOAhNDOT0Wo0LV"
 RATE_LIMIT_MAX = "60"
 RATE_LIMIT_WINDOW_MS = "60000"
 MAX_BODY_BYTES = "16384"

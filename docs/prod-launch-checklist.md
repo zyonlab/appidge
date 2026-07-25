@@ -22,11 +22,11 @@
 | 域名 | updates.appidge.com | [待配置] | `publish-updates production` 自动建（当前是孤儿 DNS 记录，背后无 Worker，见 §1） |
 | 更新服务 | updates-staging.appidge.com | **[已备]** | 2026-07-25 已部署 `appidge-updates-staging`，build 66 + appcast 上线，`smoke staging` 全绿 |
 | 公开配置 | PUBLIC_SITE_URL / API / DOWNLOAD / LICENSE_* / SPARKLE_FEED / SITE_BASE / TRIAL_DAYS | [已备] | `ops/environments/production.conf` |
-| 公开配置 | PUBLIC_POLAR_CHECKOUT_URL（Creem live 支付链接） | [待填] | `production.conf` |
+| 公开配置 | PUBLIC_POLAR_CHECKOUT_URL（Creem live 支付链接） | **[已备]** | `production.conf`（2026-07-26 回填） |
 | Worker var | MOCK_MODE / CREEM_API_BASE / RATE_LIMIT / MAX_BODY | [已备] | `apps/api/wrangler.toml [env.production.vars]` |
-| Worker var | CREEM_PRODUCT_ID（Creem live product id） | [待填] | `apps/api/wrangler.toml [env.production.vars]` |
+| Worker var | CREEM_PRODUCT_ID（Creem live product id） | **[已备]** | `apps/api/wrangler.toml`（2026-07-26 回填 `prod_3DHsihYJeOAhNDOT0Wo0LV`） |
 | Worker secret | CREEM_API_KEY / CREEM_WEBHOOK_SECRET / LICENSE_HMAC_PEPPER | [待配置] | `wrangler secret put … --env production` |
-| Webhook | live webhook → `/v1/webhooks/creem` | [待配置] | Creem Dashboard |
+| Webhook | live webhook → `/v1/webhooks/creem` | [已配置]（待端到端验证） | Creem Dashboard（2026-07-26 已建，`api.appidge.com` 上线后才可实投） |
 | D1 | appidge-licensing-production（id `1db51c0e…`，3 migration） | [已备] | 远端 apply 用 `migrate-api production` 复核 |
 | 发布审批 | staging 全链路 smoke 通过 + 三重保护 | [待配置] | 见 §8 |
 
@@ -73,7 +73,7 @@
 | PUBLIC_SITE_URL | https://appidge.com | [已备] | web canonical/OG/sitemap |
 | PUBLIC_API_BASE_URL | https://api.appidge.com | [已备] | web + LICENSE_API_BASE_URL 同源 |
 | PUBLIC_DOWNLOAD_URL | https://updates.appidge.com/appidge-latest.dmg | [已备] | web 下载 CTA |
-| PUBLIC_POLAR_CHECKOUT_URL | REQUIRED_CREEM_LIVE_CHECKOUT_URL | **[待填]** | web 购买 CTA（见 §5） |
+| PUBLIC_POLAR_CHECKOUT_URL | https://www.creem.io/payment/prod_3DHsihYJeOAhNDOT0Wo0LV | **[已备]** | web 购买 CTA（2026-07-26 回填；尾部 product id 与 §3 一致） |
 | LICENSE_API_BASE_URL | https://api.appidge.com | [已备] | Info.plist LicenseAPIBaseURL |
 | LICENSE_CHECKOUT_URL | https://appidge.com/#pricing | [已备] | Info.plist LicenseCheckoutURL（App 内购买跳官网定价锚点；单页 IA 下 `/pricing` 独立页已撤，用锚点避免 404） |
 | SPARKLE_FEED_URL | https://updates.appidge.com/appcast.xml | [已备] | Info.plist SUFeedURL |
@@ -90,7 +90,7 @@
 |---|---|---|
 | MOCK_MODE | false（打真实 Creem live） | [已备] |
 | CREEM_API_BASE | https://api.creem.io | [已备] |
-| CREEM_PRODUCT_ID | REQUIRED_CREEM_LIVE_PRODUCT_ID | **[待填]**（见 §5） |
+| CREEM_PRODUCT_ID | prod_3DHsihYJeOAhNDOT0Wo0LV | **[已备]**（2026-07-26 回填） |
 | RATE_LIMIT_MAX / RATE_LIMIT_WINDOW_MS / MAX_BODY_BYTES | 60 / 60000 / 16384 | [已备] |
 | D1 database_id | 1db51c0e-9d4b-4b32-82f7-e02553508c11 | [已备]（2026-07-24 创建回填） |
 
@@ -99,32 +99,37 @@
 live secret 由用户在 Creem 过 KYC 后从 Dashboard 取得，用 wrangler 注入 production Worker：
 
 ```sh
-wrangler secret put CREEM_API_KEY        --env production   # Creem live API key（前缀 creem_live_，非 creem_test_）
+wrangler secret put CREEM_API_KEY        --env production   # Creem live API key
 wrangler secret put CREEM_WEBHOOK_SECRET --env production   # Creem live webhook secret（前缀 whsec_，按 Dashboard 字面值，不剥前缀）
 wrangler secret put LICENSE_HMAC_PEPPER  --env production   # license fingerprint pepper（自生成高熵随机串；一经上线不轮换）
 ```
 
 - 在 `apps/api/` 目录执行（该目录 wrangler.toml 定义了 env.production）。
-- **现状 [待配置]**：`preflight production --remote` 会（登录后）核对这三个 secret 名是否存在，
-  缺失逐项列出。secret **值**永不被读取/打印。
-- `LICENSE_HMAC_PEPPER` 不依赖 Creem，可先自生成注入；另两个待 Creem live 凭证。
+- **key 形态**：test key 是 `creem_test_<alnum>`；**live key 只有一段 `creem_<alnum>`**，没有 `creem_live_`
+  这种写法（2026-07-26 拿到真实 live key 后修正；`src/log.ts` 的兜底脱敏正则已同步覆盖单段形态）。
+- **现状 [待配置]**：live key 与 webhook secret 用户已提供（2026-07-26），尚未注入；
+  `LICENSE_HMAC_PEPPER` 不依赖 Creem，自生成即可（如 `openssl rand -hex 32`）。
+  `preflight production --remote` 会（登录后）核对这三个 secret 名是否存在，缺失逐项列出。
+  secret **值**永不被读取/打印。
 
-## 5. Creem live 待填一览（KYC 通过后「填空即可」）
+## 5. Creem live 非秘密标识（2026-07-26 已回填）
 
-Creem 是 Merchant of Record，**不需要 Polar 式的 org/benefit ID**——live 只需下面两个非秘密标识 + §4 两个 secret。
+Creem 是 Merchant of Record，**不需要 Polar 式的 org/benefit ID**——live 只需下面两个非秘密标识 + §4 三个 secret。
 
-| 待填项 | 从哪拿 | 填哪（tracked 文件，占位已就位） | 格式约束 |
+| 项 | 值 | 填在哪（tracked） | 校验 |
 |---|---|---|---|
-| Creem live **product id** | Creem Dashboard（live 模式）→ 目标产品 → product id | `apps/api/wrangler.toml` → `[env.production.vars]` → `CREEM_PRODUCT_ID` | `prod_` 前缀；非秘密 |
-| Creem live **支付链接** | 同一 live 产品 → Share / Payment Link | `ops/environments/production.conf` → `PUBLIC_POLAR_CHECKOUT_URL` | host `creem.io`，**不得含 `/test/`** |
+| Creem live **product id** | `prod_3DHsihYJeOAhNDOT0Wo0LV` | `apps/api/wrangler.toml` → `[env.production.vars]` → `CREEM_PRODUCT_ID` | 非空非占位（preflight） |
+| Creem live **支付链接** | `https://www.creem.io/payment/prod_3DHsihYJeOAhNDOT0Wo0LV` | `ops/environments/production.conf` → `PUBLIC_POLAR_CHECKOUT_URL` | host `creem.io` 且不含 `/test/`（preflight）；`deploy-web` 另断言产物含此 host |
 
-填完这两处，`preflight production` 的 2 项 REQUIRED_ 失败即清零（D1 id 已备，不再报第 3 项）。
-product 白名单：webhook 只处理 `CREEM_PRODUCT_ID` 匹配的事件，其余登记后忽略。
+两处的 product id 必须相同——`webhook` 的 product 白名单按 `CREEM_PRODUCT_ID` 过滤，
+官网 CTA 按支付链接引流；不一致会出现「买了但事件被忽略」。
+回填后 `appidge-ops preflight production` 本地 **0 fail**（见 §9）。
 
 ## 6. Webhook（live）
 
-- **[待配置]**：Creem Dashboard（live 模式）→ Developers → Webhooks，新增指向
-  `https://api.appidge.com/v1/webhooks/creem`（注意路径是 `/creem`，不是历史 `/polar`）。
+- **[已配置，待端到端验证]**：2026-07-26 用户已在 Creem Dashboard（live）建好 webhook，指向
+  `https://api.appidge.com/v1/webhooks/creem`（路径是 `/creem`，不是历史 `/polar`）。
+  该域名此刻还没有 Worker，投递必然失败——`deploy-api production` 上线后再在 Dashboard 重投一条测试事件确认。
 - secret 即 §4 的 `CREEM_WEBHOOK_SECRET`。验签 = `hex(HMAC-SHA256(secret, rawBody))`，头 `creem-signature`；
   无 webhook-id/timestamp 头，防重放靠 payload 顶层事件 id 幂等登记。
 - 处理事件：`checkout.completed`（审计）、`refund.created` / `dispute.created`（order tombstone + 尽力吊销）。
@@ -167,24 +172,37 @@ ops/bin/appidge-ops plan production                 # 人工核对 routes / 公�
 > 一键：`APPIDGE_PRODUCTION_APPROVED=YES appidge-ops release production --apply --confirm-production --build-number <N>`
 > （串起 1→8，fail-fast）。首次上线建议分步，便于每步人工核对。
 >
+> ⚠️ **首发的 build 号单调性死锁（2026-07-26 实测）**：第 4 步 `build-macos production` 会拉取
+> **两个** feed 求历史最高 build，production 下任一 feed 查不到即 `ops_die`（staging 是 warn 放行）。
+> 而 `updates.appidge.com` 的 appcast 要到第 6 步 `publish-updates` 才存在 ⇒ 首发时第 4 步必然失败。
+> 当前两 feed 最高 build = **78**（staging），故首个 production build 号须 ≥ **79**。
+> 解法二选一：给 production 首发加一次性显式开关（如 `APPIDGE_ALLOW_MISSING_FEED=YES`，仍强制
+> 另一 feed 的单调性），或先人工把一份合法 appcast 发上 `updates.appidge.com` 再跑发布链。
+> **不要**把该检查改成静默跳过——它是防「发了个比线上更旧的 build，用户永远收不到更新」的唯一护栏。
+>
 > **build-macos 需受控 release Mac** 的 `.env` 签名/公证凭证 + `Config/Signing.xcconfig`；CI/开发机不具备，属人工闸门。
 > **系统扩展升级**：staging→prod 共用 Bundle ID/App Group/扩展 ID，旧版→新版真机 Sparkle + 系统扩展重绑
 > smoke 仍是人工闸门（`scripts/verify-staging-update.sh`）。
 
 ---
 
-## 9. preflight / test 现状（本次核对）
+## 9. preflight / test 现状（2026-07-26 核对）
 
-- `bash ops/tests/test-config.sh` → **PASS=82 FAIL=0**（需先 `pnpm install --frozen-lockfile`，否则 node_modules 缺失单项失败为环境问题）。
-- `appidge-ops preflight production` → fail-closed，逐项列出 **2 项 REQUIRED_**（`PUBLIC_POLAR_CHECKOUT_URL`、`CREEM_PRODUCT_ID`）；
-  D1 database_id 已回填不再报第 3 项。填完 §5 两处后此 2 项清零。
+- `sh ops/tests/test-config.sh` → **PASS=95 FAIL=0**（需先 `pnpm install --frozen-lockfile`，否则 node_modules 缺失单项失败为环境问题）。
+- `appidge-ops preflight production` → **OK（0 项 PREFLIGHT-FAIL）**：§5 两处回填后本地校验全过。
+- 占位 fail-closed 的回归覆盖不再依赖真实 conf 里存在占位——改由 `test-config.sh` 的 fixture
+  （临时 conf 塞回 `REQUIRED_`）长期守住；同时把「是否有占位」的判定收紧到赋值行，
+  避免注释里解释闸门语义的 `REQUIRED_*` 字样把已回填的配置误判成未填。
 
 ## 10. 剩余人工闸门总表（上线前必须逐项完成）
 
-1. **[用户]** Creem KYC 通过 → live 产品 → 回填 §5 两处（product id + 支付链接）。
-2. **[用户]** `wrangler secret put CREEM_API_KEY / CREEM_WEBHOOK_SECRET / LICENSE_HMAC_PEPPER --env production`（§4）。
-3. **[用户]** Creem Dashboard 配 live webhook → `https://api.appidge.com/v1/webhooks/creem`（§6）。
-4. **[用户/Cloudflare]** 确认 `appidge.com` zone 在本账号（§1）。
-5. **[用户]** staging 全链路 smoke 通过（买单→activate→validate→退款+disable→validate=revoked）+ production 发布审批。
-6. **[release Mac]** `build-macos` 签名/公证凭证 + 真机系统扩展升级 smoke（§8）。
-7. 全部就绪后按 §8 三重保护序列发布，`smoke production` 收尾。
+1. ~~Creem KYC → live 产品 → 回填 §5 两处~~ **已完成（2026-07-26）**。
+2. ~~Creem Dashboard 配 live webhook~~ **已建（2026-07-26）**，待 API 上线后重投一条事件验证（§6）。
+3. ~~确认 `appidge.com` zone 在本账号~~ **已确认（2026-07-25，NS 指向 Cloudflare）**。
+4. **[用户]** 注入 3 个 Worker secret（§4）——上线前唯一剩余的配置闸门。
+5. **[发布链]** 首次建域的证书传播 ≈10 分钟，`deploy-api` 内置 6×8s healthz 重试不足以覆盖（§1 警告）。
+6. **[发布链]** 首发的 build 号单调性死锁：`build-macos production` 要求 `updates.appidge.com`
+   的 appcast 可查，而该 feed 要到 `publish-updates` 才存在（§8 脚注）。
+7. **[用户]** staging 全链路 smoke 通过（买单→activate→validate→退款+disable→validate=revoked）+ production 发布审批。
+8. **[release Mac]** `build-macos` 签名/公证凭证 + 真机系统扩展升级 smoke（§8）。
+9. 全部就绪后按 §8 三重保护序列发布，`smoke production` 收尾。

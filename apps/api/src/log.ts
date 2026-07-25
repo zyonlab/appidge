@@ -12,8 +12,9 @@ export function redact(input: unknown, secrets: string[]): string {
       s = s.split(secret).join("[REDACTED]");
     }
   }
-  // 兜底：形似 Creem/webhook token（creem_test_/creem_live_ API key、whsec_）打码
-  s = s.replace(/\b(creem_[a-z]{2,6}_|whsec_)[A-Za-z0-9_-]{6,}\b/g, "$1[REDACTED]");
+  // 兜底：形似 Creem/webhook token 打码。第二段前缀可选——test key 是 creem_test_<alnum>，
+  // 但真实 live key 只有一段（creem_<alnum>），只认 creem_xx_ 会把 live key 漏出去。
+  s = s.replace(/\b(creem_(?:[a-z]{2,6}_)?|whsec_)[A-Za-z0-9_-]{6,}\b/g, "$1[REDACTED]");
   return s;
 }
 

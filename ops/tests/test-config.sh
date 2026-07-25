@@ -381,9 +381,12 @@ if [ -x "$CLI" ]; then
   # [gate] production preflight：占位存在 ⇒ 必须 fail closed 且逐项列出；
   #        真实值填入后 ⇒ 本地 preflight 必须通过（结构不阻塞）。
   # ------------------------------------------------------------------
+  # 只看「赋值行的值」，不看注释：两个文件都保留着解释 REQUIRED_ 闸门语义的注释，
+  # 用全文 grep 会在真实值回填后仍误判成占位，把本该转入「已填必须通过」的分支钉死在失败上。
   has_placeholder=0
-  toml_prod_section | grep -qE 'PLACEHOLDER|REQUIRED_|00000000-0000-0000-0000-000000000000' && has_placeholder=1
-  grep -q 'REQUIRED_' "$PC" 2>/dev/null && has_placeholder=1
+  toml_prod_section | grep -E '^[A-Za-z_]+ *= *"' \
+    | grep -qE 'PLACEHOLDER|REQUIRED_|00000000-0000-0000-0000-000000000000' && has_placeholder=1
+  grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$PC" 2>/dev/null | grep -q 'REQUIRED_' && has_placeholder=1
 
   pf_out=$("$CLI" preflight production 2>&1); pf_rc=$?
   if [ "$has_placeholder" = 1 ]; then
@@ -453,6 +456,17 @@ if [ -x "$CLI" ]; then
   { cat "$SC"; echo "EVIL_KEY='x'"; } > "$FIX/staging.conf"
   expect_fail "非 allowlist key 被拒" \
     env APPIDGE_OPS_CONFIG_DIR="$FIX" "$CLI" show-config staging
+  # e) REQUIRED_ 占位仍必须让 production preflight fail closed。
+  #    真实值回填后（2026-07-26 起）真实 conf 已无占位，这条 fixture 是该闸门的长期回归覆盖。
+  cp "$SC" "$FIX/staging.conf"
+  sed 's|^PUBLIC_POLAR_CHECKOUT_URL=.*|PUBLIC_POLAR_CHECKOUT_URL='\''REQUIRED_CREEM_LIVE_CHECKOUT_URL'\''|' \
+    "$PC" > "$FIX/production.conf"
+  expect_fail "production preflight 对 REQUIRED_ 占位 fail closed（fixture）" \
+    env APPIDGE_OPS_CONFIG_DIR="$FIX" "$CLI" preflight production
+  fx_out=$(env APPIDGE_OPS_CONFIG_DIR="$FIX" "$CLI" preflight production 2>&1 || true)
+  printf '%s\n' "$fx_out" | grep -q 'PREFLIGHT-FAIL:.*PUBLIC_POLAR_CHECKOUT_URL' \
+    && t_pass "production preflight 逐项列出占位的 PUBLIC_POLAR_CHECKOUT_URL（fixture）" \
+    || t_fail "production preflight 逐项列出占位的 PUBLIC_POLAR_CHECKOUT_URL（fixture）"
   rm -rf "$FIX"
 
   # ------------------------------------------------------------------

@@ -21,6 +21,14 @@ describe("redact()", () => {
     const out = redact("oops creem_live_1234567890abc leaked", []);
     expect(out).not.toContain("creem_live_1234567890abc");
   });
+
+  // 真实 live API key 没有第二段前缀（形如 creem_<alnum>，不是 creem_live_<alnum>）——
+  // 兜底正则只认 creem_xx_ 会漏掉它。主路（按 env.CREEM_API_KEY 原值屏蔽）仍覆盖，
+  // 这里守的是纵深防御第二道：任何路径不慎打印同形态串也不得漏出。
+  it("scrubs live-key shape with no second segment (creem_<alnum>)", () => {
+    const out = redact("oops creem_4bNkFAKEfakeFAKEfake leaked", []);
+    expect(out).not.toContain("creem_4bNkFAKEfakeFAKEfake");
+  });
 });
 
 describe("log redaction across handlers", () => {

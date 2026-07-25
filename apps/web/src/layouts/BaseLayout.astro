@@ -2,7 +2,7 @@
 import '../styles/global.css';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
-import { SITE_NAME, SITE_URL } from '../config/site';
+import { SITE_NAME, SITE_TAGLINE, SITE_URL } from '../config/site';
 import { HREFLANG, HTML_LANG, LOCALES, OG_LOCALE, localePath, ui, type Locale } from '../i18n';
 
 interface Props {
@@ -21,7 +21,9 @@ const { title, description, path = '/', locale = 'en', jsonld } = Astro.props;
 const t = ui[locale];
 const canonical = new URL(localePath(locale, path), SITE_URL).href;
 const isHome = path === '/';
-const tagline = locale === 'zh' ? '按进程控制网络去向' : 'Per-process proxy control for macOS';
+// 单一真相源：定位口径只在 site.ts 定一处。此处原先硬编了一份副本，导致 SITE_TAGLINE
+// 成了从未被引用的死常量——改它以为改了站点，其实没有。
+const tagline = SITE_TAGLINE[locale === 'zh' ? 'zh' : 'en'];
 const fullTitle = isHome ? `${SITE_NAME} · ${tagline}` : `${title} · ${SITE_NAME}`;
 
 const defaultJsonld = {

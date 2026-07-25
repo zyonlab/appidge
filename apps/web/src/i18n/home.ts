@@ -81,7 +81,7 @@ export const home: Record<'zh' | 'en', HomeCopy> = {
     metaDescription:
       '全局代理开着，AI 客户端、Docker、pip 照样连不上？Appidge 在 macOS 上按进程接管网络，把不认系统代理的应用强制转给你自己的代理，支持透明代理与代理链。非 VPN、不含节点，先下载试用。',
     hero: {
-      chip: 'macOS 进程级代理工具 · 配合你手上的任何代理 · 透明代理 / 代理链都支持',
+      chip: 'macOS 进程级流量转发 · 转给你手上的任何代理 · 透明代理 / 代理链都支持',
       h1Pain: '全局代理开着，Claude、Docker、pip 照样连不上？',
       h1Em: '按进程抓流量，强制转给你的代理',
       subHtml:
@@ -243,7 +243,7 @@ export const home: Record<'zh' | 'en', HomeCopy> = {
     metaDescription:
       "Proxy's on system-wide, yet Claude, Docker, and pip still won't connect? Appidge intercepts traffic per process on macOS and forces apps that ignore proxy settings through your own proxy — transparent proxies and proxy chains included. Not a VPN, no bundled nodes. Free trial.",
     hero: {
-      chip: 'Per-process proxy control for macOS · Works with any proxy you run',
+      chip: 'Per-process traffic forwarding for macOS · Routes through any proxy you already run',
       h1Pain: "Proxy's on — and Claude, Docker, pip still won't connect?",
       h1Em: 'Force any process through your proxy.',
       subHtml:

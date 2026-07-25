@@ -79,4 +79,15 @@ export const SUPPORT_EMAIL = 'support@appidge.com';
 
 /** 站点常量。 */
 export const SITE_NAME = 'Appidge';
-export const SITE_TAGLINE = '按进程控制网络去向';
+/**
+ * 站点 tagline（`<title>` 与 JSON-LD description 用）。
+ *
+ * 定位口径：我们是**流量转发工具**——按进程把流量转发到*用户自己的*代理，或直连、拦截。
+ * 不说「代理工具 / proxy control」：前者读起来像「我们就是代理」（与「非 VPN、不含节点」
+ * 的红线自相矛盾，也会招来「你们节点在哪」），后者读起来像代理切换/管理器，都不是我们做的事。
+ * 「proxy」保留为**目的地**（转给你的代理）而非我们的品类——既准确，也不丢搜索词。
+ */
+export const SITE_TAGLINE = {
+  zh: '按进程把流量转发到你自己的代理',
+  en: 'Per-process traffic forwarding for macOS',
+} as const;

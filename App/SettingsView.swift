@@ -335,11 +335,7 @@ struct LicenseGateView: View {
 
     var body: some View {
         VStack(spacing: 18) {
-            Image("PigeonLogo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 88, height: 88)
-                .accessibilityLabel("appidge")
+            BrandIcon(size: 88)
             Text("激活 Appidge").font(.title2).bold()
             Text(statusText)
                 .foregroundStyle(statusColor)

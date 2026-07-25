@@ -62,8 +62,7 @@ struct OnboardingView: View {
 
     private var welcomeStep: some View {
         VStack(spacing: 16) {
-            Image("PigeonLogo").resizable().scaledToFit().frame(width: 96, height: 96)
-                .accessibilityLabel("appidge")
+            BrandIcon(size: 96)
             Text("appidge · 按进程代理").font(.title2).bold()
             Text("为每个应用单独指定走代理或直连,还能让不同应用走不同代理。代理异常时自动回退直连。")
                 .font(.body).foregroundStyle(.secondary)
@@ -111,8 +110,7 @@ struct OnboardingView: View {
 
     private var doneStep: some View {
         VStack(spacing: 16) {
-            Image("PigeonLogo").resizable().scaledToFit().frame(width: 88, height: 88)
-                .accessibilityLabel("appidge")
+            BrandIcon(size: 88)
             Text("准备就绪").font(.title2).bold()
             Text("扩展批准并有流量后,「活动」页会实时列出每条连接。状态栏显示「引擎正常」即在接管。")
                 .font(.body).foregroundStyle(.secondary)

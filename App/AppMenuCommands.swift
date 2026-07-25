@@ -11,7 +11,9 @@ struct AppMenuCommands: Commands {
     @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
-        CommandGroup(after: .appInfo) {
+        // `replacing:` 而非 `after:`——后者是在系统自带的「关于 appidge」**之后追加**一条，
+        // 结果应用菜单里出现两个「关于」。替换掉系统项，只保留我们这个（含版本/更新/法务/购买）。
+        CommandGroup(replacing: .appInfo) {
             Button("关于 Appidge…") { openWindow(id: AppWindowID.about) }
             Button("管理许可证…") { openWindow(id: AppWindowID.manageLicense) }
         }

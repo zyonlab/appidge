@@ -12,16 +12,13 @@ struct AboutView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            Image("PigeonLogo")
-                .resizable().scaledToFit()
-                .frame(width: 84, height: 84)
-                .accessibilityHidden(true)
+            BrandIcon(size: 84)
 
             Text("Appidge").font(.title2).bold()
             Text("版本 \(Self.shortVersion)（构建 \(Self.buildVersion)）")
                 .font(.callout).foregroundStyle(.secondary)
                 .textSelection(.enabled)
-            Text("按进程接管网络去向的 macOS 透明代理。")
+            Text("流量转发工具：按进程接管 Mac 上的网络流量，再按你定的规则转发到你自己的代理服务，或直连、拦截。appidge 不提供代理服务，也不托管任何节点。")
                 .font(.caption).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)

@@ -13,6 +13,7 @@ import AppFeature
 struct StatusBar: View {
     var store: Store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.openWindow) private var openWindow
 
     private var activeCount: Int {
         store.state.connectionLog.reduce(into: 0) { if $1.phase == .opened { $0 += 1 } }
@@ -67,6 +68,14 @@ struct StatusBar: View {
                 .contentTransition(.numericText())
                 .animation(reduceMotion ? nil : .snappy, value: activeCount)
             Spacer()
+            // 试用倒计时 + 醒目购买入口（原主窗口顶部整条横幅收到这里）。已授权/到期不显示：
+            // 到期时 isLicenseActive 为假、主窗口走授权门，本状态栏不构建。
+            if case .trial(let days) = TrialState.from(store.state.licensePhase) {
+                TrialStatusItem(store: store, daysLeft: days) {
+                    openWindow(id: AppWindowID.manageLicense)
+                }
+                Divider().frame(height: 11)
+            }
             Text("↑ \(TrafficFormat.bytes(totals.up))   ↓ \(TrafficFormat.bytes(totals.down))")
                 .monospacedDigit()
                 .foregroundStyle(.secondary)

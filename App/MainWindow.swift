@@ -44,16 +44,12 @@ struct MainWindow: View {
             }
             .safeAreaInset(edge: .top, spacing: 0) {
                 VStack(spacing: 0) {
-                    // 更紧急的告警（环 / 待批准）优先占位；试用细横幅是常驻信息，叠在其下。
+                    // 只留真正需要打断用户的告警（环 / 待批准）。试用倒计时是常驻信息，
+                    // 已收进底部状态栏（TrialStatusItem），不再占顶部一整条。
                     if let warning = store.state.loopWarning {
                         LoopWarningBanner(signature: warning) { store.dispatch(.dismissLoopWarning) }
                     } else if let prompt = approvalPrompt {
                         ExtensionApprovalBanner(text: prompt)
-                    }
-                    // 试用中细横幅：「剩 N 天 · 购买」，点按打开管理许可证窗口。已授权/到期不显示
-                    //（到期时 isLicenseActive 为假、主窗口不构建）。菜单栏不加倒计时（保持克制）。
-                    if case .trial(let days) = TrialState.from(store.state.licensePhase) {
-                        TrialBanner(daysLeft: days) { openWindow(id: AppWindowID.manageLicense) }
                     }
                 }
             }

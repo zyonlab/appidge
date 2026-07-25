@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		02BEB1FC0CB43D222CCE48DB /* StatusBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 199BAC5919441EDC3576E476 /* StatusBar.swift */; };
+		B7A1C0DE0002BRANDICON0002 /* BrandIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A1C0DE0001BRANDICON0001 /* BrandIcon.swift */; };
 		04185895FCF3CDC65EB9D064 /* SOCKS5UDPRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A51CC29A0FAEF740DA3E9414 /* SOCKS5UDPRelay.swift */; };
 		04E37C3909CD365DDE5C07E7 /* TCPFlowPump.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98E5B5D192F55B2E76BC681B /* TCPFlowPump.swift */; };
 		13292EF7F746994DDBF9B5FE /* TrafficFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DCF5FB636E2A7088A1D6CDF /* TrafficFormat.swift */; };
@@ -84,6 +85,7 @@
 		06FF2EED709EE367FEA4A9A7 /* TrafficPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrafficPane.swift; sourceTree = "<group>"; };
 		163B07BB0DEAE3E528ECBC13 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		199BAC5919441EDC3576E476 /* StatusBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBar.swift; sourceTree = "<group>"; };
+		B7A1C0DE0001BRANDICON0001 /* BrandIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandIcon.swift; sourceTree = "<group>"; };
 		1DA718340F1304A9F6ECF582 /* NWConnectionProxyProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NWConnectionProxyProbe.swift; sourceTree = "<group>"; };
 		EE11705E0000000000000B02 /* ExitIPChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExitIPChecker.swift; sourceTree = "<group>"; };
 		299CCCC8304EDC13E69F6A38 /* TransparentProxyController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransparentProxyController.swift; sourceTree = "<group>"; };
@@ -224,6 +226,7 @@
 				AD605E784762BD3CF20333B3 /* AppMenuCommands.swift */,
 				A150F43974A4AB0EEF91D4D1 /* TrialUI.swift */,
 				199BAC5919441EDC3576E476 /* StatusBar.swift */,
+				B7A1C0DE0001BRANDICON0001 /* BrandIcon.swift */,
 				AF69302A0C9EBB787D6C4B95 /* SystemExtensionActivator.swift */,
 				6DCF5FB636E2A7088A1D6CDF /* TrafficFormat.swift */,
 				06FF2EED709EE367FEA4A9A7 /* TrafficPane.swift */,
@@ -400,6 +403,7 @@
 				24300D291E090B82EBC80C26 /* AppMenuCommands.swift in Sources */,
 				AC1B1455817830C25FEF50E8 /* TrialUI.swift in Sources */,
 				02BEB1FC0CB43D222CCE48DB /* StatusBar.swift in Sources */,
+				B7A1C0DE0002BRANDICON0002 /* BrandIcon.swift in Sources */,
 				98D1829068AA9598B8F08A3B /* SystemExtensionActivator.swift in Sources */,
 				13292EF7F746994DDBF9B5FE /* TrafficFormat.swift in Sources */,
 				53994341147E0E7B6A3F55AE /* TrafficPane.swift in Sources */,

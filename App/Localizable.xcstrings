@@ -52,16 +52,6 @@
         }
       }
     },
-    "按进程接管网络去向的 macOS 透明代理。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "A macOS transparent proxy that routes traffic per process."
-          }
-        }
-      }
-    },
     "退款政策": {
       "localizations": {
         "en": {
@@ -118,16 +108,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trial · %lld days left"
-          }
-        }
-      }
-    },
-    "剩 %lld 天 · 购买": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld days left · Buy"
           }
         }
       }
@@ -208,16 +188,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "You have full access during the trial. Buy a license to remove limits and support future updates."
-          }
-        }
-      }
-    },
-    "点按管理许可证或购买。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Click to manage your license or buy."
           }
         }
       }
@@ -3308,6 +3278,66 @@
           "stringUnit": {
             "state": "translated",
             "value": "Create rule for %@:%u"
+          }
+        }
+      }
+    },
+    "流量转发工具：按进程接管 Mac 上的网络流量，再按你定的规则转发到你自己的代理服务，或直连、拦截。appidge 不提供代理服务，也不托管任何节点。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A traffic forwarding tool. It takes over network traffic on your Mac per process, then forwards it to your own proxy servers according to rules you define — or connects directly, or blocks it. appidge does not provide proxy service and does not host any servers."
+          }
+        }
+      }
+    },
+    "试用中 · 剩 %lld 天": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trial · %lld days left"
+          }
+        }
+      }
+    },
+    "试用中，剩 %lld 天": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trial, %lld days left"
+          }
+        }
+      }
+    },
+    "购买": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buy"
+          }
+        }
+      }
+    },
+    "在浏览器中打开购买页面。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the purchase page in your browser."
+          }
+        }
+      }
+    },
+    "已购买？在这里输入许可证密钥。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Already purchased? Enter your license key here."
           }
         }
       }

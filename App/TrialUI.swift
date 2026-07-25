@@ -24,31 +24,38 @@ enum TrialState: Equatable {
     }
 }
 
-/// 主窗口顶部**细横幅**：试用中显示「剩 N 天 · 购买」，点按打开「管理许可证」窗口。
-/// 克制、单行；菜单栏（MenuBarExtra）不加倒计时（见任务约束）。已授权时调用方不构建它。
-struct TrialBanner: View {
+/// 状态栏里的试用提示：一句话说明 + 一个醒目的「购买」按钮（直接打开官网购买页）。
+///
+/// 原先是主窗口**顶部整条蓝色横幅**，占掉一整行、还把搜索框挤下去，对一个常驻信息来说太重了。
+/// 现在收进底部状态栏——和「引擎正常 / 活动连接 N / 流量合计」同一行，常驻但不打扰；
+/// 购买用 `.borderedProminent` 保持醒目，点了直接开官网（而不是先弹「管理许可证」窗口再找入口）。
+/// 菜单栏（MenuBarExtra）仍不加倒计时（保持克制）。已授权时调用方不构建它。
+struct TrialStatusItem: View {
+    var store: Store
     let daysLeft: Int
-    let onTap: () -> Void
+    /// 「剩 N 天」之外的入口：打开「管理许可证」窗口（输入已购买的密钥）。
+    let onManage: () -> Void
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 8) {
-                Image(systemName: "hourglass")
-                Text("剩 \(daysLeft) 天 · 购买")
-                    .font(.callout.weight(.medium))
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+        HStack(spacing: 6) {
+            Image(systemName: "hourglass")
+                .foregroundStyle(.secondary)
+            Text("试用中 · 剩 \(daysLeft) 天")
+                .foregroundStyle(.secondary)
+            if !LicenseBuildConfig.checkoutURL.isEmpty {
+                Button("购买") {
+                    store.dispatch(.licensePurchaseRequested(checkoutURL: LicenseBuildConfig.checkoutURL))
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .help("在浏览器中打开购买页面。")
             }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.accentColor)
-            .contentShape(Rectangle())
+            Button("输入许可证…", action: onManage)
+                .buttonStyle(.link)
+                .help("已购买？在这里输入许可证密钥。")
         }
-        .buttonStyle(.plain)
-        .help("点按管理许可证或购买。")
-        .accessibilityLabel(Text("剩 \(daysLeft) 天 · 购买"))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text("试用中，剩 \(daysLeft) 天"))
     }
 }
 
@@ -66,10 +73,7 @@ struct TrialPromptView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Image("PigeonLogo")
-                .resizable().scaledToFit()
-                .frame(width: 64, height: 64)
-                .accessibilityHidden(true)
+            BrandIcon(size: 64)
 
             switch trial {
             case .trial(let days):

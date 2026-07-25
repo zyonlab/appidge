@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Core
 
 /// 用户可选的界面语言。`@AppStorage(AppLanguage.storageKey)` 存原始字符串——它同时就是喂给
 /// `AppleLanguages` 的语言代码(`zh-Hans` / `en`)。
@@ -71,14 +72,35 @@ enum LanguageBootstrap {
         relaunch()
     }
 
-    /// 新开一个实例(带重启守卫 env),再正常退出当前实例——退出走 `applicationWillTerminate`,
-    /// 会先停掉透明代理会话(不留僵尸接管,几秒内新实例重新接管)。
+    /// 新开一个实例(带重启守卫 env),确认它真的起来了之后再退出当前实例，并**把接管会话交接**
+    /// 给接班者(退出时不停会话)。
+    ///
+    /// 为什么要交接：NE 配置是**按 app 全局一份**、不是每进程一份。老实例退出走
+    /// `applicationWillTerminate` → `stopCachedSessionForTermination()` 会停掉已知的**全部**会话
+    /// （那是为根治「退出留下僵尸接管 = 全系统断网」特意做的），而接班者此时往往已经
+    /// `startVPNTunnel()` 起好了会话 —— 于是前任把接班者的会话停掉，扩展再收不到任何 flow，
+    /// 表现为「切完语言活动列表就空了」。扩展在这条路径上并没有变，本就该交接而不是停。
+    ///
+    /// 为什么必须确认接班成功：原实现忽略 `openApplication` 的两个回调参数、无条件 terminate。
+    /// 在「退出即停会话」的旧语义下最多是白退一次；改成交接语义后，同一条路径会变成
+    /// 「app 退了 + 接班者没起来 + 会话还在跑且没有 UI 能停它」= 全系统断网只能重启电脑。
+    /// 故失败时留在原地继续运行（语言下次启动仍会生效，`AppleLanguages` 已经写好了）。
     private static func relaunch() {
         let config = NSWorkspace.OpenConfiguration()
         config.createsNewApplicationInstance = true
         config.environment = [relaunchGuardEnv: "1"]
-        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: config) { _, _ in
-            Task { @MainActor in NSApp.terminate(nil) }
+        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: config) { app, error in
+            let launched = app != nil && error == nil
+            Task { @MainActor in
+                switch RelaunchHandoff.decide(successorLaunched: launched) {
+                case .handOffAndTerminate:
+                    AppTermination.isHandingOffToSuccessor = true
+                    NSApp.terminate(nil)
+                case .abortStayRunning:
+                    // 不退出、不交接：宁可语言这次没切成，也绝不留下无人管的接管。
+                    NSLog("appidge: language relaunch aborted — successor did not launch (\(error?.localizedDescription ?? "unknown")); staying alive")
+                }
+            }
         }
     }
 }

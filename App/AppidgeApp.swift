@@ -35,9 +35,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // 先强制同步存盘(退出前把最新配置落地,防 400ms 防抖没触发就退出丢改动),再停会话。
+        // 先强制同步存盘(退出前把最新配置落地,防 400ms 防抖没触发就退出丢改动),再按路径处置会话。
         AppTermination.persist?()
-        TransparentProxyController.stopCachedSessionForTermination()
+        switch RelaunchHandoff.terminationPolicy(isHandingOff: AppTermination.isHandingOffToSuccessor) {
+        case .stopAllSessions:
+            // 普通退出 / Sparkle 升级重启：UI 不在，接管就不该在。升级时扩展二进制会被整个替换，
+            // 把老会话跨着 provider 替换带过去正是「绑死旧 provider」的黑洞成因——必须停。
+            TransparentProxyController.stopCachedSessionForTermination()
+        case .keepSessionForSuccessor:
+            // 语言切换交接：扩展没变，接班实例已确认启动并持有同一份全局 NE 配置。
+            // 这里若照停，停掉的正是接班者刚起的那个会话（切完语言活动列表就空了的成因）。
+            // 万一交接窗口出意外，接班者启动后的会话监督会把会话拉回来（sessionSupervisionDecision）。
+            break
+        }
     }
 }
 
@@ -47,6 +57,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @MainActor
 enum AppTermination {
     static var persist: (() -> Void)?
+    /// 本次退出是不是「语言切换交接给接班实例」。只有 `LanguageBootstrap.relaunch()` 在**确认**
+    /// 接班实例已启动后才置真；置真时退出不停接管会话（见 `applicationWillTerminate`）。
+    /// 默认 false —— 任何其它退出路径（普通退出、Sparkle 升级重启）都照常停光会话。
+    static var isHandingOffToSuccessor = false
 }
 
 /// 主窗口选中的顶层分段(活动/应用/规则/代理)提升为**跨窗口共享状态**:主窗口的分段 Picker 与
@@ -209,6 +223,10 @@ struct AppidgeApp: App {
                 // 试用：读本地双锚点（Keychain + Application Support 文件）。reducer 仅在 license==nil
                 // 且相位 .unlicensed 时才据此进入 .trial/.trialExpired，故排在授权恢复之后。
                 store.dispatch(.trialLoadRequested)
+                // 会话监督：确认接管会话真的连上了，没有就拉起来。**不假设交接一定成功**——
+                // 语言切换时前任可能刚好把接班者起的会话停掉（NE 配置按 app 全局一份），
+                // 交接标记只是让这件事不再发生，这里才是兜底。判定是 Core 纯函数、可反复评估。
+                superviseSession()
                 // 周期性时钟推进：本地判定宽限耗尽/订阅到期（防时钟回拨），到期则每日联网校验一次。
                 Task { @MainActor in
                     while !Task.isCancelled {
@@ -305,6 +323,25 @@ struct AppidgeApp: App {
               let ext = items.first(where: { $0.pathExtension == "systemextension" }) else { return nil }
         let info = ext.appendingPathComponent("Contents/Info.plist")
         return (NSDictionary(contentsOf: info)?["CFBundleVersion"] as? String)
+    }
+
+    /// 启动后确认接管会话真的在跑；不在就拉起来。判定是 Core 纯函数
+    /// ``Core/AppState/sessionSupervisionDecision(isSessionConnected:)``，本方法只查状态 + 执行副作用。
+    ///
+    /// 为什么需要：会话可能在 app 不知情的情况下被停掉——最典型是切换界面语言，老实例退出时
+    /// 会停掉**全部**已知会话，而 NE 配置按 app 全局只有一份，于是接班者刚起的会话被前任停掉
+    /// （症状：切完语言活动列表就空了）。交接标记让这条路径不再发生，但监督是不依赖交接成功的兜底。
+    ///
+    /// 会话状态要等 NE 真正连上才稳定，故给一个短暂的宽限窗口再判，避免刚起就误判成「没连上」。
+    @MainActor
+    private func superviseSession() {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(3))
+            let connected = await TransparentProxyController.isRunning()
+            guard store.state.sessionSupervisionDecision(isSessionConnected: connected) == .startSession
+            else { return }
+            TransparentProxyController.start()
+        }
     }
 
     /// 版本握手自愈「升级后会话绑死旧 provider=黑洞」。判定全部在 Core 的纯函数里（可测），

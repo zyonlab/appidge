@@ -66,12 +66,9 @@ struct AppidgeApp: App {
     @State private var profilesModel: ProfilesModel
     /// 主窗口分段选中态,菜单栏「打开入口」与主窗口 Picker 共享同一份(见 MainTabSelection)。
     @State private var tabSelection = MainTabSelection()
-    /// 本进程内是否见过「扩展运行版本 ≠ 包内版本」(= 刚升级过);见 maybeHealStaleBinding。
-    @State private var sawExtensionMismatch = false
-    /// 升级后是否已重绑过一次会话到新 provider(一次为限,避免反复)。
-    @State private var reboundAfterUpgrade = false
-    /// 升级后卡在旧 provider(运行≠包内【持续】=死锁)时是否已做过【一次】有界重启;见 maybeHealStaleBinding。
-    @State private var mismatchHealAttempted = false
+    /// 升级后陈旧绑定自愈的一次性记忆(强制重启/重绑各最多一次)。判定逻辑是 Core 里的纯函数
+    /// ``Core/AppState/staleBindingHealDecision(memo:)``,本层只负责在若干时机重新评估并执行副作用。
+    @State private var staleBindingHealMemo = StaleBindingHealMemo.initial
     /// 未购买（试用中/已到期）时的启动弹窗是否正在展示（Proxifier 式每次启动提示）。
     @State private var showTrialPrompt = false
     /// 本次启动是否已评估过启动弹窗（一次为限：相位一旦落到试用/到期就弹一次，不反复打扰）。
@@ -197,6 +194,10 @@ struct AppidgeApp: App {
                     // 规则调序是离散按钮点击(非连续拖拽流),JSON 又小,每次同步原子写代价可忽略。
                     persistCurrentConfiguration()
                 }
+                // 补一次自愈评估：扩展的版本回报（XPC 一连上就发）很可能早于上面 onAction 的接线，
+                // 那次回报不会触发任何观察者，而 action 去重又让它不会再报一次——只有在这里读
+                // 当前 state 主动评估，「升级后那一次启动」才不会被永久错过。判定幂等。
+                maybeHealStaleBinding()
                 store.dispatch(.appLaunched)
                 // 启动恢复完成后,把最终的完整配置全量重推给扩展一次。onConnect 那次可能发生在
                 // 恢复之前(状态还空);这次确保扩展拿到的是恢复后的最新全量(规则+代理+路由+UDP+
@@ -306,30 +307,34 @@ struct AppidgeApp: App {
         return (NSDictionary(contentsOf: info)?["CFBundleVersion"] as? String)
     }
 
-    /// 版本握手自愈「升级后会话绑死旧 provider=黑洞」:运行==包内且曾见不匹配→重绑一次;运行≠包内【持续】=死锁→延迟8s后做一次有界重启逼 NE 换到最新 provider(只一次防旧 bug 无限环,仍不行留手动「重启接管」兜底)。
+    /// 版本握手自愈「升级后会话绑死旧 provider=黑洞」。判定全部在 Core 的纯函数里（可测），
+    /// 本方法只执行副作用。
+    ///
+    /// **必须允许反复调用**：自愈原先只挂在 `.extensionVersionReported` 这一个 action 边沿上，
+    /// 而扩展 XPC 一连上就发版本，往往早于下面 `store.onAction` 的接线（中间隔着 ipcReceiver.start
+    /// 之后的数个 await）；加上该 action 本身有去重，扩展再报同一版本也不会重新触发——
+    /// 于是「升级后那一次启动」这个唯一需要自愈的场景被永久错过，表现为打开应用没有活动连接。
+    /// 现在改为读当前 state 做判定，幂等由 `staleBindingHealMemo` 保证，可在任意时机安全补评估。
     @MainActor
     private func maybeHealStaleBinding() {
-        guard store.state.isLicenseActive, store.state.hasCompletedOnboarding else { return }
-        guard let running = store.state.runningExtensionVersion,
-              let bundled = store.state.bundledExtensionVersion else { return }
-        if running != bundled {
-            sawExtensionMismatch = true
-            guard !mismatchHealAttempted else { return }
-            mismatchHealAttempted = true
+        let decision = store.state.staleBindingHealDecision(memo: staleBindingHealMemo)
+        staleBindingHealMemo.recordDecision(decision)
+        switch decision {
+        case .none:
+            return
+        case .rebindNow:
+            TransparentProxyController.restart()
+        case .scheduleForcedRestart:
+            // 延迟一小段再动手：给 NE 自己完成 provider 切换的机会，避免和系统的重绑打架。
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(8))
-                guard let r = store.state.runningExtensionVersion,
-                      let b = store.state.bundledExtensionVersion, r != b,
+                // 期间可能已自行恢复（版本追平）——那就不必强制重启，交给 .rebindNow 那条路径。
+                guard store.state.extensionNeedsRebind,
                       store.state.isLicenseActive,
                       store.state.hasCompletedOnboarding else { return }
-                reboundAfterUpgrade = true
                 TransparentProxyController.restart()
             }
-            return
         }
-        guard sawExtensionMismatch, !reboundAfterUpgrade else { return }
-        reboundAfterUpgrade = true
-        TransparentProxyController.restart()
     }
 
     /// 未购买时的启动弹窗调度：相位落到试用/到期就弹一次（一次为限，Proxifier 式每次启动提示）；
@@ -428,6 +433,9 @@ struct AppidgeApp: App {
             if case .disabled = state { return }
             SystemExtensionActivator.shared.activate()
             TransparentProxyController.start()
+            // 相位（授权/试用）是异步从 Keychain 恢复后才落定的，落定前 isLicenseActive 为假、
+            // 自愈判定一律 .none。这里在能力开放后再评估一次，避免「相位晚落定」把升级自愈吃掉。
+            maybeHealStaleBinding()
         }
     }
 

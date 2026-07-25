@@ -184,6 +184,7 @@ struct OnboardingView: View {
     private static func activation(_ state: ExtensionActivation) -> ActivationStyle {
         switch state {
         case .active: ActivationStyle("checkmark.shield.fill", "已启用,可以继续", .green)
+        case .activePendingReboot: ActivationStyle("arrow.clockwise.circle.fill", "已启用（新版本待重启生效）", .orange)
         case .inactive: ActivationStyle("bolt.horizontal.circle", "未接入——点「启用扩展」", .secondary)
         case .activating: ActivationStyle("arrow.triangle.2.circlepath", "安装中…", .orange)
         case .needsApproval: ActivationStyle("exclamationmark.circle.fill", "待批准——去系统设置点「允许」", .orange)

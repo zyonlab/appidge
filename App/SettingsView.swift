@@ -173,6 +173,7 @@ struct SettingsView: View {
     private static func activation(_ state: ExtensionActivation) -> (label: LocalizedStringKey, color: Color) {
         switch state {
         case .active: ("已接管", .secondary)
+        case .activePendingReboot: ("已接管（新版本待重启电脑生效）", .orange)
         case .inactive: ("未接入", .secondary)
         case .activating: ("安装中…", .orange)
         case .needsApproval: ("待批准（去系统设置允许）", .orange)

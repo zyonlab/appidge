@@ -238,6 +238,8 @@ struct MainWindow: View {
             "系统扩展等待批准——在「登录项与扩展 → 网络扩展」里允许 appidge 后即开始接管。"
         case .disabled:
             "网络扩展已被停用——在「登录项与扩展 → 网络扩展」里重新打开后自动恢复接管。"
+        case .activePendingReboot:
+            "新版本扩展要重启电脑后才生效——当前仍由旧版本接管，功能不受影响，可继续使用。"
         case .active, .inactive, .activating, .failed:
             nil
         }

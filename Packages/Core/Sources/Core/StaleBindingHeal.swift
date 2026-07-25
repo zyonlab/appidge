@@ -16,6 +16,10 @@ public enum StaleBindingHealDecision: Sendable, Equatable {
     case scheduleForcedRestart
     /// 曾见不匹配、现在版本已一致：重绑一次，让会话真正挂到新 provider 上。
     case rebindNow
+    /// 新版本卡在「待重启电脑生效」：**重启隧道是徒劳的**——`restart()` 用版本无关的
+    /// `providerBundleIdentifier`，改不了系统注册哪个版本。唯一能换版本的是重新提交
+    /// `OSSystemExtensionRequest`（并先释放旧 provider 的占用，给替换一次不用重启就完成的机会）。
+    case reactivateExtension
 }
 
 /// 自愈的一次性记忆。App 层持有，跨多次评估累积，保证「强制重启」「重绑」各自最多发生一次。
@@ -31,15 +35,19 @@ public struct StaleBindingHealMemo: Sendable, Equatable {
     public var forcedRestartAttempted: Bool
     /// 是否已经做过升级后的那一次重绑。
     public var rebound: Bool
+    /// 是否已经为「待重启生效」重新提交过一次 activation。
+    public var reactivateAttempted: Bool
 
     public static let initial = StaleBindingHealMemo(
-        sawMismatch: false, forcedRestartAttempted: false, rebound: false
+        sawMismatch: false, forcedRestartAttempted: false, rebound: false, reactivateAttempted: false
     )
 
-    public init(sawMismatch: Bool, forcedRestartAttempted: Bool, rebound: Bool) {
+    public init(sawMismatch: Bool, forcedRestartAttempted: Bool, rebound: Bool,
+                reactivateAttempted: Bool = false) {
         self.sawMismatch = sawMismatch
         self.forcedRestartAttempted = forcedRestartAttempted
         self.rebound = rebound
+        self.reactivateAttempted = reactivateAttempted
     }
 
     /// 把一次决策记进 memo。`.none` 不消耗任何一次性额度——否则相位还没落定时的那次
@@ -53,6 +61,9 @@ public struct StaleBindingHealMemo: Sendable, Equatable {
             forcedRestartAttempted = true
         case .rebindNow:
             rebound = true
+        case .reactivateExtension:
+            sawMismatch = true
+            reactivateAttempted = true
         }
     }
 }
@@ -69,6 +80,10 @@ extension AppState {
         guard runningExtensionVersion != nil, bundledExtensionVersion != nil else { return .none }
 
         if extensionNeedsRebind {
+            // 系统已明说新版本要重启电脑才生效：重启隧道改不了扩展版本，只能重新提交 activation。
+            if extensionActivation.isPendingReboot {
+                return memo.reactivateAttempted ? .none : .reactivateExtension
+            }
             return memo.forcedRestartAttempted ? .none : .scheduleForcedRestart
         }
         // 版本已一致：只有「曾经见过不匹配」才需要补一次重绑；正常启动不该无谓重启接管。

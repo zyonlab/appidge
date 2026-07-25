@@ -3341,6 +3341,76 @@
           }
         }
       }
+    },
+    "新版本待重启生效 · 仍在接管": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New version pending restart · still handling"
+          }
+        }
+      }
+    },
+    "已装新版本，但系统要重启电脑后才会换到它；当前仍由旧版本扩展接管流量，功能不受影响。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The new version is installed, but macOS will only switch to it after you restart your Mac. Traffic is still being handled by the previous extension version — functionality is unaffected."
+          }
+        }
+      }
+    },
+    "已接管（新版本待重启电脑生效）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Handling (new version pending Mac restart)"
+          }
+        }
+      }
+    },
+    "新版本扩展要重启电脑后才生效——当前仍由旧版本接管，功能不受影响，可继续使用。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The new extension version takes effect after you restart your Mac. The previous version is still handling traffic — functionality is unaffected, you can keep using appidge."
+          }
+        }
+      }
+    },
+    "新版本待重启生效": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New version pending restart"
+          }
+        }
+      }
+    },
+    "当前仍由旧版本扩展接管，功能不受影响。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Traffic is still handled by the previous extension version — functionality is unaffected."
+          }
+        }
+      }
+    },
+    "已启用（新版本待重启生效）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enabled (new version pending restart)"
+          }
+        }
+      }
     }
   }
 }

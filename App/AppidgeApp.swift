@@ -94,8 +94,11 @@ struct AppidgeApp: App {
     // Sparkle 自动升级:startingUpdater=true 一构造即启动后台自动检查;菜单栏「检查更新…」用其
     // `updater` 手动触发。feed URL / EdDSA 公钥读自 App/Info.plist(SUFeedURL / SUPublicEDKey)。
     // Developer ID 非沙盒 app 用标准配置即可,无需 XPC 服务分离。
+    // updaterDelegate 负责在安装/重启前停掉接管会话，释放旧扩展占用，让系统扩展替换能当场完成
+    // 而不是落进「重启电脑后生效」（见 UpdaterSessionRelease）。
+    private static let updaterSessionRelease = UpdaterSessionRelease()
     private let updaterController = SPUStandardUpdaterController(
-        startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil
+        startingUpdater: true, updaterDelegate: AppidgeApp.updaterSessionRelease, userDriverDelegate: nil
     )
     // 代理密码存 Keychain，不落 JSON（见 PersistedProxyServer 结构上无 password 字段）。
     private let credentialStore: any CredentialStore = KeychainCredentialStore()
@@ -361,6 +364,18 @@ struct AppidgeApp: App {
             return
         case .rebindNow:
             TransparentProxyController.restart()
+        case .reactivateExtension:
+            // 系统已明说新版本要重启电脑才生效：重启隧道是徒劳的（改不了系统注册哪个版本）。
+            // 先停会话释放旧 provider 的占用，再重新提交 activation——给替换一次「不必重启电脑
+            // 就完成」的机会；完成后会话由 onStateChange/会话监督重新起来。
+            // 仍不行则维持旧版本接管（功能完整，停掉反而断网），由 UI 如实告知需要重启电脑。
+            Task { @MainActor in
+                TransparentProxyController.stop()
+                try? await Task.sleep(for: .seconds(2))
+                SystemExtensionActivator.shared.activate()
+                try? await Task.sleep(for: .seconds(3))
+                TransparentProxyController.start()
+            }
         case .scheduleForcedRestart:
             // 延迟一小段再动手：给 NE 自己完成 provider 切换的机会，避免和系统的重绑打架。
             Task { @MainActor in

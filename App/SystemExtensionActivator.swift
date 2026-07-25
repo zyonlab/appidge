@@ -129,8 +129,14 @@ final class SystemExtensionActivator: NSObject, OSSystemExtensionRequestDelegate
     nonisolated func request(_ request: OSSystemExtensionRequest, didFinishWithResult result: OSSystemExtensionRequest.Result) {
         FileHandle.standardError.write(Data("SEA: activation finished result=\(result.rawValue)\n".utf8))
         activatorLogger.log("activation finished: \(String(describing: result), privacy: .public)")
-        // .completed / .willCompleteAfterReboot 都视作已接管（重启后生效那种也算装上了）。
-        Task { @MainActor in self.report(.active) }
+        // ⚠️ 曾经把 .completed 与 .willCompleteAfterReboot 都报成 .active —— 那是**谎报**：
+        // 后者意味着系统因旧扩展仍被占用而无法立即替换，新版本要重启电脑后才生效，此刻
+        // 跑的仍是**旧** provider。谎报的后果：app 照常起会话、绑到旧 provider，
+        // runningExtensionVersion 与 bundledExtensionVersion 长期不一致，而版本握手自愈
+        // 只会重启隧道（用版本无关的 providerBundleIdentifier，改不了系统注册哪个版本），
+        // 于是永远修不好——真机实测 69→70 升级后卡死，只有完整重启 app 才恢复。
+        let state: ExtensionActivation = result == .willCompleteAfterReboot ? .activePendingReboot : .active
+        Task { @MainActor in self.report(state) }
     }
 }
 

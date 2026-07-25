@@ -33,6 +33,10 @@ struct StatusBar: View {
     /// 状态先看扩展装没装(没装/待批准/失败都得先说清,否则"引擎正常"会误导);装上了再看引擎健康度。
     private var status: StatusInfo {
         switch store.state.extensionActivation {
+        case .activePendingReboot:
+            // 如实告知：接管在跑，但跑的是旧版本扩展，新版本要重启电脑才生效。
+            return StatusInfo(color: .orange, text: "新版本待重启生效 · 仍在接管", emphasized: true,
+                              tooltip: "已装新版本，但系统要重启电脑后才会换到它；当前仍由旧版本扩展接管流量，功能不受影响。")
         case .active:
             return store.state.isEngineHealthy
                 ? StatusInfo(color: .green, text: "引擎正常", emphasized: false, tooltip: nil)

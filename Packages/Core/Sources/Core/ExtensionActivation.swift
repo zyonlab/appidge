@@ -17,6 +17,16 @@ public enum ExtensionActivation: Sendable, Equatable, Codable {
     case needsApproval
     /// 扩展已安装并在运行。
     case active
+    /// **接管在跑，但跑的是旧版本**：升级后系统因旧扩展仍被占用而无法立即替换，
+    /// `OSSystemExtensionRequest` 返回 `.willCompleteAfterReboot` —— 新版本要重启电脑后才生效。
+    ///
+    /// 必须与 `.active` 区分开：曾经两者都被报成 `.active`，等于谎报「新版本已接管」，
+    /// 于是 app 照常起会话、会话绑到仍在跑的旧 provider，`runningExtensionVersion` 与
+    /// `bundledExtensionVersion` 长期不一致且**无法靠重启隧道修复**
+    /// （`restart()` 用的是版本无关的 providerBundleIdentifier，改不了系统注册哪个版本）。
+    ///
+    /// 此态下旧 provider 功能完整、仍在转发流量，故 ``isRunning`` 为真——停掉反而让用户断网。
+    case activePendingReboot
     /// 扩展**已安装但被用户在「系统设置 → 通用 → 登录项与扩展」里停用**——不会收到任何 flow,
     /// XPC 也无人监听。区别于 `needsApproval`(从未批准):这是"批准过又被关掉",由启动时的
     /// `propertiesRequest` 状态查询发现(isEnabled == false 且不在等批准)。UI 据此把人指向
@@ -25,6 +35,12 @@ public enum ExtensionActivation: Sendable, Equatable, Codable {
     /// 激活失败(如缺 entitlement、签名不符);`reason` 是系统给的原因,供 tooltip/日志。
     case failed(reason: String)
 
-    /// 扩展是否确实在跑——只有 `.active` 为真。状态栏据此决定「先看扩展状态还是看引擎健康」。
-    public var isRunning: Bool { self == .active }
+    /// 扩展是否确实在转发流量。`.active` 与 `.activePendingReboot` 都为真——后者跑的虽是旧版本，
+    /// 但功能完整、流量确实在被接管，据此停接管只会让用户断网。版本是否陈旧由
+    /// ``AppState/extensionNeedsRebind`` 单独回答，两件事不要混。
+    public var isRunning: Bool { self == .active || self == .activePendingReboot }
+
+    /// 新版本是否卡在「要重启电脑才生效」。UI 据此如实告知，自愈据此改走重新提交 activation
+    /// （重启隧道对这一态无效）。
+    public var isPendingReboot: Bool { self == .activePendingReboot }
 }

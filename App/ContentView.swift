@@ -42,6 +42,9 @@ struct MenuBarView: View {
             )
         }
         switch store.state.extensionActivation {
+        case .activePendingReboot:
+            return StatusPresentation(symbol: "arrow.clockwise.circle.fill", tint: .orange,
+                                      text: "新版本待重启生效", help: "当前仍由旧版本扩展接管，功能不受影响。")
         case .active:
             return store.state.isEngineHealthy
                 ? StatusPresentation(symbol: "checkmark.shield.fill", tint: .green,

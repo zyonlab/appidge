@@ -13,12 +13,26 @@ struct ProxyServerReducerTests {
         .applyProxyConfig(servers: servers.sorted { $0.id.value < $1.id.value }, activeID: active)
     }
 
+    /// 加入**首台**代理时除了推配置，还会建一条 `* * → 代理` 兜底规则并推规则集
+    /// （「配置过代理时默认走代理」，见 DefaultCatchAllRuleTests）。故这里断言两个 effect。
     @Test("addProxyServer inserts by id and emits a config-push effect with the new config")
     func addProxyServer() {
         let server = makeServer("a")
         let (next, effects) = Reducer.reduce(AppState(), .addProxyServer(server))
         #expect(next.proxyServers[ProxyServerID("a")] == server)
-        #expect(effects == [configEffect([server], active: ProxyServerID("a"))])
+        #expect(effects == [
+            configEffect([server], active: ProxyServerID("a")),
+            .applyRuleSet(assignments: [:], matchRules: [Reducer.defaultCatchAllRule])
+        ])
+    }
+
+    /// 非首台代理不再建兜底规则，effect 仍然只有配置推送这一个（原行为不变）。
+    @Test("adding a subsequent proxy server emits only the config push")
+    func subsequentAddEmitsOnlyConfigPush() {
+        let (afterFirst, _) = Reducer.reduce(AppState(), .addProxyServer(makeServer("a")))
+        let second = makeServer("b", host: "10.0.0.1")
+        let (next, effects) = Reducer.reduce(afterFirst, .addProxyServer(second))
+        #expect(effects == [configEffect(Array(next.proxyServers.values), active: ProxyServerID("a"))])
     }
 
     @Test("adding the first proxy server auto-selects it as active")

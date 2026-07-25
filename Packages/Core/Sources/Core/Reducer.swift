@@ -266,11 +266,33 @@ public enum Reducer {
         var state = state
         state.proxyServers[server.id] = server
         // 第一台被加入的代理自动选为 active，省去用户还得再点一下选中。
-        if state.activeProxyServerID == nil {
+        let isFirstProxy = state.activeProxyServerID == nil
+        if isFirstProxy {
             state.activeProxyServerID = server.id
         }
-        return (state, [proxyConfigPush(state)])
+        // 「配置过代理时默认走代理」（CLAUDE.md §1 核心语义）。扩展的路由回落是
+        // 规则表 → 每进程规则 → 默认 .direct（fail-open 安全网，不能改：规则下发失败时宁可直连
+        // 也绝不黑洞网络）。所以这条语义要靠一条**真实存在、可见可改可删**的兜底规则来表达，
+        // 而不是藏在代码里的隐式行为——与仓库既有的「自动旁路不是黑盒，如实列出」一致。
+        //
+        // 只在「第一台代理 + 规则表还是空的」时建：用户已经在管规则了就别替他做主；
+        // 他删掉这条兜底（想默认直连）之后再加代理，也不会被塞回来（那时已不是第一台）。
+        // 顺序天然正确：新规则插在表首，这条兜底在引导期落到最底，之后每条具体规则都压在它上面。
+        guard isFirstProxy, state.rules.isEmpty else {
+            return (state, [proxyConfigPush(state)])
+        }
+        state = upsertingMatchRule(defaultCatchAllRule, state)
+        return (state, [proxyConfigPush(state), ruleSetPush(state)])
     }
+
+    /// 加入首台代理时自动建的兜底规则：任意进程 × 任意主机 × 任意端口 → 走代理。
+    /// `proxyServerID` 留空 = 跟随全局活动代理 / 路由模式，换代理不必改规则。
+    /// id 确定（同 `derivedRuleID` 的做法），reducer 因此保持纯函数、不生成 UUID。
+    static let defaultCatchAllRule = ProxyMatchRule(
+        id: RuleID("default:catch-all"),
+        appPattern: "*", hostPattern: "*", portRange: nil,
+        action: .proxied, proxyServerID: nil, isEnabled: true
+    )
 
     private static func updateProxyServer(_ server: ProxyServer, _ state: AppState) -> (AppState, [Effect]) {
         var state = state

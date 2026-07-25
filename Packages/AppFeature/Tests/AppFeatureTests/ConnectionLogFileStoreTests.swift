@@ -65,6 +65,30 @@ struct ConnectionLogFileStoreTests {
         #expect(loaded.map(\.id) == ["3", "4", "5"])
     }
 
+    /// 回归:`append` 复用一个常驻 FileHandle(消除每条日志一次 open/close 的浪费)。滚动与
+    /// `clear()` 都会用原子写/删除**替换掉文件本身**,旧 inode 随即作废——此时若不弃掉旧句柄,
+    /// 后续 append 会一路写进那个不可达的 inode:调用全部"成功"、磁盘上却再不增长,
+    /// 表现为「跑着跑着连接日志不再更新」。这条把该不变量钉死。
+    @Test("回归·滚动与 clear 替换文件后,继续 append 仍写进当前文件(不写已作废的 inode)")
+    func appendKeepsWorkingAfterFileReplaced() async throws {
+        let url = makeTempFileURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        let store = ConnectionLogFileStore(fileURL: url, maxLines: 3)
+        // 越过上限触发滚动(文件被原子写替换)。
+        for i in 1...5 { await store.append(makeEntry(id: "\(i)")) }
+        // 滚动之后继续写——这些必须真的落到当前文件里。
+        for i in 6...8 { await store.append(makeEntry(id: "\(i)")) }
+        let afterRotation = await store.loadRecent(limit: 100)
+        #expect(afterRotation.map(\.id) == ["6", "7", "8"])
+
+        // clear() 删掉文件后继续写,同样必须落到新建的文件里。
+        await store.clear()
+        await store.append(makeEntry(id: "9"))
+        let afterClear = await store.loadRecent(limit: 100)
+        #expect(afterClear.map(\.id) == ["9"])
+    }
+
     @Test("超过 maxLines 后触发滚动,丢掉最旧的行,只保留最后 maxLines 条")
     func capRotationDropsOldestLines() async throws {
         let url = makeTempFileURL()

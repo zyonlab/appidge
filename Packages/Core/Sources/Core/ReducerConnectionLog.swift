@@ -33,7 +33,11 @@ extension Reducer {
     /// 已存在就不碰,避免覆盖扫描/持久化已经取到的更好的 displayName/已分配的 rule)。
     static func applyingConnectionEntry(_ entry: ConnectionLogEntry, to state: AppState) -> AppState {
         var state = state
-        if let index = state.connectionLog.firstIndex(where: { $0.id == entry.id }) {
+        // 从**尾部**找:日志按插入顺序排列,而绝大多数更新打的是刚刚建立的那条连接
+        // (opened → 统计 → closed),它就在尾部附近 —— 倒着找命中通常是 O(1),正着找则每次都要
+        // 从最老的一条扫起。id 在日志里唯一(本函数即按 id 去重),所以 first/last 找到的是
+        // **同一个元素**,语义完全等价,没有行为变化。
+        if let index = state.connectionLog.lastIndex(where: { $0.id == entry.id }) {
             state.connectionLog[index] = entry
         } else {
             state.connectionLog.append(entry)

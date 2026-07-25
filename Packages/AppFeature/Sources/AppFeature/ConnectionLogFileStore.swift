@@ -22,6 +22,18 @@ public actor ConnectionLogFileStore {
     /// 换来 append 的均摊成本从 O(n) 降到 O(1)。maxLines 很小时(测试)退化成每次都查,行为不变。
     private var rotationCheckStride: Int { max(1, maxLines / 4) }
 
+    /// 复用的写句柄。原先每条 append 都 `createDirectory` + `fileExists` + 打开 + 关闭一次
+    /// FileHandle —— 全量接管下连接事件十几~上百条/秒,等于每秒上百次文件打开,纯属浪费。
+    /// 这里只在首次(或文件被替换/删除后)打开一次，之后一直复用。
+    ///
+    /// **落盘时机完全不变**:仍是每条 append 立刻 write 到已打开的句柄,不做跨调用缓冲——
+    /// 缓冲会让 `loadRecent` / 直接读文件看不到刚写的行,那是语义变化(现有测试正是这么用的)。
+    /// 这里只消除重复系统调用,不改变可见性。
+    private var handle: FileHandle?
+    /// 复用的编码器(原先每条 append 新建一个)。`JSONEncoder` 无跨调用状态,可安全复用;
+    /// actor 已串行化访问。
+    private let encoder = JSONEncoder()
+
     /// 默认落盘位置:`~/Library/Application Support/appidge/connections.log.jsonl`。
     /// 与 `FilePersistenceStore.defaultFileURL` 同目录,仅文件名不同。
     public static var defaultFileURL: URL {
@@ -44,19 +56,14 @@ public actor ConnectionLogFileStore {
     /// 默认 `JSONEncoder` 输出无内部换行,天然满足「一条 entry 恰好一行」的 JSONL 约束。
     /// 追加后检查行数,越过 `maxLines` 就滚动。全程错误静默,永不抛。
     public func append(_ entry: Core.ConnectionLogEntry) async {
-        guard let data = try? JSONEncoder().encode(entry) else { return }
+        guard let data = try? encoder.encode(entry) else { return }
         var payload = data
         payload.append(0x0A)   // '\n'
 
-        let directory = fileURL.deletingLastPathComponent()
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-
-        if FileManager.default.fileExists(atPath: fileURL.path),
-           let handle = try? FileHandle(forWritingTo: fileURL) {
-            defer { try? handle.close() }
-            _ = try? handle.seekToEnd()
+        if let handle = writeHandle() {
             try? handle.write(contentsOf: payload)
         } else {
+            // 拿不到句柄(首次创建失败等)时退回原子写,保证这条不丢。
             try? payload.write(to: fileURL, options: .atomic)
         }
 
@@ -84,6 +91,9 @@ public actor ConnectionLogFileStore {
     /// `append` 靠 `fileExists` 判断"续写 vs 新建",删文件让下次 append 走"新建"分支,
     /// 逻辑更简单)。文件本来就不存在也不算错误。
     public func clear() async {
+        // 先弃掉句柄:文件即将被删除,继续持有就会写进一个已不可达的 inode(数据看似写成功、
+        // 实际永远读不到)。下次 append 会重新建文件并打开。
+        closeHandle()
         try? FileManager.default.removeItem(at: fileURL)
     }
 
@@ -106,6 +116,33 @@ public actor ConnectionLogFileStore {
         guard lines.count > maxLines else { return }
         let kept = lines.suffix(maxLines)
         let joined = kept.joined(separator: "\n") + "\n"
+        // 原子写会用新文件**替换**旧的 → 旧 inode 作废。必须先弃句柄,否则之后的 append 全都
+        // 写进那个已被替换掉的 inode,表现为「日志突然不再增长」。
+        closeHandle()
         try? Data(joined.utf8).write(to: fileURL, options: .atomic)
+    }
+
+    /// 取写句柄(必要时建目录、建空文件并打开)。已持有就直接复用,并保证写位置在文件尾。
+    private func writeHandle() -> FileHandle? {
+        if let handle { return handle }
+        let directory = fileURL.deletingLastPathComponent()
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        if !FileManager.default.fileExists(atPath: fileURL.path) {
+            FileManager.default.createFile(atPath: fileURL.path, contents: nil)
+        }
+        guard let opened = try? FileHandle(forWritingTo: fileURL) else { return nil }
+        _ = try? opened.seekToEnd()
+        handle = opened
+        return opened
+    }
+
+    /// 关闭并弃掉当前句柄(文件被删除/替换前必须调用)。
+    private func closeHandle() {
+        try? handle?.close()
+        handle = nil
+    }
+
+    deinit {
+        try? handle?.close()
     }
 }

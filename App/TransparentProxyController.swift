@@ -105,6 +105,10 @@ enum TransparentProxyController {
                 // 由系统调度，与 flow.first 的差值即「NE 会话建立」本身的耗时（天然成本，改不动）。
                 PerfDiag.milestone("session.tunnel_started")
                 emit("startVPNTunnel() called — provider.startProxy should now run")
+                // 隧道**真正连上**的时刻。缺了这个点就分不清「flow.first 晚」到底是
+                // 隧道建立慢，还是隧道早就通了、只是机器空闲没有新连接产生——两者
+                // 一个可能有优化空间、一个完全正常。有界轮询，最多 30s，只为埋点。
+                observeUntilConnected(mgr)
             }
         } catch {
             let ns = error as NSError
@@ -268,6 +272,21 @@ enum TransparentProxyController {
         // 记住全部已知会话(新建时也把这台记进去),供退出全量停会话。
         remember(managers.isEmpty ? [mgr] : managers)
         return mgr
+    }
+
+    /// 轮询到隧道 `.connected` 为止（上限 30s），记一个里程碑。**纯埋点**：不改变任何行为，
+    /// 不参与启停决策，超时就放弃、不做任何补救动作。
+    private static func observeUntilConnected(_ mgr: NETransparentProxyManager) {
+        Task { @MainActor in
+            for _ in 0..<300 {
+                if mgr.connection.status == .connected {
+                    PerfDiag.milestone("session.connected")
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            PerfDiag.milestone("session.connected", note: "timeout-30s")
+        }
     }
 
     private static func statusName(_ s: NEVPNStatus) -> String {

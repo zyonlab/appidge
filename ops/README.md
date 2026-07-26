@@ -81,6 +81,8 @@ APPIDGE_PRODUCTION_APPROVED=YES ops/bin/appidge-ops deploy-api  production --app
 APPIDGE_PRODUCTION_APPROVED=YES ops/bin/appidge-ops deploy-web  production --apply --confirm-production
 ops/bin/appidge-ops build-macos production --build-number <N>
 ops/bin/appidge-ops prepare-updates production --build-number <N>
+# 首发专用：production feed 还不存在时，一次性放行该 feed 的单调性校验
+# APPIDGE_ALLOW_MISSING_FEED=YES ops/bin/appidge-ops build-macos production --build-number <N>
 APPIDGE_PRODUCTION_APPROVED=YES ops/bin/appidge-ops publish-updates production --apply --confirm-production --build-number <N>
 ops/bin/appidge-ops smoke production
 ops/bin/appidge-ops release-manifest production --build-number <N>
@@ -107,6 +109,21 @@ ops/bin/appidge-ops release-manifest production --build-number <N>
   production migration 前记录 bookmark。
 - **macOS 更新包**：已被下载的错误 build 不能靠降 build 号修复——必须发更高 build。
   每次 `release-manifest` 保存 appcast/DMG 的 SHA-256 以供审计。
+
+## build 号单调性与 `APPIDGE_ALLOW_MISSING_FEED`
+
+staging/production 共用一条**全局递增** build 序列。`build-macos` 会拉取两个 feed 求历史最高
+build，新包必须严格更高——否则用户装到手的版本比线上更旧，且永远收不到更新。
+
+首发有个死锁：`updates.appidge.com` 的 appcast 要到 `publish-updates` 才存在，而 `build-macos`
+在它之前就要求该 feed 可查。用 `APPIDGE_ALLOW_MISSING_FEED=YES` 一次性放行。该开关的边界：
+
+- 只免除**查不到的那个 feed**；可查的 feed 照旧强制单调。
+- 两个 feed 都查不到时**也不放行**——没有任何单调性证据就不许出包。
+- 值必须精确 `=YES`。
+
+⚠️ 别设成常态、更别把该检查改成静默跳过——它是防"发了个比线上更旧的 build"的唯一护栏。
+边界由 `ops/tests/test-config.sh` 的 9 条打桩测试守住（不联网）。
 
 ## 边界
 

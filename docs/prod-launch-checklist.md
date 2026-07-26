@@ -17,16 +17,16 @@
 
 | 类别 | 项 | 现状 | 回填/操作位置 |
 |---|---|---|---|
-| 域名 | appidge.com / www | [待配置] | Cloudflare 账号加 zone + `deploy-web production` 自动建 DNS/证书 |
-| 域名 | api.appidge.com | [待配置] | `deploy-api production` 自动建 |
-| 域名 | updates.appidge.com | [待配置] | `publish-updates production` 自动建（当前是孤儿 DNS 记录，背后无 Worker，见 §1） |
+| 域名 | appidge.com / www | **[已备]** | 2026-07-26 `deploy-web production` 上线，两 route 均绑定（需先删孤儿 A 记录，见 §1） |
+| 域名 | api.appidge.com | **[已备]** | 2026-07-26 `deploy-api production` 上线，healthz 连续 10 次绿 |
+| 域名 | updates.appidge.com | [待配置] | `publish-updates production` 自动建（孤儿 DNS 记录已于 2026-07-26 清掉，见 §1） |
 | 更新服务 | updates-staging.appidge.com | **[已备]** | 2026-07-25 已部署 `appidge-updates-staging`，build 66 + appcast 上线，`smoke staging` 全绿 |
 | 公开配置 | PUBLIC_SITE_URL / API / DOWNLOAD / LICENSE_* / SPARKLE_FEED / SITE_BASE / TRIAL_DAYS | [已备] | `ops/environments/production.conf` |
 | 公开配置 | PUBLIC_POLAR_CHECKOUT_URL（Creem live 支付链接） | **[已备]** | `production.conf`（2026-07-26 回填） |
 | Worker var | MOCK_MODE / CREEM_API_BASE / RATE_LIMIT / MAX_BODY | [已备] | `apps/api/wrangler.toml [env.production.vars]` |
 | Worker var | CREEM_PRODUCT_ID（Creem live product id） | **[已备]** | `apps/api/wrangler.toml`（2026-07-26 回填 `prod_3DHsihYJeOAhNDOT0Wo0LV`） |
-| Worker secret | CREEM_API_KEY / CREEM_WEBHOOK_SECRET / LICENSE_HMAC_PEPPER | [待配置] | `wrangler secret put … --env production` |
-| Webhook | live webhook → `/v1/webhooks/creem` | [已配置]（待端到端验证） | Creem Dashboard（2026-07-26 已建，`api.appidge.com` 上线后才可实投） |
+| Worker secret | CREEM_API_KEY / CREEM_WEBHOOK_SECRET / LICENSE_HMAC_PEPPER | **[已备]** | 2026-07-26 注入；`CREEM_API_KEY` 已用 live 探针证明可用（§11） |
+| Webhook | live webhook → `/v1/webhooks/creem` | [已配置]（待端到端验证） | Creem Dashboard（2026-07-26 已建；`api.appidge.com` 现已上线，可以重投测试事件了） |
 | D1 | appidge-licensing-production（id `1db51c0e…`，3 migration） | [已备] | 远端 apply 用 `migrate-api production` 复核 |
 | 发布审批 | staging 全链路 smoke 通过 + 三重保护 | [待配置] | 见 §8 |
 
@@ -46,7 +46,20 @@
 
 - **现状**：四条 route 均已在 tracked 配置里 **[已备]**；`preflight` 的拓扑校验已断言它们存在且不与 staging 交叉。
   `appidge.com` zone **已确认在本账号名下**（2026-07-25 核：NS = tricia/hayes.ns.cloudflare.com）。
+  2026-07-26：`appidge.com` / `www` / `api` 三条 route **已实际绑定上线**，`updates` 待 `publish-updates`。
 - **[待配置] 解锁**：DNS/证书由各自 deploy 命令自动完成，无需手动加 A/CNAME。
+
+> ⚠️ **2026-07-26 实测：孤儿 A 记录会让 custom domain 绑定直接失败（code 100117）。**
+> `deploy-web production` 报 `Hostname 'appidge.com' already has externally managed DNS records
+> (A, CNAME, etc). Delete them first`——Worker 与静态资源**已上传成功**，只是 route 绑不上。
+> 原因是 apex/www/updates 上留着拆分环境之前那次部署的手工 A 记录（当时 apex 返回 522、
+> www 返回 525、updates 完全超时，背后早已无源站）。
+> **解法**：在 Cloudflare Dashboard 删掉这三个名字的 A/CNAME 记录后重跑 deploy，wrangler 会自建托管记录。
+> **别碰** MX（`eforward1~5.registrar-servers.com`，Namecheap 邮件转发，删了收不到 Creem 订单/退款通知）、
+> 任何 TXT（SPF/DKIM/域名验证）和 NS。
+> 三条孤儿记录已于 2026-07-26 清理完毕 ⇒ `updates.appidge.com` 下次 `publish-updates` **不会**再撞 100117。
+> wrangler 的 OAuth token 只有 `zone:read`，**没有 `dns_records:write`**（实测列记录 403），
+> 这一步只能人工在 Dashboard 做或另发一个 scoped API token。
 
 > ⚠️ **2026-07-25 实测：production Worker 一个都还没部署过。**
 > 账号上只存在 `appidge-web-staging` / `appidge-api-staging` / `appidge-updates-staging` 三个；
@@ -63,6 +76,13 @@
 > 对发布链的影响：`deploy-api` 的健康检查是 6×8s ≈ 48s，**不足以覆盖首次建域**，
 > production 上线时 `api.appidge.com` 极可能在这一步误判失败并中断发布链。
 > 建议上线当天要么先单独把四个域建好等证书稳定、再跑发布链，要么临时放宽该重试窗口。
+>
+> **2026-07-26 production 实测修正**：`api.appidge.com` 约 **30 秒**就稳定（DNS 传播完即通，
+> 未出现 staging 那次的 `tlsv1 unrecognized name` 分批下发）——差别在于 `appidge.com` zone
+> 早已 active 且有代理记录，不是全新 zone。但 `deploy-api` 的 48s 窗口**仍然踩空**：
+> 前 6 次全是 `Could not resolve host`，命令以 `ERROR: healthz 连续 6 次失败` 退出，
+> **而 Worker 其实已经部署成功**。⚠️ 这一步失败**不是回滚信号**——先用连续探测
+> （建议 10 次连续 200 才算通过，单次 200 不作数）确认，再决定要不要 rollback。
 
 ## 2. 公开环境变量（构建期注入 web / Info.plist）
 
@@ -107,10 +127,13 @@ wrangler secret put LICENSE_HMAC_PEPPER  --env production   # license fingerprin
 - 在 `apps/api/` 目录执行（该目录 wrangler.toml 定义了 env.production）。
 - **key 形态**：test key 是 `creem_test_<alnum>`；**live key 只有一段 `creem_<alnum>`**，没有 `creem_live_`
   这种写法（2026-07-26 拿到真实 live key 后修正；`src/log.ts` 的兜底脱敏正则已同步覆盖单段形态）。
-- **现状 [待配置]**：live key 与 webhook secret 用户已提供（2026-07-26），尚未注入；
-  `LICENSE_HMAC_PEPPER` 不依赖 Creem，自生成即可（如 `openssl rand -hex 32`）。
-  `preflight production --remote` 会（登录后）核对这三个 secret 名是否存在，缺失逐项列出。
-  secret **值**永不被读取/打印。
+- **现状 [已备]**：三个 secret 已于 2026-07-26 注入 `appidge-api-production`（`preflight production --remote` 三个名字全在）。
+  ⚠️ 注入时 Worker 尚不存在，wrangler 会问 *"There doesn't seem to be a Worker called …, create it?"* → 答 yes；
+  **先建 worker 放 secret、再 deploy**，比先部署一个读不到 key 的 API 上线安全。因此管道形式
+  （`openssl rand | wrangler secret put`）必须放在交互式那两条之后，否则非交互下会被该提示卡住。
+- `LICENSE_HMAC_PEPPER` 不依赖 Creem，自生成即可（本次用 `openssl rand -hex 32`）。**一经上线不轮换**。
+- `preflight production --remote` 会（登录后）核对这三个 secret 名是否存在，缺失逐项列出。secret **值**永不被读取/打印。
+- **key 是否真的可用，healthz 证明不了**——它不碰 Creem。用 §11 的 live 探针验证。
 
 ## 5. Creem live 非秘密标识（2026-07-26 已回填）
 
@@ -199,10 +222,62 @@ ops/bin/appidge-ops plan production                 # 人工核对 routes / 公�
 1. ~~Creem KYC → live 产品 → 回填 §5 两处~~ **已完成（2026-07-26）**。
 2. ~~Creem Dashboard 配 live webhook~~ **已建（2026-07-26）**，待 API 上线后重投一条事件验证（§6）。
 3. ~~确认 `appidge.com` zone 在本账号~~ **已确认（2026-07-25，NS 指向 Cloudflare）**。
-4. **[用户]** 注入 3 个 Worker secret（§4）——上线前唯一剩余的配置闸门。
-5. **[发布链]** 首次建域的证书传播 ≈10 分钟，`deploy-api` 内置 6×8s healthz 重试不足以覆盖（§1 警告）。
+4. ~~注入 3 个 Worker secret（§4）~~ **已完成（2026-07-26）**，且 live key 已验证可用（§11）。
+5. **[发布链]** `deploy-api` 内置 6×8s healthz 重试**不足以覆盖首次建域**——2026-07-26 实测踩空并以
+   ERROR 退出，但 Worker 已部署成功（§1）。**该失败不是回滚信号**，改用连续探测判定。
 6. **[发布链]** 首发的 build 号单调性死锁：`build-macos production` 要求 `updates.appidge.com`
    的 appcast 可查，而该 feed 要到 `publish-updates` 才存在（§8 脚注）。
 7. **[用户]** staging 全链路 smoke 通过（买单→activate→validate→退款+disable→validate=revoked）+ production 发布审批。
 8. **[release Mac]** `build-macos` 签名/公证凭证 + 真机系统扩展升级 smoke（§8）。
 9. 全部就绪后按 §8 三重保护序列发布，`smoke production` 收尾。
+
+---
+
+## 11. 云端上线记录（2026-07-26，API + Web）
+
+本轮范围**只有云端 API 与 Web**；macOS 出包与 `publish-updates` 未做，故 `updates.appidge.com` 仍未上线。
+
+| 组件 | 结果 | 证据 |
+|---|---|---|
+| `appidge-api-production` | ✅ 上线 | Version `eebd650b-041a-400c-b211-d7ce0d27a1cf`；route `api.appidge.com`（custom domain） |
+| `appidge-web-production` | ✅ 上线 | Version `b52481cb-ece9-4fec-87c4-f66e25811f42`；route `appidge.com` + `www.appidge.com`；31 静态资源 |
+| D1 `appidge-licensing-production` | ✅ 无 pending | `No migrations to apply!`（0001/0002/0003 早已 apply） |
+| 3 个 Worker secret | ✅ 齐 | `preflight production --remote` 0 fail |
+| `updates.appidge.com` | ⛔ 未部署 | 本轮范围外；`smoke production` 的 3 条 updates 失败均源于此 |
+
+**发布前本地闸门**（`appidge-ops test production`，EXIT=0，4/4 全跑通）：
+`test-config.sh` PASS=99 FAIL=0 · `pnpm check` 绿 · `pnpm check:swift` 五包绿 ·
+`wrangler dry-run` 绑定确认为 production D1 + `MOCK_MODE=false` + live product id。
+
+**上线后验证**：
+
+```text
+appidge.com / www.appidge.com   连续 10×200
+api.appidge.com/healthz         连续 10× {"status":"ok","mockMode":false}
+smoke production                web 5/5 ✅  api 2/2 ✅  updates 0/3 ⛔（范围外）
+```
+
+**live key 探针**（只读，不写任何真实 license）：
+
+```sh
+curl -sS -X POST https://api.appidge.com/v1/licenses/validate \
+  -H 'content-type: application/json' \
+  -d '{"licenseKey":"AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE","instanceId":"preflight-probe","appVersion":"0.0.0"}'
+# → 402 {"error":"invalid_license"}
+```
+
+返回 `invalid_license` 而**不是** `upstream_unavailable`，说明 Worker 已用 live key 通过 Creem 认证、
+Creem 回答"无此 license" ⇒ `CREEM_API_KEY` 确实可用。**这是 healthz 给不了的证据**（healthz 不碰 Creem）。
+另：`{"licenseKey":"x"}` → 400 `invalid_request`，本地校验拦在打上游之前。
+
+**本轮修掉的两个 ops bug**（都属"闸门静默失效"，见 commit `9033860` / `4aaaaa3`）：
+
+1. `cmd_test` 里 `"$OPS_CONF）"` 被 sh 把全角括号并进变量名，`set -u` 下每次都崩在 2/4 步 ⇒
+   **`pnpm check` / `check:swift` / dry-run 三步从来没跑过**，而且看起来像"测完了"。
+2. `deploy-web` 的环境交叉检查 `grep -RFq "$bad"` 缺 `-e`，`-staging.appidge.com` 被当选项解析、
+   打 usage 返回非零 ⇒ 该条静默放行（靠后一条子串模式侥幸兜住）。
+
+**已知缺口（本轮遗留）**：官网下载 CTA 指向 `updates.appidge.com/appidge-latest.dmg`，
+该域名尚无 Worker ⇒ **下载链接当前是坏的**（购买 CTA 走 Creem live，不受影响）。
+关闭窗口的唯一办法是跑完 `build-macos` → `prepare-updates` → `publish-updates`（首个 build 号须 ≥ 79，
+并需先解掉 §8 的单调性死锁）。

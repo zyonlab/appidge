@@ -61,12 +61,15 @@
 > wrangler 的 OAuth token 只有 `zone:read`，**没有 `dns_records:write`**（实测列记录 403），
 > 这一步只能人工在 Dashboard 做或另发一个 scoped API token。
 
-> ⚠️ **2026-07-25 实测：production Worker 一个都还没部署过。**
+> ⚠️ **2026-07-25 实测（部分已被 2026-07-26 推翻，见下方红字）：production Worker 一个都还没部署过。**
 > 账号上只存在 `appidge-web-staging` / `appidge-api-staging` / `appidge-updates-staging` 三个；
 > `appidge-web` / `appidge-api` / `appidge-updates` 及其 `-production` 变体均 **不存在**，也无 Pages 项目。
 > 其中 `updates.appidge.com` 仍留着一条**孤儿 DNS 记录**（代理态 A 记录，背后无 Worker）：
 > 边缘缓存未过期时还能返回旧 build 63 的静态资源，缓存一过就是 530 / Cloudflare 1016 Origin DNS error。
-> 这不是故障，是「拆分前那次部署的残留」——`publish-updates production` 会重新绑定，无需手工清理。
+> 这不是故障，是「拆分前那次部署的残留」。
+> ❌ **「`publish-updates production` 会重新绑定，无需手工清理」这句是错的**——2026-07-26 实测：
+> 手工建的 A 记录会让 custom domain 绑定报 100117 直接失败（见上一条）。三条孤儿记录当天已人工删除。
+> **2026-07-26 起 `appidge-api-production` / `appidge-web-production` 已上线**，本条只剩历史价值。
 
 > ⚠️ **首次自定义域的证书传播远超 10~30s。** 2026-07-25 建 `updates-staging.appidge.com` 实测：
 > DNS 立刻生效，但 TLS 证书在各边缘节点上**分批**下发，约 **10 分钟**才做到 10 次连续成功；

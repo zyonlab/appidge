@@ -1591,6 +1591,21 @@ h2 {
   margin: 10px 0 4px;
 }
 
+.price-amount {
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: 8px 0 2px;
+}
+
+.price-amount span {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
 .price-line {
   font-size: 14px;
   color: var(--muted);

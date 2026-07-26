@@ -24,6 +24,7 @@ const { locale, t } = Astro.props;
       <div class="price-card">
         <span class="tag">{t.card.tag}</span>
         <h2>{t.card.name}</h2>
+        <p class="price-amount">{t.card.price} <span>{t.card.priceSuffix}</span></p>
         <p class="price-line">{t.card.priceLine}</p>
         <ul class="price-feats">
           {t.card.feats.map((f) => <li>{f}</li>)}

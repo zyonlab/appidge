@@ -263,21 +263,23 @@ cmd_deploy_web() {
 
   dist="$OPS_ROOT/apps/web/dist"
   [ -d "$dist" ] || ops_die "构建产物缺失：$dist"
+  # -e 不可省：production 侧的 "-staging.appidge.com" 以 '-' 开头，没有 -e 时 grep 会当成选项
+  # 解析、打 usage 并返回非零 ⇒ 该条交叉检查静默失效（被更宽的 "staging.appidge.com" 兜住才没出事）。
   if [ "$OPS_ENV" = staging ]; then
     for bad in "https://appidge.com" "https://www.appidge.com" "https://api.appidge.com" "https://updates.appidge.com"; do
-      if grep -RFq "$bad" "$dist"; then
+      if grep -RFq -e "$bad" "$dist"; then
         ops_die "staging 产物包含 production URL：${bad}（环境交叉，拒绝部署）"
       fi
     done
   else
     for bad in "-staging.appidge.com" "staging.appidge.com" "sandbox" "creem.io/test" ".invalid"; do
-      if grep -RFq "$bad" "$dist"; then
+      if grep -RFq -e "$bad" "$dist"; then
         ops_die "production 产物包含 staging/sandbox/test 痕迹：${bad}（环境交叉，拒绝部署）"
       fi
     done
   fi
-  grep -RFq "$(url_host "$PUBLIC_POLAR_CHECKOUT_URL")" "$dist" || ops_die "产物缺 checkout CTA（$(url_host "$PUBLIC_POLAR_CHECKOUT_URL")）"
-  grep -RFq "$PUBLIC_DOWNLOAD_URL" "$dist" || ops_die "产物缺 download CTA（${PUBLIC_DOWNLOAD_URL}）"
+  grep -RFq -e "$(url_host "$PUBLIC_POLAR_CHECKOUT_URL")" "$dist" || ops_die "产物缺 checkout CTA（$(url_host "$PUBLIC_POLAR_CHECKOUT_URL")）"
+  grep -RFq -e "$PUBLIC_DOWNLOAD_URL" "$dist" || ops_die "产物缺 download CTA（${PUBLIC_DOWNLOAD_URL}）"
   ops_note "产物环境一致性 + CTA 检查通过"
 
   ops_note "wrangler deploy --dry-run --env ${OPS_ENV}（web）"

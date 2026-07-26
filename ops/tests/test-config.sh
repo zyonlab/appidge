@@ -520,6 +520,31 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# [gate] deploy-web 的环境交叉检查里 "-staging.appidge.com" 以 '-' 开头：grep 没有 -e 时
+# 会把它当选项解析，打 usage 并返回非零 ⇒ 那条检查静默失效（2026-07-26 production 首发
+# 部署日志里就打出了 grep usage）。这里先证明 grep 语义确实如此，再断言源码用了 -e。
+# ---------------------------------------------------------------------------
+TMPG=$(mktemp -d)
+printf 'href="https://updates-staging.appidge.com/x.dmg"\n' > "$TMPG/page.html"
+if grep -RFq -e "-staging.appidge.com" "$TMPG" 2>/dev/null; then
+  t_pass "grep -RFq -e 能匹配以 '-' 开头的字面模式"
+else
+  t_fail "grep -RFq -e 能匹配以 '-' 开头的字面模式"
+fi
+if grep -RFq "-staging.appidge.com" "$TMPG" 2>/dev/null; then
+  t_fail "grep 无 -e 时把 '-staging…' 当选项（本机 grep 行为与预期不符，检查是否仍需 -e）"
+else
+  t_pass "grep 无 -e 时以 '-' 开头的模式失效（故 deploy-web 必须带 -e）"
+fi
+rm -rf "$TMPG"
+if LC_ALL=C grep -nE 'grep [^|;)]*-e "\$bad"' "$ROOT/ops/bin/appidge-ops" >/dev/null 2>&1 \
+   && ! LC_ALL=C grep -nE 'grep [^|;)]*[^e] "\$bad"' "$ROOT/ops/bin/appidge-ops" >/dev/null 2>&1; then
+  t_pass "deploy-web 环境交叉检查用 grep -e \"\$bad\"（模式可能以 '-' 开头）"
+else
+  t_fail "deploy-web 环境交叉检查缺 -e，'-staging.appidge.com' 那条会静默失效"
+fi
+
+# ---------------------------------------------------------------------------
 # 汇总
 # ---------------------------------------------------------------------------
 echo

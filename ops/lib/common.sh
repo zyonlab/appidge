@@ -258,7 +258,7 @@ wrangler_run() { # $1 = api|web|updates，其余为 wrangler 参数（updates/we
   # 使 web/updates 的 deploy 与 dry-run 实际作用于 api Worker（已有回归测试覆盖）。
   _dir=$1; shift
   _wrangler="$OPS_ROOT/apps/api/node_modules/.bin/wrangler"
-  [ -x "$_wrangler" ] || ops_die "wrangler_run: 缺少 $_wrangler（先在仓库根 pnpm install）"
+  [ -x "$_wrangler" ] || ops_die "wrangler_run: 缺少 ${_wrangler}（先在仓库根 pnpm install）"
   case "$_dir" in
     api)     ( cd "$OPS_ROOT/apps/api"      && "$_wrangler" "$@" ) ;;
     web)     ( cd "$OPS_ROOT/apps/web"      && "$_wrangler" "$@" ) ;;

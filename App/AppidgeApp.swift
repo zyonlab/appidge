@@ -137,6 +137,12 @@ struct AppidgeApp: App {
         transport.setOnConnect { [weak store] in
             Task { @MainActor in store?.dispatch(.resyncExtension) }
         }
+        // XPC 通道可达性翻转沿回灌 store(连续掉线过阈值 → 不可达;收到扩展消息 → 恢复)。
+        // 不可达 = 扩展监听器很可能注册失败(升级换血竞态,bootstrap "No such process")——
+        // UI 据此显式警告(活动页/设置),自愈在 onAction 里有界重启接管一次(见 maybeHealStaleBinding)。
+        transport.setOnReachabilityChange { [weak store] reachable in
+            Task { @MainActor in store?.dispatch(.xpcChannelReachabilityChanged(reachable)) }
+        }
         _store = State(initialValue: store)
         _ipcReceiver = State(initialValue: IPCReceiver(
             store: store, transport: transport, connectionLogFileStore: connectionLogFileStore
@@ -193,6 +199,9 @@ struct AppidgeApp: App {
                     // 扩展 XPC 连上回报版本时,若与包内版本不一致 = 会话绑在旧 provider 上(反复热
                     // 升级的僵尸态)→ 自动重启会话重绑最新扩展,一次为限(见 maybeHealStaleBinding)。
                     if case .extensionVersionReported = action { maybeHealStaleBinding() }
+                    // XPC 通道被判不可达(扩展监听器注册失败的竞态)时同样补一次自愈评估——
+                    // 注册失败时版本握手根本到不了,只有这个信号能触发恢复(有界重启接管一次)。
+                    if case .xpcChannelReachabilityChanged(false) = action { maybeHealStaleBinding() }
                     // 授权记录从 Keychain 恢复落地后：若已到每日校验间隔，联网做一次新鲜度校验
                     // （离线只会进宽限，不锁）。授权与持久化无关，故放在下面的 guard 之前。
                     if case .licenseRestored = action {
@@ -363,6 +372,12 @@ struct AppidgeApp: App {
         case .none:
             return
         case .rebindNow:
+            TransparentProxyController.restart()
+        case .restartForUnreachableChannel:
+            // 扩展在跑但 XPC 通道不可达(监听器注册失败):重启接管一次。stop→start 的 sessionless
+            // 窗口让扩展侧自检判死的坏进程退出、launchd 重生新进程重新注册 mach service(闭环见
+            // Extension/ProxyExtensionProviderXPCHealth.swift)。一次为限,防重生后仍失败的无限环;
+            // 之后由活动页/设置的显式警告引导用户手动「重启接管」。
             TransparentProxyController.restart()
         case .reactivateExtension:
             // 系统已明说新版本要重启电脑才生效：重启隧道是徒劳的（改不了系统注册哪个版本）。

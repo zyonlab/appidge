@@ -19,6 +19,13 @@ packages:
     path: Packages/EngineKit
   AppFeature:
     path: Packages/AppFeature
+  # Sparkle 2 自动更新(只链接进 App target,Extension 绝不链接;见 CLAUDE.md §5.6)。
+  # 必须声明在这里而不是手工改 pbxproj——工程由 xcodegen 从本文件重生成,手工改动会被冲掉
+  # (2026-07-26 实锤:曾手工加的 Sparkle 引用在一次 regenerate 中丢失导致 build 失败)。
+  # 版本钉在 Package.resolved(2.9.4);这里的 from 只是兼容下界。
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.0.0
 
 settingGroups:
   common:
@@ -55,6 +62,7 @@ targets:
       - package: Core
       - package: IPCContract
       - package: AppFeature
+      - package: Sparkle
       - target: ProxyExtension
         embed: true
     scheme:

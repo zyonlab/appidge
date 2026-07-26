@@ -121,4 +121,66 @@ struct StaleBindingHealTests {
         let settled = activeState(running: "63", bundled: "66")
         #expect(settled.staleBindingHealDecision(memo: memo) == .reactivateExtension)
     }
+
+    // MARK: - XPC 通道可达性纳入握手健康度
+    //
+    // 真机实锤的缺口（80→81 升级）：新扩展进程的 NSXPCListener 注册失败时，XPC 根本连不上，
+    // `runningExtensionVersion` 永远是 nil —— 版本握手自愈的「版本都已知」前置条件永远不满足，
+    // 自愈整条链路对这类故障失明。通道不可达本身就是握手不健康，必须独立于版本触发。
+
+    /// 「扩展在跑 + 通道不可达」的状态（版本未知——XPC 断着，握手根本到不了）。
+    private func unreachableState() -> AppState {
+        var state = activeState(running: nil, bundled: "81")
+        state.extensionActivation = .active
+        state.isXPCChannelReachable = false
+        return state
+    }
+
+    @Test("扩展在跑但 XPC 不可达 → 重启接管一次（版本未知也要触发——注册失败时版本永远未知）")
+    func unreachableChannelRestartsOnce() {
+        #expect(unreachableState().staleBindingHealDecision(memo: .initial) == .restartForUnreachableChannel)
+    }
+
+    @Test("通道重启只做一次——防「重生后仍失败」的无限重启环，之后留显式警告 + 手动兜底")
+    func channelRestartOnlyOnce() {
+        var memo = StaleBindingHealMemo.initial
+        let state = unreachableState()
+        memo.recordDecision(state.staleBindingHealDecision(memo: memo))
+        #expect(state.staleBindingHealDecision(memo: memo) == .none)
+    }
+
+    @Test("通道不可达但扩展没在跑 → 不动作（停用/待批准是另一类提示的职责）")
+    func unreachableWithoutRunningExtensionDoesNothing() {
+        var state = unreachableState()
+        state.extensionActivation = .disabled
+        #expect(state.staleBindingHealDecision(memo: .initial) == .none)
+    }
+
+    @Test("通道不可达时不落入版本自愈——版本信息不可能新鲜，不据陈旧数据 reactivate")
+    func unreachableChannelSkipsVersionHeal() {
+        var state = unreachableState()
+        // 通道断开前握过手、留下陈旧的不匹配版本。
+        state.runningExtensionVersion = "80"
+        var memo = StaleBindingHealMemo.initial
+        memo.recordDecision(state.staleBindingHealDecision(memo: memo))   // restartForUnreachableChannel
+        // 额度用尽后不改走 reactivate/forced-restart（那要等通道恢复、版本变新鲜再判）。
+        #expect(state.staleBindingHealDecision(memo: memo) == .none)
+    }
+
+    @Test("通道恢复后版本自愈照常工作——两条路径互不侵占额度")
+    func versionHealStillWorksAfterChannelRecovers() {
+        var memo = StaleBindingHealMemo.initial
+        memo.recordDecision(unreachableState().staleBindingHealDecision(memo: memo))
+
+        var recovered = activeState(running: "80", bundled: "81")
+        recovered.extensionActivation = .active
+        #expect(recovered.staleBindingHealDecision(memo: memo) == .reactivateExtension)
+    }
+
+    @Test("通道可达时该路径不触发（正常路径零打扰）")
+    func reachableChannelNeverTriggersChannelRestart() {
+        var state = activeState(running: "81", bundled: "81")
+        state.extensionActivation = .active
+        #expect(state.staleBindingHealDecision(memo: .initial) == .none)
+    }
 }

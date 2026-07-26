@@ -20,6 +20,11 @@ public enum StaleBindingHealDecision: Sendable, Equatable {
     /// `providerBundleIdentifier`，改不了系统注册哪个版本。唯一能换版本的是重新提交
     /// `OSSystemExtensionRequest`（并先释放旧 provider 的占用，给替换一次不用重启就完成的机会）。
     case reactivateExtension
+    /// 扩展在跑但 XPC 通道不可达（监听器注册失败的竞态,2026-07-26 真机实锤）：重启接管一次。
+    /// 与版本自愈**独立触发**——注册失败时握手根本到不了,`runningExtensionVersion` 永远 nil,
+    /// 版本判据对这类故障失明。配合扩展侧「自检失败 + sessionless 即 exit」,stop→start 的窗口
+    /// 让坏进程退出重生,新进程重新注册 mach service,闭环恢复。
+    case restartForUnreachableChannel
 }
 
 /// 自愈的一次性记忆。App 层持有，跨多次评估累积，保证「强制重启」「重绑」各自最多发生一次。
@@ -37,17 +42,20 @@ public struct StaleBindingHealMemo: Sendable, Equatable {
     public var rebound: Bool
     /// 是否已经为「待重启生效」重新提交过一次 activation。
     public var reactivateAttempted: Bool
+    /// 是否已经为「XPC 通道不可达」重启过一次接管。
+    public var channelRestartAttempted: Bool
 
     public static let initial = StaleBindingHealMemo(
         sawMismatch: false, forcedRestartAttempted: false, rebound: false, reactivateAttempted: false
     )
 
     public init(sawMismatch: Bool, forcedRestartAttempted: Bool, rebound: Bool,
-                reactivateAttempted: Bool = false) {
+                reactivateAttempted: Bool = false, channelRestartAttempted: Bool = false) {
         self.sawMismatch = sawMismatch
         self.forcedRestartAttempted = forcedRestartAttempted
         self.rebound = rebound
         self.reactivateAttempted = reactivateAttempted
+        self.channelRestartAttempted = channelRestartAttempted
     }
 
     /// 把一次决策记进 memo。`.none` 不消耗任何一次性额度——否则相位还没落定时的那次
@@ -64,6 +72,8 @@ public struct StaleBindingHealMemo: Sendable, Equatable {
         case .reactivateExtension:
             sawMismatch = true
             reactivateAttempted = true
+        case .restartForUnreachableChannel:
+            channelRestartAttempted = true
         }
     }
 }
@@ -77,6 +87,13 @@ extension AppState {
     /// - 运行版本与包内版本都已知 —— 不确定就不误重启接管（``extensionNeedsRebind`` 的语义）。
     public func staleBindingHealDecision(memo: StaleBindingHealMemo) -> StaleBindingHealDecision {
         guard isLicenseActive, hasCompletedOnboarding else { return .none }
+        // **通道可达性先于版本判据**：监听器注册失败时 XPC 根本连不上，`runningExtensionVersion`
+        // 永远 nil（或是断开前的陈旧值）——版本自愈对这类故障失明。扩展在跑、通道却不可达，
+        // 就重启接管一次（一次为限，防重生后仍失败的无限环）；不可达期间**不落入**版本自愈，
+        // 陈旧的版本数据不足以支撑 reactivate/强制重启，等通道恢复、数据新鲜了再判。
+        if !isXPCChannelReachable, extensionActivation.isRunning {
+            return memo.channelRestartAttempted ? .none : .restartForUnreachableChannel
+        }
         guard runningExtensionVersion != nil, bundledExtensionVersion != nil else { return .none }
 
         if extensionNeedsRebind {

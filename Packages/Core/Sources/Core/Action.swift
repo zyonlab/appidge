@@ -63,6 +63,11 @@ public enum Action: Sendable, Equatable {
     case extensionVersionReported(String)
     /// app 启动时读到的包内嵌扩展版本(期望的最新)。纯状态回灌。
     case bundledExtensionVersionSet(String)
+    /// app↔扩展 XPC 通道的可达性翻转(由 AppFeature 的重连退避在「连续掉线过阈值/收到真实消息」
+    /// 的翻转沿回调驱动)。纯状态回灌;false = 扩展监听器很可能注册失败(升级换血窗口的竞态,
+    /// bootstrap look-up 报 "No such process"),配置推不下去、活动页收不到事件——UI 据
+    /// ``AppState/isXPCChannelBroken`` 显式警告,自愈据此有界重启接管一次(见 ``StaleBindingHealDecision``)。
+    case xpcChannelReachabilityChanged(Bool)
     /// 把当前完整配置**全量重推**给扩展(规则表 + 每进程规则 + 代理配置 + 路由模式 + 抓包 +
     /// UDP 策略 + 排除名单)。用途:app↔扩展的 XPC(重)连上时、或启动恢复完成后触发一次,
     /// 保证扩展手里的配置永远是最新的——不然扩展升级/重启/XPC 掉线重连后,它会一直空转

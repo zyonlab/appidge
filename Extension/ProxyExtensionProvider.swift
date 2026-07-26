@@ -131,6 +131,13 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     // 每 2s 最多一条,避免 app 侧连接表被洪流驱动重排(见 EngineKit.ObserveCoalescer)。锁保护。
     // 非 private:emitObservedFlow 在同 target 的跨文件 extension 里访问(同其它 stored 成员先例)。
     var storedObserveCoalescer = ObserveCoalescer(interval: 2.0)
+    // XPC 监听器注册自检状态(升级换血竞态下 NSXPCListener 会静默注册失败,app 永远连不上;
+    // 见 ProxyExtensionProviderXPCHealth.swift 的驱动与退出决策)。锁保护。
+    // 非 private:驱动逻辑拆在同 target 的跨文件 extension(同其它 stored 成员先例)。
+    var storedListenerSelfCheck = XPCListenerSelfCheck()
+    // 当前是否有活跃的透明代理会话(startProxy→true / stopProxy→false)。退出重生的安全闸:
+    // 有会话时绝不 exit(杀进程=全系统断网,见记忆「升级黑洞」)。锁保护。
+    var storedSessionActive = false
 
     private var packetCaptureEnabled: Bool {
         configLock.withLock { storedPacketCaptureEnabled }
@@ -200,6 +207,11 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             guard let self else { return }
             Task { await self.handleAppMessage(message, transport: transport) }
         }
+        // 会话从此算活跃(退出重生的安全闸),随后自检监听器是否真的注册成功——升级换血竞态下
+        // NSXPCListener 会静默失败,app 永远连不上(bootstrap "No such process"),扩展却带着
+        // 空排除名单接管流量。自检失败先重建 listener 重试;判死后等 stopProxy(sessionless)退出重生。
+        configLock.withLock { storedSessionActive = true }
+        startListenerSelfCheck(transport: transport)
 
         // 透明代理网络设置:拦截所有出站 TCP + UDP。此前完全没设置——拦截从未真正生效(也是
         // 「待人工回填」里 flow metadata 观测被卡住的一环)。UDP 纳入拦截是 A1「拦截 QUIC/UDP
@@ -212,6 +224,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
 
     override func stopProxy(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
         ExtDiag.log("stopProxy called reason=\(reason.rawValue)")
+        configLock.withLock { storedSessionActive = false }
         // 先 invalidate 旧 XPC 监听器,释放 mach service——否则它泄漏、仍占着服务,下次 startProxy
         // 新建的监听器与它抢同一服务,新 app 连上被路由到旧监听器,flow 投到新 transport 全丢
         // (退出重开「会话通却收不到 flow」的真因)。
@@ -220,6 +233,10 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         transport = nil
         diagnosticsRunner = nil
         completionHandler()
+        // 自检曾判死(监听器注册失败,进程内无解)的进程,趁 sessionless 退出让 launchd 重生——
+        // 这是「重启接管」能真正修复注册失败的关键一环(否则 stop→start 仍复用同一个坏进程)。
+        // 健康进程 no-op;退出前有缓冲+复查,新 startProxy 随即进来也绝不带活跃会话退出。
+        exitIfRegistrationFailed(reason: "stopProxy reason=\(reason.rawValue)")
     }
 
     private func handleAppMessage(_ message: AppToExtensionMessage, transport: XPCFlowTransport) async {

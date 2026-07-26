@@ -44,10 +44,14 @@ struct MainWindow: View {
             }
             .safeAreaInset(edge: .top, spacing: 0) {
                 VStack(spacing: 0) {
-                    // 只留真正需要打断用户的告警（环 / 待批准）。试用倒计时是常驻信息，
+                    // 只留真正需要打断用户的告警（环 / XPC 通道断 / 待批准）。试用倒计时是常驻信息，
                     // 已收进底部状态栏（TrialStatusItem），不再占顶部一整条。
                     if let warning = store.state.loopWarning {
                         LoopWarningBanner(signature: warning) { store.dispatch(.dismissLoopWarning) }
+                    } else if store.state.isXPCChannelBroken {
+                        // 活动页空白的根因显形:扩展在跑、通道却断着(升级竞态的监听器注册失败),
+                        // 之前用户只能看着空列表猜。自愈已自动重启过一次;横幅提供手动兜底。
+                        XPCChannelBrokenBanner { TransparentProxyController.restart() }
                     } else if let prompt = approvalPrompt {
                         ExtensionApprovalBanner(text: prompt)
                     }

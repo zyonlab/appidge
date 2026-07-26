@@ -55,6 +55,11 @@ extension Reducer {
             var state = state
             state.bundledExtensionVersion = version
             return (state, [])
+        case .xpcChannelReachabilityChanged(let reachable):
+            guard state.isXPCChannelReachable != reachable else { return (state, []) }
+            var state = state
+            state.isXPCChannelReachable = reachable
+            return (state, [])
         default:
             return nil
         }

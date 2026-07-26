@@ -46,6 +46,12 @@ public struct AppState: Sendable, Equatable {
     /// **app 包内嵌的扩展**版本(启动时从 embedded `.systemextension` 读)——期望的最新版本。
     /// 运行时状态,不持久化。
     public var bundledExtensionVersion: String?
+    /// app↔扩展 XPC 通道当前是否可达。默认 true——没有失败证据前不误报。由 AppFeature 的
+    /// 重连退避在翻转沿回灌(连续掉线过阈值 → false;收到扩展任何真实消息 → true)。
+    /// false 的典型根因:升级换血窗口的竞态让新扩展进程的 `NSXPCListener` 注册失败,
+    /// app 侧 bootstrap look-up 报 "No such process"(2026-07-26 真机实锤,80→81 升级 100% 复现)。
+    /// 运行时状态,不持久化。
+    public var isXPCChannelReachable: Bool
 
     /// 授权状态机相位（见 ``LicensePhase`` / CLAUDE.md §5.5）。默认未激活。
     /// **和网络接管完全解耦**：授权服务故障绝不影响转发/路由，付费能力只在 `isLicenseActive` 时开放。
@@ -62,6 +68,15 @@ public struct AppState: Sendable, Equatable {
     public var extensionNeedsRebind: Bool {
         guard let running = runningExtensionVersion, let bundled = bundledExtensionVersion else { return false }
         return running != bundled
+    }
+
+    /// XPC 通道故障(UI 显式警告的判据):扩展明明在跑(含 pending-reboot 的旧版本——它也该
+    /// 能通 XPC),通道却不可达。此时配置推不进扩展(排除名单为空 → 本地代理流量被全量接管的
+    /// 性能地雷)、连接事件送不回 app(活动页永远空白但引擎显示 OK)。扩展没在跑(停用/待批准)
+    /// 或功能未开放时不算此故障——那些状态有各自的提示,不重复打扰。
+    public var isXPCChannelBroken: Bool {
+        isLicenseActive && hasCompletedOnboarding
+            && extensionActivation.isRunning && !isXPCChannelReachable
     }
 
     /// 下发给扩展的两档排除(直连档 = 端口发现;完全旁路档 = 环自愈)。
@@ -131,6 +146,7 @@ public struct AppState: Sendable, Equatable {
         proxyEnvironment: ProxyEnvironment = ProxyEnvironment(),
         runningExtensionVersion: String? = nil,
         bundledExtensionVersion: String? = nil,
+        isXPCChannelReachable: Bool = true,
         licensePhase: LicensePhase = .unlicensed,
         license: LicenseInfo? = nil,
         trialConfig: TrialConfig = .default,
@@ -156,6 +172,7 @@ public struct AppState: Sendable, Equatable {
         self.proxyEnvironment = proxyEnvironment
         self.runningExtensionVersion = runningExtensionVersion
         self.bundledExtensionVersion = bundledExtensionVersion
+        self.isXPCChannelReachable = isXPCChannelReachable
         self.licensePhase = licensePhase
         self.license = license
         self.trialConfig = trialConfig

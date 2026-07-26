@@ -240,6 +240,27 @@ struct ExtensionApprovalBanner: View {
     }
 }
 
+/// XPC 通道故障告警条:扩展在跑、通道却不可达(升级换血竞态下扩展监听器注册失败)——配置推
+/// 不进扩展、活动页收不到任何连接事件,用户此前对此完全无感知(引擎显示 OK)。红色 + 一键
+/// 「重启接管」:stop→start 让扩展侧自检判死的坏进程退出重生,重新注册 XPC 服务。
+struct XPCChannelBrokenBanner: View {
+    let onRestart: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "bolt.horizontal.circle.fill")
+            Text("与扩展的通讯通道中断（常见于刚升级后）——规则推送不到扩展，活动列表也收不到连接。点「重启接管」自动修复；若反复出现，请重启电脑。")
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+            Button("重启接管", action: onRestart)
+        }
+        .foregroundStyle(.white)
+        .padding(8)
+        .background(Color.red)
+    }
+}
+
 /// 主动环检测告警条:贴在主窗口顶部。`internal` 供 MainWindow 引用。
 struct LoopWarningBanner: View {
     let signature: String

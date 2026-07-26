@@ -3411,6 +3411,26 @@
           }
         }
       }
+    },
+    "与扩展的通讯通道中断（常见于刚升级后）——规则推送不到扩展，活动列表也收不到连接。点「重启接管」自动修复；若反复出现，请重启电脑。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Communication with the extension is down (common right after an upgrade) — rules can't reach the extension and the activity list receives no connections. Click “Restart Handling” to fix it automatically; if it keeps happening, restart your Mac."
+          }
+        }
+      }
+    },
+    "与扩展的通讯通道中断——扩展在运行，但 app 连不上它（常见于刚升级后的注册竞态）。规则推送不到扩展、活动列表收不到连接。点下方「重启接管」修复；若反复出现，请重启电脑。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Communication with the extension is down — the extension is running, but the app can't reach it (a registration race common right after an upgrade). Rules can't reach the extension and the activity list receives no connections. Click “Restart Handling” below to fix it; if it keeps happening, restart your Mac."
+          }
+        }
+      }
     }
   }
 }

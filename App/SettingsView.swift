@@ -75,6 +75,15 @@ struct SettingsView: View {
             }
 
             Section("网络接管") {
+                if store.state.isXPCChannelBroken {
+                    Label {
+                        Text("与扩展的通讯通道中断——扩展在运行，但 app 连不上它（常见于刚升级后的注册竞态）。规则推送不到扩展、活动列表收不到连接。点下方「重启接管」修复；若反复出现，请重启电脑。")
+                            .fixedSize(horizontal: false, vertical: true)
+                    } icon: {
+                        Image(systemName: "bolt.horizontal.circle.fill").foregroundStyle(.red)
+                    }
+                    .font(.callout)
+                }
                 if store.state.extensionNeedsRebind {
                     Label {
                         Text("接管会话绑在旧扩展实例上（运行 \(store.state.runningExtensionVersion ?? "?")、已安装 \(store.state.bundledExtensionVersion ?? "?")）——流量可能被交给僵尸扩展。已自动尝试重绑；若仍异常，点「重启接管」，或重启电脑清理旧扩展。")

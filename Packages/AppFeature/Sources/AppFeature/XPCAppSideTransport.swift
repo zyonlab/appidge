@@ -39,6 +39,12 @@ public final class XPCAppSideTransport: NSObject, AppSideTransport, AppXPCProtoc
     /// 完整配置全量重推给扩展(`Action.resyncExtension`)——扩展升级/重启/XPC 掉线重连后,
     /// 扩展是空规则起步的,必须由 app 主动补推,否则它一直空转。断线后会自动重连,重连成功即再触发。
     private var onConnect: (@Sendable () -> Void)?
+    /// 通道可达性**翻转沿**回调(true=恢复可达,false=判为不可达)。判据是 `ReconnectBackoff`
+    /// 的连续掉线阈值(见 `isChannelConsideredUnreachable`);集成方据此 dispatch
+    /// `.xpcChannelReachabilityChanged`,把「扩展监听器注册失败」从静默重试升级成显式警告。
+    private var onReachabilityChange: (@Sendable (Bool) -> Void)?
+    /// 上一次已通知出去的可达性,只在翻转时再通知(初始视为可达——没有失败证据前不误报)。
+    private var lastNotifiedReachable = true
 
     override public init() {
         super.init()
@@ -47,6 +53,11 @@ public final class XPCAppSideTransport: NSObject, AppSideTransport, AppXPCProtoc
     /// 设置"连上扩展"回调。幂等,后设覆盖先设。传 nil 清除。
     public func setOnConnect(_ handler: (@Sendable () -> Void)?) {
         lock.withLock { self.onConnect = handler }
+    }
+
+    /// 设置通道可达性翻转回调。幂等,后设覆盖先设。传 nil 清除。
+    public func setOnReachabilityChange(_ handler: (@Sendable (Bool) -> Void)?) {
+        lock.withLock { self.onReachabilityChange = handler }
     }
 
     // MARK: - AppSideTransport
@@ -89,6 +100,7 @@ public final class XPCAppSideTransport: NSObject, AppSideTransport, AppXPCProtoc
             self.backoff.reset()
             return (self.isListening, self.onMessage)
         }
+        notifyReachabilityIfFlipped()
         guard listening, let handler else { return }
         guard let message = try? JSONDecoder().decode(ExtensionToAppMessage.self, from: data) else { return }
         handler(message)
@@ -138,6 +150,19 @@ public final class XPCAppSideTransport: NSObject, AppSideTransport, AppXPCProtoc
     /// 才 `send()` 重连,期间扩展一直空转、活动栏空白。
     /// 重连即新建连接 → 再次触发 `onConnect` → app 重推配置,形成自愈闭环;扩展被停用时按
     /// 指数退避拉长到最多 30s 一次,不再空耗 CPU(见类型注释的「重连退避」)。
+    /// 可达性(由退避的连续掉线数派生)相对上次通知发生翻转时,在锁外回调一次。
+    /// 掉线路径与收消息路径都调它——两条路径都可能改变判定。
+    private func notifyReachabilityIfFlipped() {
+        let notification: (@Sendable (Bool) -> Void, Bool)? = lock.withLock {
+            let reachable = !backoff.isChannelConsideredUnreachable
+            guard reachable != lastNotifiedReachable, let handler = onReachabilityChange else { return nil }
+            lastNotifiedReachable = reachable
+            return (handler, reachable)
+        }
+        guard let (handler, reachable) = notification else { return }
+        handler(reachable)
+    }
+
     private func handleConnectionDropped() {
         let delay: Double? = lock.withLock {
             self.connection = nil
@@ -149,6 +174,7 @@ public final class XPCAppSideTransport: NSObject, AppSideTransport, AppXPCProtoc
             self.reconnectScheduled = true
             return delay
         }
+        notifyReachabilityIfFlipped()
         guard let delay else { return }
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
@@ -169,6 +195,11 @@ public final class XPCAppSideTransport: NSObject, AppSideTransport, AppXPCProtoc
 struct ReconnectBackoff: Sendable, Equatable {
     private(set) var consecutiveDrops = 0
 
+    /// 连续掉线达到几次判「通道不可达」。3 次(退避 1s+2s 后的第三次失败,首次失败后 ~7s 内落定):
+    /// 正常升级/重启的重连抖动通常 1-2 次内恢复,不误报;监听器注册失败(bootstrap look-up
+    /// "No such process")则会一直掉,快速越过阈值。
+    static let unreachableThreshold = 3
+
     mutating func recordDrop() { consecutiveDrops += 1 }
     mutating func reset() { consecutiveDrops = 0 }
 
@@ -178,4 +209,9 @@ struct ReconnectBackoff: Sendable, Equatable {
         let exponential = pow(2.0, Double(consecutiveDrops - 1))
         return min(30, exponential)
     }
+
+    /// 通道是否该被判为不可达(连续掉线过阈值,期间没收到过任何扩展消息)。
+    /// 供 transport 在翻转沿回调 app(→ `.xpcChannelReachabilityChanged`),UI 据此显式警告,
+    /// 不再让「扩展监听器注册失败」停留在静默重试里。
+    var isChannelConsideredUnreachable: Bool { consecutiveDrops >= Self.unreachableThreshold }
 }

@@ -19,7 +19,7 @@
 |---|---|---|---|
 | 域名 | appidge.com / www | **[已备]** | 2026-07-26 `deploy-web production` 上线，两 route 均绑定（需先删孤儿 A 记录，见 §1） |
 | 域名 | api.appidge.com | **[已备]** | 2026-07-26 `deploy-api production` 上线，healthz 连续 10 次绿 |
-| 域名 | updates.appidge.com | [待配置] | `publish-updates production` 自动建（孤儿 DNS 记录已于 2026-07-26 清掉，见 §1） |
+| 域名 | updates.appidge.com | **[已上线]** | 2026-07-26 `publish-updates production --build-number 81` 上线：appcast(build 81)+appidge-latest.dmg+版本 DMG 均 200，custom domain 一次绑定成功（孤儿记录已清，未撞 100117） |
 | 更新服务 | updates-staging.appidge.com | **[已备]** | 2026-07-25 已部署 `appidge-updates-staging`，build 66 + appcast 上线，`smoke staging` 全绿 |
 | 公开配置 | PUBLIC_SITE_URL / API / DOWNLOAD / LICENSE_* / SPARKLE_FEED / SITE_BASE / TRIAL_DAYS | [已备] | `ops/environments/production.conf` |
 | 公开配置 | PUBLIC_POLAR_CHECKOUT_URL（Creem live 支付链接） | **[已备]** | `production.conf`（2026-07-26 回填） |

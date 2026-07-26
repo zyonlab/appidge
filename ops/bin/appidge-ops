@@ -290,13 +290,6 @@ cmd_deploy_web() {
   ops_note "已部署：https://$WEB_HOST/"
 }
 
-feed_max_build() { # $1=feed url → 输出 feed 内最大 sparkle:version；查询失败输出空
-  # 兼容两种 Sparkle 写法：属性 sparkle:version="63" 与元素 <sparkle:version>63</sparkle:version>
-  curl -fsS -m 20 "$1" 2>/dev/null \
-    | grep -oE 'sparkle:version="[0-9]+"|<sparkle:version>[0-9]+' \
-    | grep -oE '[0-9]+' | sort -n | tail -1
-}
-
 appcast_has_build() { # $1=appcast 文本或文件内容，$2=build 号
   # 同 feed_max_build：兼容属性 sparkle:version="66" 与元素 <sparkle:version>66</sparkle:version>。
   # generate_appcast 实际产出的是元素形式，只认属性形式会让发布链在自己刚生成的 feed 上误报。
@@ -308,21 +301,9 @@ cmd_build_macos() {
   require_build_number
   preflight_local
 
-  # build 号单调性：production 必须高于两个 feed 的最高历史 build；查不到 feed 即失败。
-  for feed in "https://updates-staging.appidge.com/appcast.xml" "https://updates.appidge.com/appcast.xml"; do
-    maxb=$(feed_max_build "$feed" || true)
-    if [ -n "${maxb:-}" ]; then
-      ops_note "feed $feed 最高 build：$maxb"
-      [ "$BUILD_NUMBER" -gt "$maxb" ] \
-        || ops_die "--build-number $BUILD_NUMBER 未高于 $feed 的最高历史 build ${maxb}（staging/prod 共用全局单调序列）"
-    else
-      if [ "$OPS_ENV" = production ]; then
-        ops_die "production build 前无法查询 $feed 确认 build 号单调性——fail closed（人工确认后重试）"
-      else
-        ops_warn "无法查询 ${feed}（可能尚未发布过）——staging 允许继续，但请人工确认 build 号"
-      fi
-    fi
-  done
+  # build 号单调性（实现与回归测试在 ops/lib/common.sh；首发放行开关见该函数注释）
+  assert_build_monotonic "$OPS_ENV" "$BUILD_NUMBER" \
+    "https://updates-staging.appidge.com/appcast.xml" "https://updates.appidge.com/appcast.xml"
 
   if [ "$OPS_ENV" = staging ]; then
     ops_warn "⚠️ staging 与 production 共用 Bundle ID/App Group/系统扩展 ID——staging 安装会覆盖 production 安装，只能在内部测试 Mac 使用。"

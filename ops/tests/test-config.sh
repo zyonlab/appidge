@@ -545,6 +545,36 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# [gate] build 号单调性 + 首发缺 feed 的一次性放行（APPIDGE_ALLOW_MISSING_FEED）。
+# feed_max_build 在测试里被 stub 掉，全程不联网。
+#   S/P = staging/production feed 的最高 build（空串 = 该 feed 查不到）
+# 核心不变量：放行开关只免除「查不到的那个 feed」，另一个 feed 的单调性照旧强制；
+#             两个都查不到时开关也不放行（没有任何证据就不许出包）。
+# ---------------------------------------------------------------------------
+mono() { # $1=env $2=build $3=staging_max $4=prod_max [$5=ALLOW]
+  E=$1 B=$2 S=$3 P=$4 APPIDGE_ALLOW_MISSING_FEED=${5:-} sh -c '
+    . ops/lib/common.sh
+    feed_max_build() { case "$1" in *updates-staging*) printf "%s" "$S" ;; *) printf "%s" "$P" ;; esac; }
+    assert_build_monotonic "$E" "$B" \
+      "https://updates-staging.appidge.com/appcast.xml" "https://updates.appidge.com/appcast.xml"
+  '
+}
+
+expect_ok   "两 feed 都可查且 build 更高 → 通过"                 mono production 79 78 70
+expect_fail "build 未高于 staging feed 最高 build → 拒绝"        mono production 78 78 70
+expect_fail "build 未高于 production feed 最高 build → 拒绝"     mono production 79 70 79
+expect_fail "production 缺 feed 且无放行开关 → fail closed"      mono production 79 78 ""
+expect_ok   "production 缺 feed + ALLOW=YES + 另一 feed 单调 → 放行" \
+            mono production 79 78 "" YES
+expect_fail "ALLOW=YES 不免除另一个可查 feed 的单调性" \
+            mono production 78 78 "" YES
+expect_fail "两 feed 都查不到时 ALLOW=YES 也不放行（无任何单调性证据）" \
+            mono production 79 "" "" YES
+expect_fail "ALLOW 值必须精确 =YES" \
+            mono production 79 78 "" 1
+expect_ok   "staging 缺 feed 仍按原行为放行（只 warn）"           mono staging 79 78 ""
+
+# ---------------------------------------------------------------------------
 # 汇总
 # ---------------------------------------------------------------------------
 echo

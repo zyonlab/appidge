@@ -47,6 +47,51 @@ url_host() { # 提取 https URL 的 host（不含 path/port）
 }
 
 # ---------------------------------------------------------------------------
+# build 号单调性：staging/production 共用一条全局递增序列，新包必须高于**两个** feed
+# 出现过的最高 build——否则用户装到手的版本会比线上更旧，且永远收不到更新。
+# 测试通过重定义 feed_max_build 打桩，不联网。
+# ---------------------------------------------------------------------------
+feed_max_build() { # $1=feed url → 输出 feed 内最大 sparkle:version；查询失败输出空
+  # 兼容两种 Sparkle 写法：属性 sparkle:version="63" 与元素 <sparkle:version>63</sparkle:version>
+  curl -fsS -m 20 "$1" 2>/dev/null \
+    | grep -oE 'sparkle:version="[0-9]+"|<sparkle:version>[0-9]+' \
+    | grep -oE '[0-9]+' | sort -n | tail -1
+}
+
+# assert_build_monotonic <env> <build number> <feed url>...
+#
+# 首发死锁：production 的 appcast 要到 publish-updates 才存在，而 build-macos 在它之前就要
+# 求该 feed 可查 ⇒ 第一个 production 包永远出不来。放行开关 APPIDGE_ALLOW_MISSING_FEED=YES
+# 只免除**查不到的那个 feed**；可查的 feed 照旧强制单调，两个都查不到时开关也不放行。
+# 绝不能把这个检查改成静默跳过——它是防「发了个比线上更旧的 build」的唯一护栏。
+assert_build_monotonic() {
+  _abm_env=$1; _abm_build=$2; shift 2
+  _abm_ok=0; _abm_missing=""
+  for _abm_feed in "$@"; do
+    _abm_max=$(feed_max_build "$_abm_feed" || true)
+    if [ -n "${_abm_max:-}" ]; then
+      _abm_ok=$((_abm_ok + 1))
+      ops_note "feed $_abm_feed 最高 build：$_abm_max"
+      [ "$_abm_build" -gt "$_abm_max" ] \
+        || ops_die "--build-number $_abm_build 未高于 $_abm_feed 的最高历史 build ${_abm_max}（staging/prod 共用全局单调序列）"
+    else
+      _abm_missing="$_abm_missing $_abm_feed"
+      if [ "$_abm_env" = production ]; then
+        [ "${APPIDGE_ALLOW_MISSING_FEED:-}" = YES ] \
+          || ops_die "production build 前无法查询 $_abm_feed 确认 build 号单调性——fail closed。首发时该 feed 尚不存在属预期，用 APPIDGE_ALLOW_MISSING_FEED=YES 一次性放行（仍强制另一个 feed 的单调性）"
+        ops_warn "⚠️ APPIDGE_ALLOW_MISSING_FEED=YES：跳过 ${_abm_feed} 的单调性校验。仅限首发,别设成常态。"
+      else
+        ops_warn "无法查询 ${_abm_feed}（可能尚未发布过）——staging 允许继续，但请人工确认 build 号"
+      fi
+    fi
+  done
+  if [ "$_abm_env" = production ] && [ -n "$_abm_missing" ] && [ "$_abm_ok" = 0 ]; then
+    ops_die "全部 feed 都查不到（${_abm_missing# }）——没有任何 build 号单调性证据，拒绝出包（APPIDGE_ALLOW_MISSING_FEED 也不放行这种情况）"
+  fi
+  return 0
+}
+
+# ---------------------------------------------------------------------------
 # 环境配置读取：allowlist keys、POSIX sourceable、APPIDGE_ENVIRONMENT 与参数一致。
 # 测试可用 APPIDGE_OPS_CONFIG_DIR 指向 fixture 目录。
 # ---------------------------------------------------------------------------

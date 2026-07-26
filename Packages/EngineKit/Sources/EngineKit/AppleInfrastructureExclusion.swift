@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 /// 纯、无状态的「Apple 签名/公证基础设施域名」内置强制直连判定：一条 flow 的目的主机若正是
@@ -54,5 +55,82 @@ public enum AppleInfrastructureExclusion {
         if normalized.hasSuffix(".") { normalized.removeLast() }
         guard !normalized.isEmpty else { return false }
         return hosts.contains(normalized)
+    }
+
+    // MARK: - IP 字面量硬闸（第四次复发的修复）
+
+    /// 纯 IP flow 的 Apple 签名基础设施判定：codesign 的 RFC 3161 时间戳 flow 到达扩展时
+    /// **有时只带 IP、无 remoteHostname**（实测 `17.157.80.35`），上面的域名精确匹配必然
+    /// 不命中 → 穿闸进用户代理链，Apple 拒绝（"The timestamp transaction is not permitted
+    /// or supported"），archive 以 ~50% 概率失败——同一根因第四次复发。
+    ///
+    /// 三重收窄（每一重都是「不误伤」的一道边界）：
+    /// 1. **仅纯 IP flow**：候选里只要有任何一个域名（非严格 IP 字面量），本闸即不适用——
+    ///    域名交给上面的精确域名硬闸与用户规则表裁决。`www.apple.com` 解析到 17/8 时，
+    ///    想代理它的用户规则依旧生效（域名候选在场 → 本闸退位）。
+    /// 2. **仅 Apple 自有地址段**：IPv4 `17.0.0.0/8`（Apple 整段自有）；IPv6 为公开 RIR
+    ///    记录里 Apple Inc. 的自有 /32——`2620:149::/32`（ARIN，实测 2026-07-26
+    ///    `timestamp.apple.com` 的 AAAA 落在此段）、`2403:300::/32`（APNIC）、
+    ///    `2a01:b740::/32`（RIPE）。非 Apple 地址永不命中。
+    /// 3. **仅端口 80**：RFC 3161 时间戳与 OCSP/CRL 都走 HTTP；443 及其他端口交回规则表
+    ///    （HTTPS 的 Apple 服务 flow 正常携带主机名，走域名硬闸/规则即可）。
+    ///
+    /// 与域名硬闸同级的「强制」语义：在扩展 `resolveDecision` 里先于规则表，用户写了该 IP
+    /// 走代理的规则也不覆盖——签名基础设施走代理只有害处。
+    ///
+    /// IP 解析语义与 ``PrivateNetworkExclusion`` 对齐：`inet_pton` 严格解析（拒绝 `17.1`
+    /// 缩写与形似域名），容忍首尾空白与 IPv6 方括号。无状态、无 I/O。
+    ///
+    /// - Parameters:
+    ///   - hosts: flow 的全部目标候选（remoteHostname + endpoint host，去 nil 后）。
+    ///     空串/纯空白候选忽略;全部候选可忽略或列表为空 → `false`。
+    ///   - port: flow 目的端口;`nil`（极少数解析不出）→ `false`，交回后续判定。
+    public static func isAppleInfrastructureIPOnlyFlow(hosts: [String], port: UInt16?) -> Bool {
+        guard port == 80 else { return false }
+        let candidates = hosts
+            .map { stripBrackets($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+            .filter { !$0.isEmpty }
+        guard !candidates.isEmpty else { return false }
+        var sawAppleAddress = false
+        for candidate in candidates {
+            if let v4 = parseIPv4(candidate) {
+                sawAppleAddress = sawAppleAddress || v4[0] == 17 // 17.0.0.0/8
+            } else if let v6 = parseIPv6(candidate) {
+                sawAppleAddress = sawAppleAddress || isAppleIPv6Prefix(v6)
+            } else {
+                return false // 域名候选在场 → 域名语义优先，本闸不适用。
+            }
+        }
+        return sawAppleAddress
+    }
+
+    private static func stripBrackets(_ host: String) -> String {
+        guard host.hasPrefix("["), host.hasSuffix("]"), host.count >= 2 else { return host }
+        return String(host.dropFirst().dropLast())
+    }
+
+    /// `inet_pton` 严格 dotted-quad(拒绝缩写与非数字 label)——与 `PrivateNetworkExclusion`
+    /// 一致:形似 IP 的域名绝不能被误读成 IP。
+    private static func parseIPv4(_ candidate: String) -> [UInt8]? {
+        var addr = in_addr()
+        guard candidate.withCString({ inet_pton(AF_INET, $0, &addr) }) == 1 else { return nil }
+        return withUnsafeBytes(of: addr.s_addr) { Array($0) }
+    }
+
+    private static func parseIPv6(_ candidate: String) -> [UInt8]? {
+        var addr = in6_addr()
+        guard candidate.withCString({ inet_pton(AF_INET6, $0, &addr) }) == 1 else { return nil }
+        return withUnsafeBytes(of: addr) { Array($0) }
+    }
+
+    /// Apple 自有 IPv6 /32 段(前 4 字节整字节比较,/32 恰在字节边界):见
+    /// `isAppleInfrastructureIPOnlyFlow` 文档第 2 重收窄的出处。
+    private static func isAppleIPv6Prefix(_ bytes: [UInt8]) -> Bool {
+        let applePrefixes: [[UInt8]] = [
+            [0x26, 0x20, 0x01, 0x49], // 2620:149::/32 (ARIN)
+            [0x24, 0x03, 0x03, 0x00], // 2403:300::/32 (APNIC)
+            [0x2a, 0x01, 0xb7, 0x40]  // 2a01:b740::/32 (RIPE)
+        ]
+        return applePrefixes.contains(Array(bytes.prefix(4)))
     }
 }

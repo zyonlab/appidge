@@ -100,6 +100,14 @@ extension ProxyExtensionProvider {
         if let host = candidates.first(where: { AppleInfrastructureExclusion.isAppleInfrastructure(host: $0) }) {
             return (.bypass, "bypass:apple-infra(\(host))")
         }
+        // ③b IP 字面量补闸(第四次复发的修复):时间戳 flow 有时只带 IP(实测 17.157.80.35,
+        //    Apple 自有 17/8 段)、无 remoteHostname,上面的域名精确匹配必然不命中 → 穿闸进
+        //    用户代理链,Apple 拒绝,archive ~50% 概率失败。仅当 flow 无任何域名候选、地址落在
+        //    Apple 自有段(17/8 + Apple IPv6 /32)且端口 80(RFC3161/OCSP/CRL 都走 HTTP)时
+        //    强制直连——带域名的 flow 不进此闸,想代理 www.apple.com 的用户规则不受影响。
+        if AppleInfrastructureExclusion.isAppleInfrastructureIPOnlyFlow(hosts: candidates, port: port) {
+            return (.bypass, "bypass:apple-infra-ip(\(candidates.first ?? "?"))")
+        }
         // ④ 地址类硬闸(回环/私网/上游)—— 一律 .bypass,不接管、活动栏不可见。
         //    注:回环流量实测**从不**到达 transparent proxy provider(平台限制,ExtDiag 实证
         //    loopback 判定 0 命中),这里的回环分支只是防御性兜底。

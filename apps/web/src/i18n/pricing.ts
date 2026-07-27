@@ -9,7 +9,7 @@ export interface PricingCopy {
   card: {
     tag: string;
     name: string;
-    /** 大字价格（如 "US$9.98"）。 */
+    /** 大字价格（如 "US$3.99"）。 */
     price: string;
     /** 价格后缀（授权范围，如 "／3 台 Mac"）。 */
     priceSuffix: string;
@@ -28,14 +28,14 @@ export const pricing: Record<'zh' | 'en', PricingCopy> = {
   zh: {
     title: '定价',
     metaDescription:
-      'Appidge 许可证 US$9.98，可激活 3 台 Mac。先免费下载试用，觉得好再通过 Creem 安全结账购买。14 天无理由退款。币种与税费以结账页显示为准。',
+      'Appidge 许可证 US$3.99，可激活 3 台 Mac。先免费下载试用，觉得好再通过 Creem 安全结账购买。14 天无理由退款。币种与税费以结账页显示为准。',
     eyebrow: '定价',
     h2: '先用，觉得好再买',
     sub: '下载和购买是两回事：先装上试试，确认解决了你的问题，再买许可证解锁。',
     card: {
       tag: 'License',
       name: 'Appidge 许可证',
-      price: 'US$9.98',
+      price: 'US$3.99',
       priceSuffix: '／可激活 3 台 Mac',
       priceLine: '币种与税费以 Creem 结账页显示为准',
       feats: [
@@ -69,14 +69,14 @@ export const pricing: Record<'zh' | 'en', PricingCopy> = {
   en: {
     title: 'Pricing',
     metaDescription:
-      'Appidge license: $9.98 for 3 Macs. Download the free trial first, then buy through Creem’s secure checkout when it earns its keep. 14-day refund, no questions asked. Currency and tax are shown at checkout.',
+      'Appidge license: $3.99 for 3 Macs. Download the free trial first, then buy through Creem’s secure checkout when it earns its keep. 14-day refund, no questions asked. Currency and tax are shown at checkout.',
     eyebrow: 'Pricing',
     h2: 'Try it first. Buy it when it earns its keep.',
     sub: 'Download and purchase are separate steps: install it, confirm it solves your problem, then unlock it with a license.',
     card: {
       tag: 'License',
       name: 'Appidge License',
-      price: '$9.98',
+      price: '$3.99',
       priceSuffix: 'for 3 Macs',
       priceLine: 'Currency and tax are shown on the Creem checkout page',
       feats: [

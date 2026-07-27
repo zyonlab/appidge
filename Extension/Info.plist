@@ -15,9 +15,9 @@
 	<key>CFBundlePackageType</key>
 	<string>SYSX</string>
 	<key>CFBundleShortVersionString</key>
-	<string>$(MARKETING_VERSION)</string>
+	<string>$(APPIDGE_EXT_MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<string>$(APPIDGE_EXT_BUILD_NUMBER)</string>
 	<key>NetworkExtension</key>
 	<dict>
 		<!-- App Group UserDefaults + Darwin 通知在这套 root 系统扩展上被真机验证证实不通

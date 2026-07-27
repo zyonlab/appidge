@@ -102,8 +102,12 @@ esac
 
 # ---------------------------------------------------------------------------
 # 0.5 build 号(CURRENT_PROJECT_VERSION)——由 APPIDGE_BUILD_NUMBER 经 xcodebuild 显式注入。
-#   为什么每次出包必须更高:系统扩展按 (short/build) 元组判新旧。build 号不变 → macOS 认为扩展
-#   没升级、不换新扩展 → 会话仍绑旧 provider;版本握手也因两边相等永不触发重绑。
+#   这个注入只决定 **App** 的 CFBundleVersion(Sparkle 按它比较新旧,必须每次出包单调更高)。
+#   **系统扩展的版本已与 app build 号解耦**:Extension/Info.plist 读的是 project.yml 里
+#   钉住的 APPIDGE_EXT_MARKETING_VERSION / APPIDGE_EXT_BUILD_NUMBER,不受本注入影响。
+#   为什么解耦:macOS 按 (short/build) 元组判断扩展是否需要替换,替换窗口正是「会话绑死旧
+#   provider / XPC 注册失败」竞态(升级黑洞)的唯一入口——扩展内容没变的发版保持版本不动,
+#   系统跳过替换,竞态窗口不存在。改了扩展忘 bump 的反向风险由 §0.6 的守门闸硬失败兜底。
 #   本脚本【不再】sed 修改 tracked project.pbxproj——构建产物的 build 号完全来自命令行参数,
 #   工程文件保持只读。构建前后校验两份 tracked 配置未被任何环节改写,变了即失败。
 # ---------------------------------------------------------------------------
@@ -117,7 +121,16 @@ assert_tracked_config_unchanged() {
     exit 1
   fi
 }
-note "build 号 = ${APPIDGE_BUILD_NUMBER}（由调用方显式提供，不改 pbxproj）"
+note "build 号 = ${APPIDGE_BUILD_NUMBER}（由调用方显式提供，不改 pbxproj；只作用于 App，不影响扩展版本）"
+
+# ---------------------------------------------------------------------------
+# 0.6 扩展版本守门闸：扩展内容闭包(Extension/ + EngineKit + IPCContract)指纹必须与
+#   scripts/extension-version.lock 登记一致。两个方向都硬失败:
+#   - 内容变了没 bump APPIDGE_EXT_BUILD_NUMBER → 系统会跳过替换,用户永远跑旧扩展;
+#   - 内容没变却 bump → 无谓重新打开替换竞态窗口(升级黑洞唯一入口)。
+# ---------------------------------------------------------------------------
+note "0.6 扩展版本守门闸（scripts/check-extension-version.sh）"
+sh scripts/check-extension-version.sh
 
 # ---------------------------------------------------------------------------
 # 1. 公证凭证：xcrun notarytool 支持两种认证方式，这里都支持，任选其一。

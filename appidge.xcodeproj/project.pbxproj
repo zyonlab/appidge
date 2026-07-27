@@ -433,6 +433,8 @@
 		4AB0DF2E8F4BBDB3424B6242 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APPIDGE_EXT_BUILD_NUMBER = 81;
+				APPIDGE_EXT_MARKETING_VERSION = 0.2.35;
 				CODE_SIGN_ENTITLEMENTS = Extension/Extension.entitlements;
 				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
@@ -546,6 +548,8 @@
 		8FF94AED94FB3A3E8AC22C4F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APPIDGE_EXT_BUILD_NUMBER = 81;
+				APPIDGE_EXT_MARKETING_VERSION = 0.2.35;
 				CODE_SIGN_ENTITLEMENTS = Extension/Extension.entitlements;
 				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;

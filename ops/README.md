@@ -125,6 +125,30 @@ build，新包必须严格更高——否则用户装到手的版本比线上更
 ⚠️ 别设成常态、更别把该检查改成静默跳过——它是防"发了个比线上更旧的 build"的唯一护栏。
 边界由 `ops/tests/test-config.sh` 的 9 条打桩测试守住（不联网）。
 
+## 系统扩展版本解耦（升级黑洞的根本缓解）
+
+app build 号每次出包递增（上节），**系统扩展版本不跟**：Extension 的
+CFBundleShortVersionString / CFBundleVersion 读 project.yml 里钉住的
+`APPIDGE_EXT_MARKETING_VERSION` / `APPIDGE_EXT_BUILD_NUMBER`，不受
+`archive-and-notarize.sh` 命令行注入的 `CURRENT_PROJECT_VERSION` 影响。
+
+为什么：macOS 按 (short, build) 元组判断系统扩展是否需要替换；替换窗口正是
+「会话绑死旧 provider / XPC 监听器注册失败」竞态（升级黑洞）的唯一入口。
+扩展内容没变的发版保持版本不动 → 系统跳过替换 → 竞态窗口不存在。
+
+发版规则：
+
+- **没改** `Extension/`、`Packages/EngineKit`、`Packages/IPCContract` → 什么都不用做，
+  出包自动跳过扩展替换（`build-macos` 里守门闸会打印确认）。
+- **改了**上述任一处 → 在 project.yml bump `APPIDGE_EXT_BUILD_NUMBER`（保持单调递增，
+  与 app build 号无需一致），跑 `scripts/check-extension-version.sh --update` 登记，
+  `xcodegen generate` 重生成工程，一起提交（含 `scripts/extension-version.lock`）。
+- 守门闸（`archive-and-notarize.sh` §0.6）对两个方向都硬失败：内容变了没 bump
+  （用户永远跑旧扩展、版本握手失明）、内容没变乱 bump（无谓重开替换窗口）。
+- 盲区：ProxyExtension 的构建设置 / Xcode SDK 变更不进指纹；确需强制替换时
+  bump 后 `--update` 显式登记。
+- 回归测试：`ops/tests/test-extension-version.sh`（不联网）。
+
 ## 边界
 
 - 开发命令（`pnpm dev:web` / `dev:api` / `check` / `check:swift`）不需要任何云凭证，API 默认 mock。

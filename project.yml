@@ -84,6 +84,16 @@ targets:
         CODE_SIGN_ENTITLEMENTS: Extension/Extension.entitlements
         PROVISIONING_PROFILE_SPECIFIER: $(PROVISIONING_PROFILE_SPECIFIER_EXT)
         SKIP_INSTALL: NO
+        # —— 扩展版本与 app build 号解耦（升级黑洞的根本缓解）——
+        # macOS 按 (short, build) 元组判断系统扩展是否需要替换；替换窗口正是「会话绑死旧
+        # provider / XPC 监听器注册失败」竞态的唯一入口。扩展内容没变的发版保持这两个值
+        # 不动 → 系统跳过替换 → 竞态窗口不存在。Extension/Info.plist 读的是这两个变量
+        # （不是 CURRENT_PROJECT_VERSION——那个会被 archive-and-notarize.sh 按 app build 号
+        # 命令行注入、覆盖所有 target）。改了 Extension/、EngineKit、IPCContract 必须 bump
+        # APPIDGE_EXT_BUILD_NUMBER 并跑 scripts/check-extension-version.sh --update；
+        # 出包前置闸门（archive-and-notarize.sh §0.6）会对内容指纹硬校验兜底。
+        APPIDGE_EXT_MARKETING_VERSION: "0.2.35"
+        APPIDGE_EXT_BUILD_NUMBER: "81"   # 初值 = 线上 production build 81 的扩展版本
     dependencies:
       - package: EngineKit
       - package: IPCContract

@@ -296,6 +296,10 @@ archive-and-notarize.sh
 
 - 上传使用独立脚本，可 dry-run，可重复执行；R2 对象使用不可变版本路径，`appcast.xml` 最后原子更新，避免 feed 指向未上传文件。
 - 系统扩展升级必须复用现有 provider 版本握手与重绑逻辑；至少保留旧版 → 新版的人工 smoke 步骤。
+- **系统扩展版本与 app build 号解耦**（升级黑洞的根本缓解）：扩展版本钉在 project.yml 的
+  `APPIDGE_EXT_BUILD_NUMBER`/`APPIDGE_EXT_MARKETING_VERSION`，扩展内容（`Extension/`、EngineKit、
+  IPCContract）没变就不 bump——系统跳过扩展替换，升级竞态窗口不打开。改了必须 bump 并跑
+  `scripts/check-extension-version.sh --update`；出包闸门对两个方向硬失败（规则详见 `ops/README.md`）。
 - 下载走 `updates.appidge.com` 直达 R2，不经过 license Worker。
 
 ---

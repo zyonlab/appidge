@@ -45,10 +45,13 @@ extension Reducer {
     /// 首启（无锚点）→ 记名 now、开满天数；后续 → 合并锚点、抬高水位、按天算相位。
     /// 两种路径都回写**全部**锚点：既锁定高水位，又把被删的那份自愈补回（"删一个不重置"的落地）。
     static func trialResolved(anchors: [TrialInfo], now: Date, _ state: AppState) -> (AppState, [Effect]) {
+        // 无论走哪个分支，`.trialResolved` 都是启动恢复链的最后一环——相位就此落定，
+        // UI 从这一刻起才允许渲染授权门（见 ``AppState/isLicensePhaseResolved``）。
+        var state = state
+        state.isLicensePhaseResolved = true
         guard state.license == nil, state.licensePhase == .unlicensed else {
             return (state, [])
         }
-        var state = state
         if var merged = mergeTrialAnchors(anchors) {
             merged.bumpHighWater(now)
             state.trial = merged

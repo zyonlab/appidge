@@ -416,3 +416,15 @@ struct LicenseGateView: View {
         }
     }
 }
+
+/// 启动瞬间的占位页：授权/试用相位尚未从 Keychain/锚点恢复落定（`isLicensePhaseResolved`
+/// 为假）时渲染。只有品牌图标、零文案零输入——它存在的意义就是**不让授权门在落定前闪现**
+/// （试用期用户看到"输入许可证"锁屏一闪而过，观感像误锁）。frame 与 ``LicenseGateView``
+/// 一致，落定后切到门/主窗口不跳尺寸。
+struct LicensePhaseResolvingView: View {
+    var body: some View {
+        BrandIcon(size: 88)
+            .frame(minWidth: 560, minHeight: 460)
+            .accessibilityHidden(true)
+    }
+}

@@ -62,6 +62,11 @@ public struct AppState: Sendable, Equatable {
     public var trialConfig: TrialConfig
     /// 本地试用锚点（合并两处冗余锚点后的当前视图）。相位为 `.trial`/`.trialExpired` 时非 nil。
     public var trial: TrialInfo?
+    /// 授权/试用相位是否已完成启动恢复（Keychain 授权记录 + 试用锚点都读回并落定）。
+    /// 默认 false——初始的 `.unlicensed` 只是「还没读」，不是「真没授权」；UI 据此在落定前
+    /// **不渲染授权门**（否则试用期用户每次启动都会闪一下"输入许可证"锁屏）。恢复链的最后
+    /// 一环是 `.trialResolved`（本地读锚点、必然回灌），由它置真。运行时状态,不持久化。
+    public var isLicensePhaseResolved: Bool = false
 
     /// 会话绑定的扩展是不是旧的:两者都已知且不相等 = 会话绑在旧 provider 上,需重启会话重绑。
     /// 任一未知(还没握手 / 读不到包内版本)时返回 false——不确定就不误报。

@@ -72,6 +72,31 @@ final class MainTabSelection {
     var section: MainWindow.MainTab = .activity
 }
 
+/// 主窗口根内容三档切换：已激活（licensed/grace/试用中）→ 主界面或引导；未激活**且相位已
+/// 落定** → 授权门；相位未落定（启动最初几百毫秒，Keychain 授权记录/试用锚点还在读）→ 占位页。
+/// 落定前不渲染授权门——初始 `.unlicensed` 只是「还没读」，不是「真没授权」，直接渲染会让
+/// 试用期用户每次启动都闪一下"输入许可证"锁屏。落定必然发生（`.trialResolved` 是本地读锚点、
+/// 读失败也回灌空数组），不会卡在占位页（见 ``Core/AppState/isLicensePhaseResolved``）。
+private struct RootContentView: View {
+    var store: Store
+    var profiles: ProfilesModel
+    var tabSelection: MainTabSelection
+
+    var body: some View {
+        if store.state.isLicenseActive {
+            if store.state.hasCompletedOnboarding {
+                MainWindow(store: store, profiles: profiles, tabSelection: tabSelection)
+            } else {
+                OnboardingView(store: store)
+            }
+        } else if store.state.isLicensePhaseResolved {
+            LicenseGateView(store: store)
+        } else {
+            LicensePhaseResolvingView()
+        }
+    }
+}
+
 @main
 struct AppidgeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -154,15 +179,7 @@ struct AppidgeApp: App {
 
     var body: some Scene {
         WindowGroup(id: "main") {
-            Group {
-                if !store.state.isLicenseActive {
-                    LicenseGateView(store: store)
-                } else if store.state.hasCompletedOnboarding {
-                    MainWindow(store: store, profiles: profilesModel, tabSelection: tabSelection)
-                } else {
-                    OnboardingView(store: store)
-                }
-            }
+            RootContentView(store: store, profiles: profilesModel, tabSelection: tabSelection)
             .task {
                 // 退出强制存盘钩子:捕获 store,同步落地最新配置(见 AppTermination / applicationWillTerminate)。
                 AppTermination.persist = { [store] in

@@ -199,4 +199,56 @@ struct TrialReducerTests {
         var e = AppState(); e.licensePhase = .trialExpired
         #expect(!e.isValidateDue(now: t0.addingTimeInterval(30 * day)))
     }
+
+    // MARK: 相位落定标记（启动闪授权门的修复判据）
+
+    @Test("phase starts UNresolved — the license gate must not render on first frames")
+    func phaseStartsUnresolved() {
+        #expect(!AppState().isLicensePhaseResolved)
+    }
+
+    @Test("trialResolved marks the phase resolved on every branch (fresh start / anchors / expired)")
+    func trialResolvedMarksResolved() {
+        // 首启记名
+        let (fresh, _) = Reducer.reduce(AppState(), .trialResolved(anchors: [], now: t0))
+        #expect(fresh.isLicensePhaseResolved)
+        // 后续启动（试用中）
+        let (mid, _) = Reducer.reduce(AppState(), .trialResolved(anchors: [anchor(t0)], now: t0.addingTimeInterval(2 * day)))
+        #expect(mid.isLicensePhaseResolved)
+        // 已到期——resolved 也必须置真，授权门此时才允许出现
+        let (expired, _) = Reducer.reduce(AppState(), .trialResolved(anchors: [anchor(t0)], now: t0.addingTimeInterval(9 * day)))
+        #expect(expired.licensePhase == .trialExpired)
+        #expect(expired.isLicensePhaseResolved)
+    }
+
+    @Test("trialResolved no-op branch (licensed / non-unlicensed) still marks the phase resolved")
+    func trialResolvedGuardBranchStillResolves() {
+        // 已授权：相位不被 trial 覆盖，但恢复链已走完，resolved 必须置真
+        var licensed = AppState()
+        licensed.license = LicenseInfo(
+            licenseKey: "K1", instanceId: "i1", status: .active,
+            activations: 1, activationLimit: 3, lastValidatedAt: t0
+        )
+        licensed.licensePhase = .licensed
+        let (next, effects) = Reducer.reduce(licensed, .trialResolved(anchors: [], now: t0))
+        #expect(next.licensePhase == .licensed)
+        #expect(next.isLicensePhaseResolved)
+        #expect(effects.isEmpty)
+        // 过期/吊销的授权记录同理（授权门要展示，但必须等落定后才展示）
+        for phase in [LicensePhase.expired, .revoked] {
+            var state = AppState()
+            state.licensePhase = phase
+            let (resolved, _) = Reducer.reduce(state, .trialResolved(anchors: [anchor(t0)], now: t0))
+            #expect(resolved.isLicensePhaseResolved)
+        }
+    }
+
+    @Test("resetState (profile switch) preserves the resolved marker — no gate re-flash mid-session")
+    func resetPreservesResolvedMarker() {
+        var state = AppState()
+        state.licensePhase = .trial(daysLeft: 5)
+        state.isLicensePhaseResolved = true
+        let (reset, _) = Reducer.reduce(state, .resetState)
+        #expect(reset.isLicensePhaseResolved)
+    }
 }

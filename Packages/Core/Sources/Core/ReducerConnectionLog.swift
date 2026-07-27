@@ -38,6 +38,13 @@ extension Reducer {
         // 从最老的一条扫起。id 在日志里唯一(本函数即按 id 去重),所以 first/last 找到的是
         // **同一个元素**,语义完全等价,没有行为变化。
         if let index = state.connectionLog.lastIndex(where: { $0.id == entry.id }) {
+            // 迟到的 `.opened` 回填绝不复活已关闭的行:扩展对活跃连接周期性重发 .opened 回填字节,
+            // Task 投递无序,关闭事件可能先落地——已 closed/failed 的行整行保留(关闭时的字节是
+            // 最终值,必然 ≥ 迟到快照),否则该行会永远显示"活动"绿点。
+            let existing = state.connectionLog[index]
+            if entry.phase == .opened, existing.phase != .opened {
+                return state
+            }
             state.connectionLog[index] = entry
         } else {
             state.connectionLog.append(entry)

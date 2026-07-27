@@ -93,7 +93,7 @@ targets:
         # APPIDGE_EXT_BUILD_NUMBER 并跑 scripts/check-extension-version.sh --update；
         # 出包前置闸门（archive-and-notarize.sh §0.6）会对内容指纹硬校验兜底。
         APPIDGE_EXT_MARKETING_VERSION: "0.2.35"
-        APPIDGE_EXT_BUILD_NUMBER: "81"   # 初值 = 线上 production build 81 的扩展版本
+        APPIDGE_EXT_BUILD_NUMBER: "82"   # 82: 连接字节周期回填 + UDP 计量(改了 Extension/EngineKit)
     dependencies:
       - package: EngineKit
       - package: IPCContract

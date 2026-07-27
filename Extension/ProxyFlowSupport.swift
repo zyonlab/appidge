@@ -96,6 +96,9 @@ final class ConnectionContext: @unchecked Sendable {
     func addDown(_ n: Int64) { lock.withLock { down += n } }
     func snapshotBytes() -> (up: Int64, down: Int64) { lock.withLock { (up, down) } }
 
+    /// 是否已走过 markClosedOnce(周期字节回填据此跳过已关闭的连接,不再重发 .opened)。
+    var isClosed: Bool { lock.withLock { closed } }
+
     /// 第一次调用返回 true(该发结束事件),之后都返回 false。
     func markClosedOnce() -> Bool {
         lock.withLock {

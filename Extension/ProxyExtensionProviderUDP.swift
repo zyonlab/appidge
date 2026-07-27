@@ -12,6 +12,16 @@ import IPCContract
 /// **DNS(53)/回环/私网/组播广播必须放行直连**,否则一条 `*→*→代理` 通配规则 + UDP 默认
 /// 「拦截止漏」就把 mDNSResponder 的系统 DNS 静默丢包,全系统所有应用 timeout
 /// (真机实锤 0.2.20,"Chrome 打不开网页、关掉扩展就好")。
+/// UDP 中继连接行的来源/目标要素(打包只为把 `startUDPRelay` 的参数数压回 lint 阈值内,
+/// 同 `FlowOrigin` 的既有先例,不是必须的抽象)。
+struct UDPRelayOrigin {
+    let processID: ProcessIdentifierDTO
+    let displayName: String?
+    /// flow 的**初始**远端(UDP flow 可向多端点发包,连接行以首个端点代表,同 NE 的 flow 归组语义)。
+    let host: String?
+    let port: UInt16?
+}
+
 extension ProxyExtensionProvider: NEAppProxyUDPFlowHandling {
     func handleNewUDPFlow(
         _ flow: NEAppProxyUDPFlow, initialRemoteFlowEndpoint remoteEndpoint: Network.NWEndpoint
@@ -66,26 +76,62 @@ extension ProxyExtensionProvider: NEAppProxyUDPFlowHandling {
             }
             return true
         case .proxy:
-            // disposition 已保证 active 是 SOCKS5;兜底再判一次。
-            guard let active, active.kind == .socks5 else {
-                flow.open(withLocalFlowEndpoint: nil) { error in
-                    flow.closeReadWithError(error); flow.closeWriteWithError(error)
-                }
-                return true
+            return startProxiedUDPRelay(
+                flow: flow, active: active, sourceID: sourceID, sourcePath: sourcePath, hostPort: hostPort
+            )
+        }
+    }
+
+    /// `.proxy` 分支的落地(从 `blockOrAllowUDPFlow` 抽出压 function_body_length):
+    /// disposition 已保证 active 是 SOCKS5,这里兜底再判一次;不满足就接管并关闭(止漏)。
+    private func startProxiedUDPRelay(
+        flow: NEAppProxyUDPFlow, active: ProxyServerDTO?,
+        sourceID: String, sourcePath: String?, hostPort: (String, UInt16)?
+    ) -> Bool {
+        guard let active, active.kind == .socks5 else {
+            flow.open(withLocalFlowEndpoint: nil) { error in
+                flow.closeReadWithError(error); flow.closeWriteWithError(error)
             }
-            startUDPRelay(flow: flow, proxy: active)
             return true
         }
+        let origin = UDPRelayOrigin(
+            processID: ProcessIdentifierDTO(sourceID),
+            displayName: sourcePath.flatMap(ProcessPathResolver.displayName(fromExecutablePath:)),
+            host: hostPort?.0, port: hostPort?.1
+        )
+        startUDPRelay(flow: flow, proxy: active, origin: origin)
+        return true
     }
 
     /// 建一个 SOCKS5 UDP 中继并按 id 持有(结束时经 onFinished 用同一 id 移除)。id 是 let,可安全
     /// 被 @Sendable 的 onFinished 捕获(不像捕获 relay 变量那样触发并发告警)。
-    func startUDPRelay(flow: NEAppProxyUDPFlow, proxy: ProxyServerDTO) {
+    ///
+    /// 计量与可见性(此前 UDP 两者皆无):按 flow 建 ``ConnectionContext``——association 建立后发
+    /// .opened 并进周期字节回填注册表,中继泵双向计数(连接行)+ 经 router 批量上报(应用页/状态栏),
+    /// 结束时发 closed/failed(经 emitClose,自动出注册表)。host/port 取 flow 的**初始**远端
+    /// (UDP flow 可向多个端点发包,连接行以首个端点代表这条 flow,同 NE 的 flow 归组语义)。
+    func startUDPRelay(flow: NEAppProxyUDPFlow, proxy: ProxyServerDTO, origin: UDPRelayOrigin) {
         let id = UUID().uuidString
-        let relay = SOCKS5UDPRelay(flow: flow, proxy: proxy) { [weak self] in
-            guard let self else { return }
-            self.configLock.withLock { _ = self.storedUDPRelays.removeValue(forKey: id) }
-        }
+        let context = ConnectionContext(
+            id: id, processID: origin.processID, host: origin.host ?? "?", port: origin.port ?? 0,
+            rule: .proxied, proxyKind: .socks5,
+            upstreamLabel: "\(proxy.host):\(proxy.port)", upstreamKind: .single,
+            openedAt: Date(), processDisplayName: origin.displayName
+        )
+        let relay = SOCKS5UDPRelay(
+            flow: flow, proxy: proxy, context: context, router: router,
+            onEstablished: { [weak self] in
+                guard let self else { return }
+                self.emitConnectionEvent(context, phase: .opened)
+                self.registerActiveContext(context)
+            },
+            onFinished: { [weak self] failed in
+                guard let self else { return }
+                self.configLock.withLock { _ = self.storedUDPRelays.removeValue(forKey: id) }
+                // association 没建立就失败的没发过 .opened,这里发 failed 让这条 flow 照样可见。
+                self.emitClose(context, failed: failed)
+            }
+        )
         configLock.withLock { storedUDPRelays[id] = relay }
         Task { await relay.start() }
     }

@@ -343,6 +343,7 @@ extension ProxyExtensionProvider {
     func emitClose(_ context: ConnectionContext, failed: Bool) {
         guard context.markClosedOnce() else { return }
         context.capture?.close() // 抓包文件随连接结束落盘关闭。
+        unregisterActiveContext(id: context.id) // 出周期字节回填注册表
         emitConnectionEvent(context, phase: failed ? .failed : .closed)
     }
 }

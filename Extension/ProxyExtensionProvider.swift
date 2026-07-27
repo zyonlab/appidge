@@ -56,7 +56,9 @@ enum TCPFlowDecision: Equatable {
 /// 否则直连目的地（``ProxyDialer/openDirect(to:)`` 显式清空代理配置，避免重蹈 5a7ad53 的覆辙）。
 /// 拨号/握手失败 fail-open：关掉这条 flow，不阻塞其它流量。
 final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Sendable {
-    private var router: FlowRouter?
+    // 不是 private:UDP 中继计量在同 target 的 ProxyExtensionProviderUDP.swift 里也要上报
+    // (router.route),同 transport/matchRules 的拆文件先例。
+    var router: FlowRouter?
     // 非 private:`emitObservedFlow` 在同类型的跨文件 extension 里投递观测事件(同 beginFlow 的先例)。
     var transport: XPCFlowTransport?
     // 不是 private:makeDiagnosticsRunner 拆到同 target 的 ProxyExtensionProviderRouting.swift。
@@ -138,6 +140,15 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     // 当前是否有活跃的透明代理会话(startProxy→true / stopProxy→false)。退出重生的安全闸:
     // 有会话时绝不 exit(杀进程=全系统断网,见记忆「升级黑洞」)。锁保护。
     var storedSessionActive = false
+    // 活跃连接注册表(TCP + UDP 中继):周期回填驱动据此对「字节有变化」的连接重发 .opened
+    // 事件刷新活动栏的发送/接收列(否则长连接存活期间字节一直显示 0,见 ConnectionStatsRefresher
+    // 的类型注释)。emitClose/中继结束时移除。锁保护。
+    // 非 private:驱动拆在同 target 的 ConnectionStatsRefreshDriver.swift(同其它 stored 先例)。
+    var storedActiveContexts: [String: ConnectionContext] = [:]
+    // 回填的差分判定(纯值,EngineKit 有测试):与上次发射的快照比,变了才发。锁保护。
+    var storedStatsRefresher = ConnectionStatsRefresher()
+    // 周期回填驱动任务:startProxy 起、stopProxy 取消。
+    var storedStatsRefreshTask: Task<Void, Never>?
 
     private var packetCaptureEnabled: Bool {
         configLock.withLock { storedPacketCaptureEnabled }
@@ -212,6 +223,8 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         // 空排除名单接管流量。自检失败先重建 listener 重试;判死后等 stopProxy(sessionless)退出重生。
         configLock.withLock { storedSessionActive = true }
         startListenerSelfCheck(transport: transport)
+        // 活跃连接字节回填:每 2s 对字节有变化的连接重发 .opened 事件(见 ConnectionStatsRefreshDriver)。
+        startConnectionStatsRefresh()
 
         // 透明代理网络设置:拦截所有出站 TCP + UDP。此前完全没设置——拦截从未真正生效(也是
         // 「待人工回填」里 flow metadata 观测被卡住的一环)。UDP 纳入拦截是 A1「拦截 QUIC/UDP
@@ -225,6 +238,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     override func stopProxy(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
         ExtDiag.log("stopProxy called reason=\(reason.rawValue)")
         configLock.withLock { storedSessionActive = false }
+        stopConnectionStatsRefresh()
         // 先 invalidate 旧 XPC 监听器,释放 mach service——否则它泄漏、仍占着服务,下次 startProxy
         // 新建的监听器与它抢同一服务,新 app 连上被路由到旧监听器,flow 投到新 transport 全丢
         // (退出重开「会话通却收不到 flow」的真因)。
@@ -438,6 +452,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             // 拨号后把上游/协议回填成实际用的那台(负载均衡才看得出轮询),再发 .opened。
             applyActualUpstream(context, used: used, ruleServer: origin.proxyServerID)
             emitConnectionEvent(context, phase: .opened)
+            registerActiveContext(context) // 进周期字节回填(长连接存活期间发送/接收列才会动)
             pumpClientToRemote(tcpFlow: tcpFlow, remote: remote, context: context, router: router)
             pumpRemoteToClient(tcpFlow: tcpFlow, remote: remote, context: context, router: router)
         } catch {

@@ -31,6 +31,22 @@ struct ConnectionLogReducerTests {
         #expect(state.connectionLog.first?.bytesDown == 900)
     }
 
+    @Test("a late .opened refresh never resurrects an already-closed row (periodic byte backfill race)")
+    func lateOpenedRefreshDoesNotResurrectClosedRow() {
+        // 扩展对活跃连接周期性重发 .opened 事件回填字节;若关闭事件先落地、迟到的回填事件
+        // 后到(Task 投递无序),绝不能把已关闭的行改回「活动」——否则该行永远显示绿点。
+        var (state, _) = Reducer.reduce(AppState(), .connectionEventReceived(entry("c1", phase: .opened)))
+        (state, _) = Reducer.reduce(state, .connectionEventReceived(entry("c1", phase: .closed, up: 100, down: 900)))
+        let closed = state.connectionLog.first
+        (state, _) = Reducer.reduce(state, .connectionEventReceived(entry("c1", phase: .opened, up: 90, down: 800)))
+        #expect(state.connectionLog.count == 1)
+        #expect(state.connectionLog.first == closed)   // 整行原样保留:phase 仍 closed,字节仍是关闭时的最终值
+        // failed 同理
+        var (s2, _) = Reducer.reduce(AppState(), .connectionEventReceived(entry("c2", phase: .failed)))
+        (s2, _) = Reducer.reduce(s2, .connectionEventReceived(entry("c2", phase: .opened, up: 1)))
+        #expect(s2.connectionLog.first?.phase == .failed)
+    }
+
     @Test("updating one connection leaves the others untouched and preserves order")
     func upsertPreservesOrder() {
         var (state, _) = Reducer.reduce(AppState(), .connectionEventReceived(entry("a")))

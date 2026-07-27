@@ -46,6 +46,7 @@
 		CD074F91F9D8E81EF3AF1E9B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 011FA75EB4918608F8A42804 /* Assets.xcassets */; };
 		CD510BD7F2C9201A67B92257 /* ExitIPChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A87A795A5461972CB2EF668 /* ExitIPChecker.swift */; };
 		CEB6289185EA4E3CA070E696 /* AppsPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8EEB3B3B4F5AE8205F1F7B3 /* AppsPaneView.swift */; };
+		D65E0A98F6E2E196750EFA90 /* ConnectionStatsRefreshDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0DBBDCFF420D0CED00063EC /* ConnectionStatsRefreshDriver.swift */; };
 		D6A8FB762DDA1A702B6D9C2A /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 21C0C6E1F95B2B68AA48B60F /* Sparkle */; };
 		D81B1C44E7FA0F18207CF8AD /* Core in Frameworks */ = {isa = PBXBuildFile; productRef = 070C87CD751D657AB4653E16 /* Core */; };
 		D8E7DC6893CB84274AEBAC74 /* AppIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEF8C43AA00DC8615A6EF807 /* AppIcon.swift */; };
@@ -131,6 +132,7 @@
 		C5A9AAC7350E301EB78C0187 /* PacketCaptureWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketCaptureWriter.swift; sourceTree = "<group>"; };
 		C8EEB3B3B4F5AE8205F1F7B3 /* AppsPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppsPaneView.swift; sourceTree = "<group>"; };
 		C9D71AD68E0D673791D64826 /* ProcessPathResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessPathResolver.swift; sourceTree = "<group>"; };
+		D0DBBDCFF420D0CED00063EC /* ConnectionStatsRefreshDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatsRefreshDriver.swift; sourceTree = "<group>"; };
 		D691CAC126FD68DFD5F6FB1C /* AppMenuCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppMenuCommands.swift; sourceTree = "<group>"; };
 		EEBD232B5EDEBEEDC598FA44 /* ProfilesModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilesModel.swift; sourceTree = "<group>"; };
 		F3502285178386167CBDC5B8 /* RulesEditorPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesEditorPaneView.swift; sourceTree = "<group>"; };
@@ -185,6 +187,7 @@
 		9F555B917CC095726A4EC854 /* Extension */ = {
 			isa = PBXGroup;
 			children = (
+				D0DBBDCFF420D0CED00063EC /* ConnectionStatsRefreshDriver.swift */,
 				6FE1FDE2601F854C4AB0FCB4 /* ExtDiag.swift */,
 				013DDA0D0CAD661B46265150 /* Extension.entitlements */,
 				163B07BB0DEAE3E528ECBC13 /* Info.plist */,
@@ -370,6 +373,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D65E0A98F6E2E196750EFA90 /* ConnectionStatsRefreshDriver.swift in Sources */,
 				C4AE8EAE06FB99890379876B /* ExtDiag.swift in Sources */,
 				AB6CB382A5B383A530062CCA /* PacketCaptureWriter.swift in Sources */,
 				586E6945675466F5FAEDBCE6 /* ProcessPathResolver.swift in Sources */,
@@ -433,7 +437,7 @@
 		4AB0DF2E8F4BBDB3424B6242 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				APPIDGE_EXT_BUILD_NUMBER = 81;
+				APPIDGE_EXT_BUILD_NUMBER = 82;
 				APPIDGE_EXT_MARKETING_VERSION = 0.2.35;
 				CODE_SIGN_ENTITLEMENTS = Extension/Extension.entitlements;
 				CODE_SIGN_IDENTITY = "Developer ID Application";
@@ -548,7 +552,7 @@
 		8FF94AED94FB3A3E8AC22C4F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				APPIDGE_EXT_BUILD_NUMBER = 81;
+				APPIDGE_EXT_BUILD_NUMBER = 82;
 				APPIDGE_EXT_MARKETING_VERSION = 0.2.35;
 				CODE_SIGN_ENTITLEMENTS = Extension/Extension.entitlements;
 				CODE_SIGN_IDENTITY = "Developer ID Application";

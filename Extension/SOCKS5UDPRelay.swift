@@ -25,15 +25,31 @@ final class SOCKS5UDPRelay: @unchecked Sendable {
     private let proxy: ProxyServerDTO
     private let control: NWConnectionByteStream   // TCP 控制连接,持有以保活 association
     private var relay: NWConnection?
-    // 结束时回调(只触发一次),让 provider 释放对本 relay 的强引用。
-    private let onFinished: @Sendable () -> Void
+    /// 本条 UDP flow 的连接上下文:泵在这里累计上下行字节(payload 计,不含 SOCKS5 封包头)——
+    /// 供活动栏连接行(opened/closed 事件 + 周期回填)展示。provider 建,这里只加数。
+    private let context: ConnectionContext
+    /// 进程级计量上报(应用页累计/速率、状态栏合计),与 TCP pump 的 route 同一条管道。
+    /// `XPCFlowTransport.forward` 是纯计量钩子(无 I/O),这里 route 不产生任何二次转发。
+    private let router: FlowRouter?
+    /// association 建立、泵即将开动时回调一次(provider 据此发 .opened + 进回填注册表)。
+    private let onEstablished: @Sendable () -> Void
+    // 结束时回调(只触发一次),让 provider 释放对本 relay 的强引用并发结束事件。
+    private let onFinished: @Sendable (_ failed: Bool) -> Void
     private let finishLock = NSLock()
     private var finished = false
 
-    init(flow: NEAppProxyUDPFlow, proxy: ProxyServerDTO, onFinished: @escaping @Sendable () -> Void) {
+    init(
+        flow: NEAppProxyUDPFlow, proxy: ProxyServerDTO,
+        context: ConnectionContext, router: FlowRouter?,
+        onEstablished: @escaping @Sendable () -> Void,
+        onFinished: @escaping @Sendable (_ failed: Bool) -> Void
+    ) {
         self.flow = flow
         self.proxy = proxy
+        self.context = context
+        self.router = router
         self.control = NWConnectionByteStream(proxyServer: proxy)
+        self.onEstablished = onEstablished
         self.onFinished = onFinished
     }
 
@@ -44,24 +60,25 @@ final class SOCKS5UDPRelay: @unchecked Sendable {
             let relay = NWConnection(to: relayEndpoint, using: .udp)
             self.relay = relay
             try await openUDP(relay)
+            onEstablished()
             pumpFlowToRelay()
             pumpRelayToFlow()
         } catch {
             udpLogger.error("UDP ASSOCIATE failed, closing flow: \(String(describing: error), privacy: .public)")
-            teardown()
+            teardown(failed: true)
             flow.closeReadWithError(error)
             flow.closeWriteWithError(error)
         }
     }
 
-    func teardown() {
+    func teardown(failed: Bool = false) {
         finishLock.lock()
         let already = finished
         finished = true
         finishLock.unlock()
         control.close()
         relay?.cancel()
-        if !already { onFinished() } // 触发一次,provider 据此释放引用
+        if !already { onFinished(failed) } // 触发一次,provider 据此释放引用 + 发结束事件
     }
 
     // MARK: - association handshake（在 TCP 控制连接上）
@@ -120,26 +137,41 @@ final class SOCKS5UDPRelay: @unchecked Sendable {
     private func pumpFlowToRelay() {
         // NEAppProxyUDPFlow.readDatagrams 现代签名:一批 (Data, NWEndpoint) 元组 + error。
         flow.readDatagrams { [weak self] datagrams, error in
-            guard let self, let datagrams, error == nil else { self?.teardown(); return }
+            guard let self, let datagrams, error == nil else { self?.teardown(failed: error != nil); return }
+            var sent: Int64 = 0
             for (data, endpoint) in datagrams {
                 guard let (host, port) = ProxyDialer.hostPort(from: endpoint),
                       let framed = try? SOCKS5UDPDatagram.encode(host: host, port: port, payload: Array(data)) else { continue }
                 self.relay?.send(content: Data(framed), completion: .idempotent)
+                sent += Int64(data.count)
             }
+            self.record(up: sent, down: 0)
             self.pumpFlowToRelay()
         }
     }
 
     private func pumpRelayToFlow() {
         relay?.receiveMessage { [weak self] data, _, _, error in
-            guard let self, let data, error == nil else { self?.teardown(); return }
+            guard let self, let data, error == nil else { self?.teardown(failed: error != nil); return }
             if let decoded = try? SOCKS5UDPDatagram.decode(Array(data)),
                let port = NWEndpoint.Port(rawValue: decoded.port) {
                 let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(decoded.host), port: port)
                 self.flow.writeDatagrams([(Data(decoded.payload), endpoint)]) { _ in }
+                self.record(up: 0, down: Int64(decoded.payload.count))
             }
             self.pumpRelayToFlow()
         }
+    }
+
+    /// 双向计量(payload 字节):连接级进 context(活动栏行),进程级经 router 批量上报
+    /// (应用页累计/速率)——此前 UDP 完全没计量,应用页对 QUIC/UDP 大户恒 0 的根因。
+    private func record(up: Int64, down: Int64) {
+        guard up > 0 || down > 0 else { return }
+        if up > 0 { context.addUp(up) }
+        if down > 0 { context.addDown(down) }
+        guard let router else { return }
+        let processID = context.processID
+        Task { await router.route(processID: processID, bytesUp: up, bytesDown: down, rule: .proxied, now: Date()) }
     }
 }
 

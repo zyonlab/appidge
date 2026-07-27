@@ -143,6 +143,8 @@ CFBundleShortVersionString / CFBundleVersion 读 project.yml 里钉住的
 - **改了**上述任一处 → 在 project.yml bump `APPIDGE_EXT_BUILD_NUMBER`（保持单调递增，
   与 app build 号无需一致），跑 `scripts/check-extension-version.sh --update` 登记，
   `xcodegen generate` 重生成工程，一起提交（含 `scripts/extension-version.lock`）。
+  bump 后、该版本**发布前**继续迭代扩展内容：`--update --same-version` 同版本重登记
+  （已发布的版本严禁用它——同版本换内容 = 系统跳过替换，用户拿不到新扩展）。
 - 守门闸（`archive-and-notarize.sh` §0.6）对两个方向都硬失败：内容变了没 bump
   （用户永远跑旧扩展、版本握手失明）、内容没变乱 bump（无谓重开替换窗口）。
 - 盲区：ProxyExtension 的构建设置 / Xcode SDK 变更不进指纹；确需强制替换时

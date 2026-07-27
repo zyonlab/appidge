@@ -18,6 +18,9 @@
 # 用法：
 #   scripts/check-extension-version.sh            校验（archive-and-notarize.sh 出包前置闸门）
 #   scripts/check-extension-version.sh --update   内容/版本变更后重写 lock（先在 project.yml bump）
+#   scripts/check-extension-version.sh --update --same-version
+#       同版本重登记——仅限「已 bump 但该版本尚未发布,继续迭代扩展内容」的开发期;
+#       对已发布的版本用它 = 系统跳过替换、用户永远拿不到新扩展,严禁。
 #
 # 测试：ops/tests/test-extension-version.sh（APPIDGE_EXT_CHECK_ROOT 指向 fixture 仓库根）。
 set -eu
@@ -107,9 +110,11 @@ case "$MODE" in
     note "OK：扩展内容闭包未变，版本保持 $EXT_BUILD/$EXT_MARKETING——本次发版将跳过系统扩展替换"
     ;;
   --update)
-    if [ "$CUR_HASH" != "$L_HASH" ] && [ "$EXT_BUILD" = "$L_BUILD" ]; then
+    if [ "$CUR_HASH" != "$L_HASH" ] && [ "$EXT_BUILD" = "$L_BUILD" ] && [ "${2:-}" != "--same-version" ]; then
       die "--update 拒绝：内容变了但 APPIDGE_EXT_BUILD_NUMBER 没 bump（仍是 $EXT_BUILD）。
-  先在 project.yml bump（> $L_BUILD）再跑 --update"
+  - 若 $EXT_BUILD 是**已发布**的版本：先在 project.yml bump（> $L_BUILD）再跑 --update。
+  - 若 $EXT_BUILD **尚未发布**（bump 后仍在开发迭代）：用 --update --same-version 同版本重登记。
+    已发布的版本禁止用该开关——同版本换内容 = 系统跳过替换,用户拿不到新扩展。"
     fi
     if [ "$EXT_BUILD" -lt "$L_BUILD" ]; then
       die "--update 拒绝：APPIDGE_EXT_BUILD_NUMBER 回退（$L_BUILD → $EXT_BUILD）。

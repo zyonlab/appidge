@@ -71,6 +71,10 @@ expect_ok   "lock 文件已生成"                                   test -f "$F
 echo 'provider v2' > "$FIX/Extension/Provider.swift"
 expect_fail "Extension/ 内容变更但版本未 bump → 拒绝"           run
 expect_fail "--update 也不放行内容变更未 bump"                  run --update
+# 未发布版本的开发迭代逃生口:显式 --same-version 才放行,且随后校验通过
+expect_ok   "--update --same-version 同版本重登记(未发布迭代)"  run --update --same-version
+expect_ok   "同版本重登记后校验通过"                            run
+echo 'provider v2b' > "$FIX/Extension/Provider.swift"
 
 # --- bump 后必须 --update 登记 ---
 set_version 82 "0.2.35"

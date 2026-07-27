@@ -33,14 +33,6 @@ struct SettingsView: View {
                 Text("切换语言会重启 app 后生效。")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-
-                LabeledContent("首次引导") {
-                    Button("查看引导流程") { store.dispatch(.reopenOnboarding) }
-                        .controlSize(.small)
-                }
-                Text("重新进入首次引导流程用于测试 / 评估;主窗口会切到引导页,走完即恢复。")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
 
             LicenseSettingsView(store: store)

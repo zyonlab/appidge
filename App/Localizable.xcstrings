@@ -2932,36 +2932,6 @@
         }
       }
     },
-    "首次引导": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Onboarding"
-          }
-        }
-      }
-    },
-    "查看引导流程": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "View onboarding"
-          }
-        }
-      }
-    },
-    "重新进入首次引导流程用于测试 / 评估;主窗口会切到引导页,走完即恢复。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Re-enter the onboarding flow for testing / evaluation; the main window switches to the onboarding pages and returns when done."
-          }
-        }
-      }
-    },
     "拖动调整日志区高度": {
       "localizations": {
         "en": {

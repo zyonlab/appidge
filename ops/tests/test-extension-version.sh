@@ -112,6 +112,24 @@ set_version 87 "0.2.35"; run --update >/dev/null 2>&1
 mv "$FIX/Extension/Provider.swift" "$FIX/Extension/Provider2.swift"
 expect_fail "文件改名（内容不变）同样触发"                       run
 
+# --- 变量展开不得紧贴非 ASCII(bash 3.2 多字节 lexer 在部分 locale 下会把全角字符首字节
+#     并进变量名 → set -u unbound;2026-07-27 用户终端真机实锤,必须 ${VAR} 花括号隔断) ---
+if perl -ne 'exit 1 if /\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]/' "$CHECK"; then
+  t_pass "脚本内无 \$VAR 紧贴非 ASCII 的展开(locale 兼容)"
+else
+  t_fail "脚本存在 \$VAR 紧贴非 ASCII 的展开——部分 locale 下 bash 会误并变量名"
+fi
+# 不同 locale 下真实执行各跑一遍(先把 fixture 重登记回绿状态——上一组改名测试留下红状态)
+set_version 87 "0.2.35"
+run --update --same-version >/dev/null 2>&1
+for loc in C zh_CN.UTF-8 en_US.UTF-8; do
+  if APPIDGE_EXT_CHECK_ROOT="$FIX" LC_ALL="$loc" sh "$CHECK" >/dev/null 2>&1; then
+    t_pass "LC_ALL=$loc 下校验通过"
+  else
+    t_fail "LC_ALL=$loc 下校验失败"
+  fi
+done
+
 # --- project.yml 缺键 fail closed ---
 cat > "$FIX/project.yml" <<'EOF'
 targets:

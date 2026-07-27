@@ -94,35 +94,35 @@ case "$MODE" in
   verify|--verify)
     if [ "$CUR_HASH" != "$L_HASH" ]; then
       if [ "$EXT_BUILD" = "$L_BUILD" ]; then
-        die "扩展内容闭包变了，但 APPIDGE_EXT_BUILD_NUMBER 没 bump（仍是 $EXT_BUILD）。
+        die "扩展内容闭包变了，但 APPIDGE_EXT_BUILD_NUMBER 没 bump（仍是 ${EXT_BUILD}）。
   发出去 macOS 会认为扩展没升级、跳过替换——用户永远跑旧扩展，版本握手也因两边相等而失明。
-  修复：project.yml 里 bump APPIDGE_EXT_BUILD_NUMBER（> $L_BUILD），然后跑
+  修复：project.yml 里 bump APPIDGE_EXT_BUILD_NUMBER（> ${L_BUILD}），然后跑
   scripts/check-extension-version.sh --update"
       fi
-      die "扩展内容与 lock 指纹不符（版本已改为 $EXT_BUILD，lock 登记 $L_BUILD）。
+      die "扩展内容与 lock 指纹不符（版本已改为 ${EXT_BUILD}，lock 登记 ${L_BUILD}）。
   确认 bump 无误后跑 scripts/check-extension-version.sh --update 重新登记"
     fi
     if [ "$EXT_BUILD" != "$L_BUILD" ] || [ "$EXT_MARKETING" != "$L_MARKETING" ]; then
-      die "扩展内容没变，版本却被改（lock: $L_BUILD/$L_MARKETING → project.yml: $EXT_BUILD/$EXT_MARKETING）。
+      die "扩展内容没变，版本却被改（lock: $L_BUILD/$L_MARKETING → project.yml: $EXT_BUILD/${EXT_MARKETING}）。
   无谓 bump 会重新打开系统扩展替换的竞态窗口（升级黑洞的唯一入口）。
   请改回；确因外部原因（构建设置/SDK）必须强制替换时，跑 --update 显式登记"
     fi
-    note "OK：扩展内容闭包未变，版本保持 $EXT_BUILD/$EXT_MARKETING——本次发版将跳过系统扩展替换"
+    note "OK：扩展内容闭包未变，版本保持 $EXT_BUILD/${EXT_MARKETING}——本次发版将跳过系统扩展替换"
     ;;
   --update)
     if [ "$CUR_HASH" != "$L_HASH" ] && [ "$EXT_BUILD" = "$L_BUILD" ] && [ "${2:-}" != "--same-version" ]; then
-      die "--update 拒绝：内容变了但 APPIDGE_EXT_BUILD_NUMBER 没 bump（仍是 $EXT_BUILD）。
-  - 若 $EXT_BUILD 是**已发布**的版本：先在 project.yml bump（> $L_BUILD）再跑 --update。
+      die "--update 拒绝：内容变了但 APPIDGE_EXT_BUILD_NUMBER 没 bump（仍是 ${EXT_BUILD}）。
+  - 若 $EXT_BUILD 是**已发布**的版本：先在 project.yml bump（> ${L_BUILD}）再跑 --update。
   - 若 $EXT_BUILD **尚未发布**（bump 后仍在开发迭代）：用 --update --same-version 同版本重登记。
     已发布的版本禁止用该开关——同版本换内容 = 系统跳过替换,用户拿不到新扩展。"
     fi
     if [ "$EXT_BUILD" -lt "$L_BUILD" ]; then
-      die "--update 拒绝：APPIDGE_EXT_BUILD_NUMBER 回退（$L_BUILD → $EXT_BUILD）。
+      die "--update 拒绝：APPIDGE_EXT_BUILD_NUMBER 回退（$L_BUILD → ${EXT_BUILD}）。
   系统扩展版本必须单调不降，否则线上机器会被判「降级」触发意外替换"
     fi
     write_lock
     ;;
   *)
-    die "未知参数：$MODE（支持无参校验或 --update）"
+    die "未知参数：${MODE}（支持无参校验或 --update）"
     ;;
 esac

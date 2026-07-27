@@ -96,6 +96,45 @@ struct PersistenceStoreTests {
         #expect(loaded?.hasCompletedOnboarding == true)
     }
 
+    @Test("save then load round-trips loopAutoExclusions — 环自愈学到的硬旁路跨重启不丢")
+    func fileStoreRoundTripPreservesLoopAutoExclusions() async throws {
+        let url = makeTempFileURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        let config = PersistedConfiguration(loopAutoExclusions: OriginExclusionDiscovery(
+            identifiers: ["com.example.yunti"],
+            executablePaths: ["/Users/admin/.yunti/xray-core/xray"]
+        ))
+        await FilePersistenceStore(fileURL: url).save(config)
+        let loaded = await FilePersistenceStore(fileURL: url).load()
+
+        #expect(loaded == config)
+        #expect(loaded?.loopAutoExclusions.executablePaths == ["/Users/admin/.yunti/xray-core/xray"])
+    }
+
+    @Test("load on a config.json that predates the loopAutoExclusions field decodes fine with an empty set")
+    func fileStoreDecodesLegacyFileMissingLoopAutoExclusionsKey() async throws {
+        let url = makeTempFileURL()
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        // matchRules 在、loopAutoExclusions 不在——模拟上一个版本写盘的 config.json。
+        let legacyJSON = """
+        {
+            "processes": [], "catalog": [], "proxyServers": [],
+            "activeProxyServerID": null, "proxyRoutingMode": {"single": {}},
+            "hasCompletedOnboarding": true, "matchRules": []
+        }
+        """
+        try Data(legacyJSON.utf8).write(to: url)
+
+        let loaded = await FilePersistenceStore(fileURL: url).load()
+
+        #expect(loaded != nil)
+        #expect(loaded?.loopAutoExclusions == OriginExclusionDiscovery())
+        #expect(loaded?.hasCompletedOnboarding == true)
+    }
+
     @Test("load returns nil gracefully when the file doesn't exist yet (first launch)")
     func fileStoreMissingFileReturnsNil() async {
         let url = makeTempFileURL()
@@ -165,6 +204,7 @@ struct PersistenceStoreTests {
         state.rules = [ProxyMatchRule(
             id: RuleID("r1"), appPattern: "x", hostPattern: "*", portRange: nil, action: .block
         )]
+        state.loopAutoExclusions = OriginExclusionDiscovery(executablePaths: ["/opt/xray"])
 
         let config = PersistedConfiguration(from: state)
 
@@ -172,6 +212,9 @@ struct PersistenceStoreTests {
         #expect(config.catalog == state.catalog)
         #expect(config.hasCompletedOnboarding == true)
         #expect(config.matchRules == state.rules)
+        // 环自愈学到的硬旁路是「学到的配置」而非瞬时状态——切语言重启靠它不丢(dynamicOriginExclusion
+        // 则仍是运行时状态:启动后端口发现会重查,不持久化)。
+        #expect(config.loopAutoExclusions == state.loopAutoExclusions)
         // isEngineHealthy / diagnostics deliberately have no
         // counterpart on PersistedConfiguration — the type system, not a runtime
         // assertion, is the proof they're excluded.

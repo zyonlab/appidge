@@ -489,7 +489,7 @@ struct AppidgeApp: App {
     }
 
     /// 决定哪些 action 改动了 `PersistedConfiguration` 覆盖的字段(进程规则/细粒度规则表/目录/
-    /// 代理服务器/路由模式/引导完成态)——这些改动只挂在 `scenePhase` 切后台才存盘的话,应用在
+    /// 代理服务器/路由模式/引导完成态/环自愈排除)——这些改动只挂在 `scenePhase` 切后台才存盘的话,应用在
     /// 切后台之前被重装/崩溃/强制重启,改动就静默丢了(这正是 WeChat 规则被重启打回"直连"、
     /// 手动加的 a.out 精确规则重启就消失的根因)。其余 action(流量统计、诊断结果、连接日志等)
     /// 都是运行时状态,`PersistedConfiguration` 里本来就没有对应字段，不用触发存盘。
@@ -497,7 +497,10 @@ struct AppidgeApp: App {
         switch action {
         case .assignRule, .addMatchRule, .removeMatchRule, .reorderMatchRules, .setMatchRuleEnabled,
              .directoryScanned, .addProxyServer, .updateProxyServer, .removeProxyServer,
-             .setActiveProxyServer, .setProxyRoutingMode, .onboardingCompleted:
+             .setActiveProxyServer, .setProxyRoutingMode, .onboardingCompleted,
+             // 环自愈学到新排除也立即落盘:切语言是重启生效的,不落盘等于每次切语言都把
+             // 学到的硬旁路清零、xray 类本地代理落回「走代理」真环重开。
+             .loopWarningRaised:
             return true
         default:
             return false

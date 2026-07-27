@@ -6,7 +6,9 @@
 /// 的那个报 `com.example.yunti`,它另一个做实际出站连接的进程却报成 `a.out`)——可执行文件路径
 /// 是更稳的第二信号,同一个软件的多个进程通常共享/关联同一个可执行文件。见
 /// `IPCContract.ProcessOriginExclusionMessage` 的 wire-format 孪生。
-public struct OriginExclusionDiscovery: Sendable, Equatable {
+/// `Codable`:环自愈档(`AppState.loopAutoExclusions`)要随 `PersistedConfiguration` 落盘——
+/// 切语言是重启生效的,不持久化就等于每次切语言都把学到的硬旁路清零。
+public struct OriginExclusionDiscovery: Sendable, Equatable, Codable {
     public var identifiers: Set<String>
     public var executablePaths: Set<String>
 

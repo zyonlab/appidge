@@ -58,6 +58,11 @@ public struct PersistedConfiguration: Sendable, Equatable, Codable {
     /// 所以是 `Array` 不是 `Set`/`Dictionary`。`ProxyMatchRule` 已经是 `Codable`,直接存整个结构体
     /// (含 `isEnabled`),不用另外拆字段。
     public var matchRules: [Core.ProxyMatchRule]
+    /// 环自愈学到的硬旁路排除(来源进程双信号)。这是**学到的配置**而非瞬时状态:切语言靠重启生效,
+    /// 不持久化的话新实例会以空集 resync、把扩展里已生效的排除整体覆盖掉——本地代理(xray 等)
+    /// 瞬间落回兜底「走代理」规则,真环重开,而环检测阈值(60/0.25s,防微信类误报特意收紧)
+    /// 不保证能及时把它学回来。`dynamicOriginExclusion` 则不持久化:启动后端口发现会重查。
+    public var loopAutoExclusions: Core.OriginExclusionDiscovery
 
     public init(
         processes: [Core.ProcessID: Core.MonitoredProcess] = [:],
@@ -66,7 +71,8 @@ public struct PersistedConfiguration: Sendable, Equatable, Codable {
         activeProxyServerID: String? = nil,
         proxyRoutingMode: Core.ProxyRoutingMode = .single,
         hasCompletedOnboarding: Bool = false,
-        matchRules: [Core.ProxyMatchRule] = []
+        matchRules: [Core.ProxyMatchRule] = [],
+        loopAutoExclusions: Core.OriginExclusionDiscovery = Core.OriginExclusionDiscovery()
     ) {
         self.processes = processes
         self.catalog = catalog
@@ -75,6 +81,7 @@ public struct PersistedConfiguration: Sendable, Equatable, Codable {
         self.proxyRoutingMode = proxyRoutingMode
         self.hasCompletedOnboarding = hasCompletedOnboarding
         self.matchRules = matchRules
+        self.loopAutoExclusions = loopAutoExclusions
     }
 
     /// 手写 `init(from:)`(而不是全靠合成):`matchRules` 是这轮新加的字段,老版本写在磁盘上的
@@ -90,6 +97,10 @@ public struct PersistedConfiguration: Sendable, Equatable, Codable {
         proxyRoutingMode = try container.decode(Core.ProxyRoutingMode.self, forKey: .proxyRoutingMode)
         hasCompletedOnboarding = try container.decode(Bool.self, forKey: .hasCompletedOnboarding)
         matchRules = try container.decodeIfPresent([Core.ProxyMatchRule].self, forKey: .matchRules) ?? []
+        // 同 matchRules 的向后兼容策略:老文件没有这个 key,解成空集而不是让整份配置解码失败。
+        loopAutoExclusions = try container.decodeIfPresent(
+            Core.OriginExclusionDiscovery.self, forKey: .loopAutoExclusions
+        ) ?? Core.OriginExclusionDiscovery()
     }
 }
 
@@ -109,20 +120,27 @@ public extension PersistedConfiguration {
             hasCompletedOnboarding: state.hasCompletedOnboarding,
             // state.rules 已经是按优先级排好的数组(reducer 的 addMatchRule 追加、reorderMatchRules
             // 就地重排),原样带走——不排序,顺序本身就是"首个命中生效"的语义。
-            matchRules: state.rules
+            matchRules: state.rules,
+            loopAutoExclusions: state.loopAutoExclusions
         )
     }
 
     /// 把持久化的配置还原成一串要在启动时 dispatch 给 store 的 `Core.Action`，顺序确定
     /// （按 `ProcessID.value` 排序，`matchRules` 保持原数组序），方便单测断言、也让重复启动可重现。
     ///
-    /// 只用 `Core.Action` 里已经存在的 case 组装——`directoryScanned` 一次性批量灌回目录，
+    /// 组装顺序:`loopAutoExclusionsRestored` **最前**(排除先落地防环,与 `resyncExtension`
+    /// 把排除名单排首位同一条纪律);随后 `directoryScanned` 一次性批量灌回目录，
     /// 每个进程先 `processDiscovered`（默认落地为 `.direct`），规则不是默认值才追加
     /// `assignRule`；`matchRules` 逐条 `addMatchRule`(reducer 就是 `state.rules.append`，
-    /// 原数组序原样重建)；最后如果引导已完成，追加一个 `onboardingCompleted`。没有新增任何
-    /// `Core.Action` case。
+    /// 原数组序原样重建)；最后如果引导已完成，追加一个 `onboardingCompleted`。
     func restorationActions() -> [Core.Action] {
         var actions: [Core.Action] = []
+
+        // 环自愈排除先行:后面的恢复/后续 resync 都会触发对扩展的推送,排除必须已经在 state 里,
+        // 否则推下去的还是空集(正是切语言后 xray 落回「走代理」的根因)。
+        if loopAutoExclusions != Core.OriginExclusionDiscovery() {
+            actions.append(.loopAutoExclusionsRestored(loopAutoExclusions))
+        }
 
         if !catalog.isEmpty {
             let entries = catalog.values.sorted { $0.id.value < $1.id.value }

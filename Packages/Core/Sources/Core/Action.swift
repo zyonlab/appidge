@@ -41,6 +41,10 @@ public enum Action: Sendable, Equatable {
     /// 的来源双信号,解析不出为 nil)。reducer 据此把来源进程**自动加入旁路排除**并回推扩展
     /// (对齐 Proxifier 的 loop 自愈:检测到环即自动建「该进程 → Direct」),并弹告警条。
     case loopWarningRaised(signature: String, processID: ProcessID?, executablePath: String?)
+    /// 启动恢复:把持久化的环自愈排除(`loopAutoExclusions`)灌回来。语言切换/普通重启起的新实例
+    /// 不再丢掉已学到的硬旁路——否则 resync 会把空集整体覆盖到扩展,本地代理(xray 等)瞬间落回
+    /// 兜底「走代理」规则,真环重开。reducer 取**并集**(不冲掉本次运行已学到的)并回推扩展。
+    case loopAutoExclusionsRestored(OriginExclusionDiscovery)
     /// 用户关闭环告警。
     case dismissLoopWarning
     /// 把 state 清回初始值(切换配置档案时用:先 reset 再 dispatch 新档案的 restorationActions,

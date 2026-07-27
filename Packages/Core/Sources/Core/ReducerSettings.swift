@@ -7,6 +7,8 @@ extension Reducer {
         switch action {
         case .loopWarningRaised(let signature, let processID, let executablePath):
             return loopWarningRaised(signature, processID: processID, executablePath: executablePath, state)
+        case .loopAutoExclusionsRestored(let restored):
+            return loopAutoExclusionsRestored(restored, state)
         case .dismissLoopWarning:
             return dismissLoopWarning(state)
         case .resetState:
@@ -116,6 +118,23 @@ extension Reducer {
             state.loopWarning = signature
         }
         return (state, effects)
+    }
+
+    /// 启动恢复:持久化的环自愈排除并集灌回。**并集而非替换**——恢复可能晚于本次运行已学到的
+    /// 新条目(理论窗口),不能把它们冲掉。入集前同样过 a.out 歧义滤网(与 `loopWarningRaised`
+    /// 的学习路径同一条政策,防旧盘面数据把未签名 CLI 连坐进来)。有真实变化才回推扩展(幂等)。
+    static func loopAutoExclusionsRestored(
+        _ restored: OriginExclusionDiscovery, _ state: AppState
+    ) -> (AppState, [Effect]) {
+        var merged = state.loopAutoExclusions
+        merged.identifiers.formUnion(
+            restored.identifiers.filter { !OriginExclusionDiscovery.isAmbiguousIdentifier($0) }
+        )
+        merged.executablePaths.formUnion(restored.executablePaths)
+        guard merged != state.loopAutoExclusions else { return (state, []) }
+        var state = state
+        state.loopAutoExclusions = merged
+        return (state, [state.originExclusionsPush])
     }
 
     /// 关闭当前告警并记住它的 signature——同一问题不再打扰;重启后清零(运行时状态)。

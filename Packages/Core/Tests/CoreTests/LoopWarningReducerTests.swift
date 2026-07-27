@@ -95,4 +95,53 @@ struct LoopWarningReducerTests {
         let (state, _) = Reducer.reduce(AppState(), .dismissLoopWarning)
         #expect(state.dismissedLoopSignatures.isEmpty)
     }
+
+    // MARK: - 启动恢复(loopAutoExclusionsRestored)——环自愈学到的排除跨重启不丢
+
+    @Test("启动恢复:持久化的环自愈排除灌回 + 回推扩展(切语言重启不再丢硬旁路)")
+    func restoredExclusionsApplyAndPush() {
+        let restored = OriginExclusionDiscovery(
+            identifiers: ["com.example.yunti"], executablePaths: ["/opt/xray"]
+        )
+        let (state, effects) = Reducer.reduce(AppState(), .loopAutoExclusionsRestored(restored))
+        #expect(state.loopAutoExclusions == restored)
+        #expect(effects == [state.originExclusionsPush])
+    }
+
+    @Test("恢复与本次运行已学到的取并集,不整体替换")
+    func restoredExclusionsUnionWithRuntime() {
+        var (state, _) = raise(AppState())
+        let restored = OriginExclusionDiscovery(executablePaths: ["/usr/local/bin/other-proxy"])
+        let effects: [Effect]
+        (state, effects) = Reducer.reduce(state, .loopAutoExclusionsRestored(restored))
+        #expect(state.loopAutoExclusions.identifiers == ["com.example.yunti"])
+        #expect(state.loopAutoExclusions.executablePaths == ["/opt/xray", "/usr/local/bin/other-proxy"])
+        #expect(effects == [state.originExclusionsPush])
+    }
+
+    @Test("恢复内容已全部在集内:无变化不重推(幂等)")
+    func restoredExclusionsIdempotent() {
+        var (state, _) = raise(AppState())
+        let effects: [Effect]
+        (state, effects) = Reducer.reduce(state, .loopAutoExclusionsRestored(state.loopAutoExclusions))
+        #expect(effects.isEmpty)
+    }
+
+    @Test("恢复空集是纯 no-op(不产生推送)")
+    func restoredEmptyIsNoOp() {
+        let (state, effects) = Reducer.reduce(AppState(), .loopAutoExclusionsRestored(OriginExclusionDiscovery()))
+        #expect(state.loopAutoExclusions == OriginExclusionDiscovery())
+        #expect(effects.isEmpty)
+    }
+
+    @Test("恢复时同样过 a.out 滤网:磁盘数据里的歧义标识不进 identifier 集,路径照常")
+    func restoredExclusionsFilterAmbiguousIdentifiers() {
+        let restored = OriginExclusionDiscovery(
+            identifiers: ["a.out", "com.example.yunti"], executablePaths: ["/opt/xray"]
+        )
+        let (state, effects) = Reducer.reduce(AppState(), .loopAutoExclusionsRestored(restored))
+        #expect(state.loopAutoExclusions.identifiers == ["com.example.yunti"])
+        #expect(state.loopAutoExclusions.executablePaths == ["/opt/xray"])
+        #expect(effects == [state.originExclusionsPush])
+    }
 }

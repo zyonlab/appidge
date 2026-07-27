@@ -19,6 +19,24 @@ struct PersistenceRestorationTests {
         #expect(actions.isEmpty)
     }
 
+    @Test("非空 loopAutoExclusions 生成 loopAutoExclusionsRestored 且排在最前——排除先落地防环,再放其余配置")
+    func loopAutoExclusionsRestoredComesFirst() {
+        let exclusions = OriginExclusionDiscovery(executablePaths: ["/opt/xray"])
+        let id = ProcessID("p")
+        let config = PersistedConfiguration(
+            processes: [id: MonitoredProcess(id: id, displayName: "P", executablePath: "/p", rule: .proxied)],
+            loopAutoExclusions: exclusions
+        )
+        let actions = config.restorationActions()
+        #expect(actions.first == .loopAutoExclusionsRestored(exclusions))
+    }
+
+    @Test("空 loopAutoExclusions 不产生恢复 action")
+    func emptyLoopAutoExclusionsEmitsNoAction() {
+        let actions = PersistedConfiguration(hasCompletedOnboarding: true).restorationActions()
+        #expect(actions == [.onboardingCompleted])
+    }
+
     @Test("catalog entries become a single batched directoryScanned action, sorted by id")
     func catalogBecomesSingleDirectoryScannedAction() {
         let a = ProcessID("a")
@@ -174,7 +192,8 @@ struct PersistenceRestorationTests {
             hasCompletedOnboarding: true,
             matchRules: [ProxyMatchRule(
                 id: RuleID("r1"), appPattern: "a.out", hostPattern: "1.2.3.4", portRange: nil, action: .direct
-            )]
+            )],
+            loopAutoExclusions: OriginExclusionDiscovery(executablePaths: ["/opt/xray"])
         )
 
         var state = AppState()
@@ -197,6 +216,7 @@ struct PersistenceRestorationTests {
         #expect(state.rules.count == config.matchRules.count + 1)
         #expect(state.rules.last?.appPattern == "a")
         #expect(state.rules.last?.action == .proxied)
+        #expect(state.loopAutoExclusions == config.loopAutoExclusions)
         // Runtime/ephemeral fields untouched by restore, still at their fresh-launch defaults.
         #expect(state.isEngineHealthy == true)
     }

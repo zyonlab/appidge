@@ -57,7 +57,8 @@ enum ProcessPathResolver {
 
     /// `audit_token_t` 是 8 个 `UInt32`;PID 按 Darwin 惯例在下标 5(ProxyBridge 与多个开源
     /// 实现一致的读法,不是我们自己猜的)。长度不对就是意外形态,不强行解析。
-    private static func pid(fromAuditToken data: Data) -> pid_t? {
+    /// 非 private:「来源即上游」环判定需要 flow 的 pid 采样进程家族(见 `FlowOrigin.pid`)。
+    static func pid(fromAuditToken data: Data) -> pid_t? {
         guard data.count == MemoryLayout<audit_token_t>.size else { return nil }
         return data.withUnsafeBytes { ptr -> pid_t in
             guard let base = ptr.baseAddress else { return 0 }

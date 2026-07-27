@@ -117,6 +117,11 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     // 的持续高速率):合法 app 达不到,真环一瞬即触发。real loop 本身也已被「本地代理来源→放行」
     // 挡在 beginFlow 之前,这里只是二级兜底,可以放宽而不牺牲安全。
     private var storedLoopDetector = LoopDetector(threshold: 60, windowSeconds: 0.25)
+    // 「来源即上游」确定性环判定(一级,零阈值):flow 来源进程与本机上游端口的监听进程同族
+    // ⇒ 转发即回环,单条 flow 即报;上面的速率检测器退居兜底(覆盖监听者解析失败的 fail-open
+    // 缺口)。锁保护;非 private——判定编排在 ProxyExtensionProviderRouting.swift(跨文件
+    // extension,同 storedUDPRelays/configLock 先例)。
+    var storedSelfForwardDetector = SelfForwardLoopDetector()
     // 逐连接抓包开关(默认关)。锁保护;开着时 beginFlow 给每条连接建一个 .dmp 写入器。
     private var storedPacketCaptureEnabled = false
     // proxied 进程的 UDP 策略(默认 .block 止漏)。锁保护。
@@ -381,10 +386,11 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             handleNewTCPFlow INTERCEPT src=\(sourceID, privacy: .public) \
             rule=\(String(describing: rule), privacy: .public) host=\(hostPort?.0 ?? "-", privacy: .public)
             """)
+            let sourcePid = tcpFlow.metaData.sourceAppAuditToken.flatMap(ProcessPathResolver.pid(fromAuditToken:))
             beginHandledFlow(
                 tcpFlow: tcpFlow,
                 origin: FlowOrigin(processID: processID, displayName: name, executablePath: sourcePath,
-                                   rule: rule, proxyServerID: proxyServerID),
+                                   pid: sourcePid, rule: rule, proxyServerID: proxyServerID),
                 to: remoteEndpoint, remoteHostname: remoteHostname, router: router
             )
             return true
@@ -415,10 +421,13 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         let host = remoteHostname ?? endpointHostPort?.0 ?? "?"
         let port = endpointHostPort?.1 ?? 0
 
-        // 主动环检测:把这次捕获喂给检测器,命中(同目标短窗口内反复捕获)就提示 app,并随事件
-        // 带上来源进程双信号——app 会把它自动加入旁路排除并回推(环自愈,对齐 Proxifier 的
-        // auto-created Direct 规则),兜底 passive 的回环/上游/来源排除漏网的情况。
+        // 主动环判定一级(确定性,「来源即上游」):来源进程与本机上游监听进程同族 ⇒ 转发即回环,
+        // 单条 flow 即报,不依赖速率。监听者解析失败时 fail-open,由下面的速率检测器兜底。
         let loopSignature = "\(host):\(port)"
+        evaluateSelfForwardLoop(origin: origin, signature: loopSignature)
+        // 主动环检测二级(速率兜底):把这次捕获喂给检测器,命中(同目标短窗口内反复捕获)就提示
+        // app,并随事件带上来源进程双信号——app 会把它自动加入旁路排除并回推(环自愈,对齐
+        // Proxifier 的 auto-created Direct 规则),兜底 passive 的回环/上游/来源排除漏网的情况。
         let looped = configLock.withLock {
             storedLoopDetector.record(signature: loopSignature, now: Date().timeIntervalSince1970)
         }

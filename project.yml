@@ -93,7 +93,7 @@ targets:
         # APPIDGE_EXT_BUILD_NUMBER 并跑 scripts/check-extension-version.sh --update；
         # 出包前置闸门（archive-and-notarize.sh §0.6）会对内容指纹硬校验兜底。
         APPIDGE_EXT_MARKETING_VERSION: "0.2.35"
-        APPIDGE_EXT_BUILD_NUMBER: "83"   # 83: 版本化 mach service 名(升级窗口名字占用的根治)
+        APPIDGE_EXT_BUILD_NUMBER: "84"   # 84: 「来源即上游」确定性环判定(SelfForwardLoopDetector 一级,速率检测退居兜底)
     dependencies:
       - package: EngineKit
       - package: IPCContract

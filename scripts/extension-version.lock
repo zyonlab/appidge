@@ -1,5 +1,5 @@
 # 由 scripts/check-extension-version.sh --update 生成，不要手改。
 # 语义：扩展版本 (build/marketing) 与其二进制内容闭包指纹的绑定登记。
-build=83
+build=84
 marketing=0.2.35
-hash=604a19c5ee64074c99d19edd81cb8448f0b85a4e3bcd9647bb3b8176943c5dbc
+hash=f876b5e52ad4455844073550e768fcc17df16ad9c8304db208b83b018618d633

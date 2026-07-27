@@ -41,6 +41,9 @@ struct FlowOrigin {
     /// 可执行文件路径(audit token 解出,可能为 nil)——环检测命中时随 loopDetected 上报,
     /// app 据此把来源进程双信号自动加入旁路排除(环自愈)。
     let executablePath: String?
+    /// 来源进程 pid(audit token 解出,可能为 nil)——「来源即上游」环判定用它采样进程家族
+    /// (pid/ppid/pgid)与本机上游监听进程比对(见 `evaluateSelfForwardLoop`)。
+    let pid: pid_t?
     let rule: ProxyRuleDTO
     /// `rule == .proxied` 时命中规则指定走哪个上游 server 的 id;nil = 跟随全局活动 server / 路由模式。
     let proxyServerID: String?

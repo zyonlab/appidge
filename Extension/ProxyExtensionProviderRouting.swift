@@ -314,6 +314,49 @@ extension ProxyExtensionProvider {
         )
     }
 
+    /// 「来源即上游」主动环判定的编排(判定本体是 EngineKit 的纯值 ``SelfForwardLoopDetector``):
+    /// 本条 flow 的来源进程与「即将拨号的本机上游端口的监听进程」同族(同 pid/父子/兄弟/同进程组)
+    /// ⇒ 把它转发给上游就是转发回它自己,按定义成环——单条 flow 即报,零阈值,微信式高并发天然
+    /// 免疫(来源与监听者无亲缘)。监听者解析(全进程表遍历,毫秒级)异步跑、TTL 缓存回灌,
+    /// 不进转发热路径;缓存冷/解析失败 fail-open,由速率检测器(LoopDetector)兜底。
+    /// 命中经既有 loopDetected 通道交 app 自愈(硬旁路 + 持久化),扩展侧不当场改路由——
+    /// 「接管+强制直连」曾在 0.2.30 引入第四次同根因故障后回退(a1655c5),不重蹈。
+    func evaluateSelfForwardLoop(origin: FlowOrigin, signature: String) {
+        guard origin.rule == .proxied else { return }
+        let ports = SelfForwardLoopDetector.localCandidatePorts(
+            of: resolvedRoute(rule: origin.rule, proxyServerID: origin.proxyServerID)
+        )
+        guard !ports.isEmpty else { return }
+        let flowFamily = origin.pid.flatMap(ListeningProcessFamilyResolver.family(ofPid:))
+        let now = Date().timeIntervalSince1970
+        let verdict = configLock.withLock {
+            storedSelfForwardDetector.evaluate(flowFamily: flowFamily, localCandidatePorts: ports, now: now)
+        }
+        for port in verdict.portsToResolve {
+            Task(priority: .utility) { [weak self] in
+                let listener = ListeningProcessFamilyResolver.listenerFamily(forPort: port)
+                guard let self else { return }
+                self.configLock.withLock {
+                    self.storedSelfForwardDetector.storeListener(
+                        listener, forPort: port, now: Date().timeIntervalSince1970
+                    )
+                }
+            }
+        }
+        guard verdict.isLoop else { return }
+        let sourceKey = origin.executablePath ?? origin.processID.value
+        let shouldReport = configLock.withLock {
+            storedSelfForwardDetector.shouldReport(sourceKey: sourceKey, now: now)
+        }
+        guard shouldReport, let transport else { return }
+        ExtDiag.log("selfForwardLoop detected: source=\(sourceKey) signature=\(signature)")
+        Task {
+            await transport.deliver(.loopDetected(
+                signature: signature, processID: origin.processID, executablePath: origin.executablePath
+            ))
+        }
+    }
+
     /// 路由 → 上游标签的(内容, 模式)。内容语言中立(host:port 或 `A → B`),模式前缀由 app 本地化。
     /// 直连 nil;单台 host:port;链列出跳序;故障转移/负载均衡列出候选。
     func routeLabel(_ route: ResolvedRoute) -> (content: String, kind: UpstreamKindDTO)? {

@@ -29,8 +29,17 @@ public final class XPCFlowTransport: NSObject, Transport, ExtensionXPCProtocol, 
     /// 时经它回报成功。nil = 没有在途探针。
     private var pendingProbe: SelfProbeToken?
 
-    /// 参数保留只为调用点兼容(曾用于 forward 的逐 chunk 上游探活,见类型注释的 ⚠️)。
-    public init(upstreamHost: String, upstreamPort: UInt16) {
+    /// 本 transport 注册/探测的 mach service 名。**唯一真相源是扩展自己的 Info.plist**
+    /// (NEMachServiceName,构建期展开版本后缀)——provider 读出后注入;缺省 legacy 名
+    /// 仅供测试/旧调用点兼容。listener 创建、自检探针、重建三处必须用同一个名字。
+    private let machServiceName: String
+
+    /// upstream 参数保留只为调用点兼容(曾用于 forward 的逐 chunk 上游探活,见类型注释的 ⚠️)。
+    public init(
+        machServiceName: String = XPCTransportConfig.machServiceName,
+        upstreamHost: String, upstreamPort: UInt16
+    ) {
+        self.machServiceName = machServiceName
         super.init()
     }
 
@@ -66,7 +75,7 @@ public final class XPCFlowTransport: NSObject, Transport, ExtensionXPCProtocol, 
     public func startListeningForAppMessages(onMessage: @escaping @Sendable (AppToExtensionMessage) -> Void) {
         lock.withLock { appMessageHandler = onMessage }
 
-        let listener = NSXPCListener(machServiceName: XPCTransportConfig.machServiceName)
+        let listener = NSXPCListener(machServiceName: machServiceName)
         listener.delegate = self
         lock.withLock { self.listener = listener }
         listener.resume()
@@ -92,7 +101,7 @@ public final class XPCFlowTransport: NSObject, Transport, ExtensionXPCProtocol, 
         }
         lock.withLock { pendingProbe = token }
 
-        let probe = NSXPCConnection(machServiceName: XPCTransportConfig.machServiceName)
+        let probe = NSXPCConnection(machServiceName: machServiceName)
         probe.remoteObjectInterface = NSXPCInterface(with: ExtensionXPCProtocol.self)
         // 连接交给 token 持有:完成(成功/失败/超时,先到者生效)时统一 invalidate,
         // 各 @Sendable 闭包只捕获 @unchecked Sendable 的 token,不直接捕获 NSXPCConnection。
@@ -125,7 +134,7 @@ public final class XPCFlowTransport: NSObject, Transport, ExtensionXPCProtocol, 
         }
         guard let old else { return }
         old.invalidate()
-        let fresh = NSXPCListener(machServiceName: XPCTransportConfig.machServiceName)
+        let fresh = NSXPCListener(machServiceName: machServiceName)
         fresh.delegate = self
         lock.withLock { listener = fresh }
         fresh.resume()

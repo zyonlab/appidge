@@ -87,6 +87,14 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         return [path]
     }()
 
+    /// 本扩展在自己 Info.plist 里声明的 `NEMachServiceName`(版本化,构建期展开)。
+    /// 注册监听必须与 plist 声明**逐字一致**,所以直接读 plist、不在代码里重拼版本公式;
+    /// 读不到(不该发生)回落 legacy 名。
+    static func ownMachServiceName() -> String {
+        let networkExtension = Bundle.main.infoDictionary?["NetworkExtension"] as? [String: Any]
+        return (networkExtension?["NEMachServiceName"] as? String) ?? XPCTransportConfig.machServiceName
+    }
+
     // App 下发的代理配置。handleAppMessage（写）和 handleNewFlow 的 Task（读）并发访问，
     // 用锁保护——provider 已是 @unchecked Sendable，这里显式担起这份线程安全。
     // 不是 private:UDP 处理拆到同 target 的 ProxyExtensionProviderUDP.swift,需要跨文件访问
@@ -206,7 +214,13 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         // 否则新旧两个 NSXPCListener 抢同一 mach service,app 连到旧的、flow 投到新 transport 全丢。
         // stopProxy 的 invalidate 只挡 stop→start;这里补挡 start→start。
         transport?.invalidate()
-        let transport = XPCFlowTransport(upstreamHost: "127.0.0.1", upstreamPort: 1080)
+        // mach service 名以扩展自己的 Info.plist 为唯一真相源(版本化,防升级窗口新旧 job 抢
+        // 同一个名字——名字占用的根治,见 Info.plist 注释);读不到时回落 legacy 名(防御)。
+        let serviceName = Self.ownMachServiceName()
+        ExtDiag.log("startProxy machServiceName=\(serviceName)")
+        let transport = XPCFlowTransport(
+            machServiceName: serviceName, upstreamHost: "127.0.0.1", upstreamPort: 1080
+        )
         // 版本握手:app 每次连上就收到"是哪个版本的 provider 在服务",据此检测会话是否绑在旧扩展上。
         let version = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown"
         transport.setReadyMessage(.extensionReady(version: version))

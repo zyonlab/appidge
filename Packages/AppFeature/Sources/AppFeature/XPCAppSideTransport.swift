@@ -46,7 +46,17 @@ public final class XPCAppSideTransport: NSObject, AppSideTransport, AppXPCProtoc
     /// 上一次已通知出去的可达性,只在翻转时再通知(初始视为可达——没有失败证据前不误报)。
     private var lastNotifiedReachable = true
 
-    override public init() {
+    /// mach service 连接候选表(非空;经 ``IPCContract/XPCTransportConfig/connectionCandidates(preferred:)``
+    /// 构造:内嵌扩展 plist 读出的版本化名优先、legacy 兜底)。选哪个由 ``ReconnectBackoff/candidateIndex``
+    /// 按连续掉线计数轮换——健康期恒用版本化名;升级窗口里系统还在跑旧扩展(监听 legacy 名)时,
+    /// 掉一次线即回退到 legacy 连上旧扩展,版本握手/自愈照常工作。
+    private let serviceNameCandidates: [String]
+
+    public init(serviceNameCandidates: [String] = [XPCTransportConfig.machServiceName]) {
+        // 防御:空候选表退回 legacy 单候选,连接路径永不无名可用。
+        self.serviceNameCandidates = serviceNameCandidates.isEmpty
+            ? [XPCTransportConfig.machServiceName]
+            : serviceNameCandidates
         super.init()
     }
 
@@ -121,7 +131,9 @@ public final class XPCAppSideTransport: NSObject, AppSideTransport, AppXPCProtoc
                 return (nil, false)
             }
             let newConnection = NSXPCConnection(
-                machServiceName: XPCTransportConfig.machServiceName,
+                machServiceName: serviceNameCandidates[
+                    backoff.candidateIndex(candidateCount: serviceNameCandidates.count)
+                ],
                 options: []
             )
             newConnection.exportedInterface = NSXPCInterface(with: AppXPCProtocol.self)
@@ -214,4 +226,12 @@ struct ReconnectBackoff: Sendable, Equatable {
     /// 供 transport 在翻转沿回调 app(→ `.xpcChannelReachabilityChanged`),UI 据此显式警告,
     /// 不再让「扩展监听器注册失败」停留在静默重试里。
     var isChannelConsideredUnreachable: Bool { consecutiveDrops >= Self.unreachableThreshold }
+
+    /// mach service 候选轮换:健康期(0 掉线)用首选(版本化名),每掉一次线换下一个候选,
+    /// 取模回绕;`reset()`(链路证实健康)后回到首选。选择只依赖连续掉线计数,不引入新状态。
+    /// 零候选返回 0(调用方守卫非空,这里只保证不除零)。
+    func candidateIndex(candidateCount: Int) -> Int {
+        guard candidateCount > 0 else { return 0 }
+        return consecutiveDrops % candidateCount
+    }
 }

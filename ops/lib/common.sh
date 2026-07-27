@@ -53,7 +53,10 @@ url_host() { # 提取 https URL 的 host（不含 path/port）
 # ---------------------------------------------------------------------------
 feed_max_build() { # $1=feed url → 输出 feed 内最大 sparkle:version；查询失败输出空
   # 兼容两种 Sparkle 写法：属性 sparkle:version="63" 与元素 <sparkle:version>63</sparkle:version>
-  curl -fsS -m 20 "$1" 2>/dev/null \
+  # --retry 4（含连接失败）：出包窗口常处于「系统代理关闭」状态,直连 Cloudflare 偶发抖动,
+  # 一次瞬时失败就把 build 判死太脆(真机 2026-07-27 连续三次分别在不同 feed 上抖掉)。
+  # 重试后仍失败照旧输出空 → fail closed,单调性护栏语义不变。
+  curl -fsS -m 20 --retry 4 --retry-all-errors --retry-delay 2 "$1" 2>/dev/null \
     | grep -oE 'sparkle:version="[0-9]+"|<sparkle:version>[0-9]+' \
     | grep -oE '[0-9]+' | sort -n | tail -1
 }

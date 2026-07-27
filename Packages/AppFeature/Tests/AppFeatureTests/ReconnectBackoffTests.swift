@@ -61,4 +61,34 @@ struct ReconnectBackoffTests {
         backoff.reset()
         #expect(!backoff.isChannelConsideredUnreachable)
     }
+
+    // MARK: - mach service 候选轮换(版本化名字优先,legacy 兜底)
+    //
+    // 升级黑洞名字占用的根治:新旧扩展用不同的版本化 mach service 名,app 连接时按候选表
+    // 轮换——健康期(0 掉线)恒用首选(版本化);掉一次换下一个试,回到头再来;链路证实健康
+    // (reset)后回到首选。选择只依赖既有的连续掉线计数,不引入新状态。
+
+    @Test("健康期(0 掉线)用首选候选;每掉一次线轮换到下一个,取模回绕")
+    func candidateRotatesPerDrop() {
+        var backoff = ReconnectBackoff()
+        #expect(backoff.candidateIndex(candidateCount: 2) == 0)   // 首选(版本化)
+        backoff.recordDrop()
+        #expect(backoff.candidateIndex(candidateCount: 2) == 1)   // 换 legacy
+        backoff.recordDrop()
+        #expect(backoff.candidateIndex(candidateCount: 2) == 0)   // 回绕
+        backoff.recordDrop()
+        #expect(backoff.candidateIndex(candidateCount: 2) == 1)
+    }
+
+    @Test("reset(链路证实健康)后回到首选;单候选/零候选安全")
+    func candidateResetAndDegenerateCounts() {
+        var backoff = ReconnectBackoff()
+        for _ in 0..<5 { backoff.recordDrop() }
+        backoff.reset()
+        #expect(backoff.candidateIndex(candidateCount: 2) == 0)
+        #expect(backoff.candidateIndex(candidateCount: 1) == 0)   // 单候选恒 0
+        backoff.recordDrop()
+        #expect(backoff.candidateIndex(candidateCount: 1) == 0)
+        #expect(backoff.candidateIndex(candidateCount: 0) == 0)   // 零候选不除零
+    }
 }

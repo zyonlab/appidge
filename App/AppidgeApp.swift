@@ -131,7 +131,13 @@ struct AppidgeApp: App {
     private let connectionLogFileStore: ConnectionLogFileStore
 
     init() {
-        let transport = XPCAppSideTransport()
+        // XPC 连接候选:内嵌扩展 plist 里的版本化 mach service 名优先(升级黑洞名字占用的
+        // 根治——新旧扩展各用各的名字),legacy 名兜底(升级窗口里系统可能还在跑旧扩展)。
+        let transport = XPCAppSideTransport(
+            serviceNameCandidates: XPCTransportConfig.connectionCandidates(
+                preferred: Self.bundledExtensionMachServiceName()
+            )
+        )
         let connectionLogFileStore = ConnectionLogFileStore()
         self.connectionLogFileStore = connectionLogFileStore
         // 本地代理进程(如 xray/yunti)签名标识查询：libproc 查监听端口 + SecCode 取签名标识，
@@ -347,11 +353,24 @@ struct AppidgeApp: App {
     /// 读 app 包内嵌扩展(`Contents/Library/SystemExtensions/*.systemextension`)的 `CFBundleVersion`
     /// ——期望运行的最新版本。读不到返回 nil(不做版本握手,退回旧行为)。
     private static func bundledExtensionVersion() -> String? {
+        bundledExtensionInfoValue { $0["CFBundleVersion"] as? String }
+    }
+
+    /// 读内嵌扩展声明的版本化 `NEMachServiceName`(名字唯一真相源是扩展 Info.plist,
+    /// 见 XPCTransportConfig 注释)。读不到返回 nil → 候选表退回 legacy 单候选。
+    private static func bundledExtensionMachServiceName() -> String? {
+        bundledExtensionInfoValue {
+            ($0["NetworkExtension"] as? [String: Any])?["NEMachServiceName"] as? String
+        }
+    }
+
+    private static func bundledExtensionInfoValue<T>(_ read: ([String: Any]) -> T?) -> T? {
         let dir = Bundle.main.bundleURL.appendingPathComponent("Contents/Library/SystemExtensions", isDirectory: true)
         guard let items = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil),
               let ext = items.first(where: { $0.pathExtension == "systemextension" }) else { return nil }
         let info = ext.appendingPathComponent("Contents/Info.plist")
-        return (NSDictionary(contentsOf: info)?["CFBundleVersion"] as? String)
+        guard let dict = NSDictionary(contentsOf: info) as? [String: Any] else { return nil }
+        return read(dict)
     }
 
     /// 启动后确认接管会话真的在跑；不在就拉起来。判定是 Core 纯函数

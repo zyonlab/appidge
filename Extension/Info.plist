@@ -26,9 +26,14 @@
 		     换回 NEMachServiceName + XPC。值必须以 entitlements 里的某个 App Group 为前缀
 		     (Proxifier: group=NXELXU5YLW.…,machSvc 以它开头;之前用 TeamID 前缀导致
 		     network_extension 类别校验 code 9,见 git log b92b35b)——我们唯一的 App Group 是
-		     group.com.appidge,这里必须原样对应 IPCContract.XPCTransportConfig.machServiceName。 -->
+		     group.com.appidge,前缀不能变。
+		     **版本后缀**(升级黑洞名字占用的根治,2026-07-27 真机三连实锤):升级替换窗口里
+		     旧扩展 job(含「等重启卸载」态)一直占着固定名字,新进程注册必然失败、只能重启电脑。
+		     名字带上扩展版本号后,新旧 job 各用各的名字、根本不抢。本 plist 是名字的**唯一真相源**:
+		     扩展读自己的 plist 注册(ProxyExtensionProvider.startProxy),app 读内嵌扩展的 plist
+		     连接(版本化优先、legacy 兜底,见 XPCTransportConfig.connectionCandidates)。 -->
 		<key>NEMachServiceName</key>
-		<string>group.com.appidge.xpc</string>
+		<string>group.com.appidge.xpc.$(APPIDGE_EXT_BUILD_NUMBER)</string>
 		<key>NEProviderClasses</key>
 		<dict>
 			<key>com.apple.networkextension.app-proxy</key>

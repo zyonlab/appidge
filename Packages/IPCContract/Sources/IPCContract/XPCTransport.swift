@@ -14,10 +14,32 @@ import Foundation
 /// （`NXELXU5YLW.…`）开头。我们唯一的 App Group 是 `group.com.appidge`，所以
 /// mach service 名字必须以 `group.com.appidge` 开头。
 public enum XPCTransportConfig {
-    /// 完整 mach service 名字，供 `Extension/Info.plist` 的 `NEMachServiceName`、
-    /// 扩展侧 `NSXPCListener(machServiceName:)`、App 侧 `NSXPCConnection(machServiceName:)`
-    /// 三处**原样一致**使用。前缀是我们唯一的 App Group（满足上面那条硬规则）。
+    /// **legacy** mach service 名字（扩展版本 ≤82 使用）。前缀是我们唯一的 App Group
+    /// （满足上面那条硬规则）。
+    ///
+    /// 自扩展版本 83 起,真实名字是**版本化**的:`Extension/Info.plist` 的 `NEMachServiceName`
+    /// 写成 `group.com.appidge.xpc.$(APPIDGE_EXT_BUILD_NUMBER)`(构建期展开)。为什么:
+    /// 升级替换窗口里,旧扩展 job(含「等重启卸载」态)会一直占着老名字,新进程注册必然失败
+    /// (2026-07-27 真机三连实锤,唯一出路是重启电脑);新旧版本各用各的名字,根本不抢。
+    /// **名字的唯一真相源是 Info.plist**:扩展读自己的 plist 注册,app 读内嵌扩展的 plist
+    /// 连接(经 ``connectionCandidates(preferred:)``),代码里不重复拼版本公式。
     public static let machServiceName = "group.com.appidge.xpc"
+
+    /// mach service 名必须携带的 App Group 前缀(entitlement 硬规则,见类型注释)。
+    static let requiredPrefix = "group.com.appidge"
+
+    /// App 侧连接候选表:首选名(从内嵌扩展 plist 读出的版本化名)在前,legacy 兜底在后
+    /// ——升级窗口里系统可能还在跑旧扩展(监听 legacy 名),回退保证仍然连得上。
+    /// 首选名缺失/空白/不带 App Group 前缀(读坏)一律丢弃,fail safe 只剩 legacy;
+    /// 与 legacy 相同则去重。恒非空、legacy 恒在末位。
+    public static func connectionCandidates(preferred: String?) -> [String] {
+        guard let preferred = preferred?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !preferred.isEmpty,
+              preferred.hasPrefix(requiredPrefix),
+              preferred != machServiceName
+        else { return [machServiceName] }
+        return [preferred, machServiceName]
+    }
 }
 
 /// 扩展侧暴露给 App 的 XPC 接口：App → 扩展方向，一次一条已编码消息

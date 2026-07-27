@@ -277,12 +277,16 @@ struct AppidgeApp: App {
                 // 扩展被用户在系统设置里**停用**时,activate() 只会打扰、startVPNTunnel 必然失败,
                 // XPC 也无人监听——这种状态下什么都不做,状态栏如实显示「已停用」,把人指向系统
                 // 设置(真机实锤:0.2.20 前 app 曾在此状态下因 XPC 重连风暴空转 100%+ CPU)。
-                // 其余状态维持老路:已完成引导就重新提交激活(幂等,兼顾升级 replace),并直接
-                // 尝试起会话一次(不依赖 activate() 的 .completed 回调,旧版本它可能不回)。
+                // **activate 与授权相位解耦**(2026-07-27 真机实锤的升级悬挂):替换请求只认
+                // 「已引导 + 未停用」。试用相位要等 trialResolved **异步**落定才 isLicenseActive,
+                // 此回调到达时相位常还是 unlicensed——旧写法把 activate 也门在授权上,试用用户
+                // 升级后激活请求永远不提交,系统永不替换旧扩展,而新 app 只连**新版本号**的
+                // mach 名 → 通道永久中断。activate 幂等且不看授权;会话 start 才看授权。
                 SystemExtensionActivator.shared.checkStatus { state in
                     if case .disabled = state { return }
-                    if store.state.hasCompletedOnboarding && store.state.isLicenseActive {
-                        SystemExtensionActivator.shared.activate()
+                    guard store.state.hasCompletedOnboarding else { return }
+                    SystemExtensionActivator.shared.activate()
+                    if store.state.isLicenseActive {
                         TransparentProxyController.start()
                     }
                 }
@@ -414,6 +418,10 @@ struct AppidgeApp: App {
             // 窗口让扩展侧自检判死的坏进程退出、launchd 重生新进程重新注册 mach service(闭环见
             // Extension/ProxyExtensionProviderXPCHealth.swift)。一次为限,防重生后仍失败的无限环;
             // 之后由活动页/设置的显式警告引导用户手动「重启接管」。
+            // 顺带重提交激活(幂等):「通道不可达」的另一个已实锤成因是**替换悬挂**——升级包的
+            // 激活请求从未提交,旧扩展还在监听旧版本号的 mach 名。只重启会话修不了它,而版本
+            // 握手自愈又依赖这条死了的通道上报版本(catch-22),这里是唯一能兜住的自动路径。
+            SystemExtensionActivator.shared.activate()
             TransparentProxyController.restart()
         case .reactivateExtension:
             // 系统已明说新版本要重启电脑才生效：重启隧道是徒劳的（改不了系统注册哪个版本）。
@@ -515,7 +523,11 @@ struct AppidgeApp: App {
         switch action {
         case .licenseActivateSucceeded, .licenseActivateFailed,
              .licenseValidateSucceeded, .licenseValidateFailed,
-             .licenseDeactivateSucceeded, .licenseRestored:
+             .licenseDeactivateSucceeded, .licenseRestored,
+             // 试用相位落定同样要同步能力:试用有效 → activate+start(升级替换请求也靠这条
+             // 补偿路径兜底);试用过期 → stop。以前列表只有 license 类 action,试用用户升级
+             // 后没有任何路径会再提交激活请求(悬挂根因之二)。
+             .trialResolved:
             return true
         case .licenseClockTick:
             // 每小时 tick 只在它刚关闭 capability 时停会话；有效授权不重复 activate/start。

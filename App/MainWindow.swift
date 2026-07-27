@@ -51,7 +51,13 @@ struct MainWindow: View {
                     } else if store.state.isXPCChannelBroken {
                         // 活动页空白的根因显形:扩展在跑、通道却断着(升级竞态的监听器注册失败),
                         // 之前用户只能看着空列表猜。自愈已自动重启过一次;横幅提供手动兜底。
-                        XPCChannelBrokenBanner { TransparentProxyController.restart() }
+                        // activate 幂等重提交:通道断的另一实锤成因是升级替换悬挂(激活请求从未
+                        // 提交、旧扩展监听旧版本号 mach 名),只重启会话修不了——见 restartFor-
+                        // UnreachableChannel 的同款处置。
+                        XPCChannelBrokenBanner {
+                            SystemExtensionActivator.shared.activate()
+                            TransparentProxyController.restart()
+                        }
                     } else if let prompt = approvalPrompt {
                         ExtensionApprovalBanner(text: prompt)
                     }

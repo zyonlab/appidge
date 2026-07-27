@@ -96,6 +96,9 @@ struct SettingsView: View {
                 LabeledContent("恢复出口") {
                     HStack(spacing: 8) {
                         Button("重启接管") {
+                            // activate 幂等重提交:覆盖「升级替换悬挂」(激活请求从未提交,
+                            // 旧扩展监听旧版本号 mach 名),只重启会话修不了那种断法。
+                            SystemExtensionActivator.shared.activate()
                             TransparentProxyController.restart()
                         }
                         .disabled(!store.state.isLicenseActive)

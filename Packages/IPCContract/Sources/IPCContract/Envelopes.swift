@@ -25,4 +25,9 @@ public enum ExtensionToAppMessage: Sendable, Equatable, Codable {
     /// 扩展 `startProxy` 时向 app 报告自己的版本(`CFBundleVersion`)——app 拿它跟包内嵌扩展版本
     /// 比对,检测"会话绑在旧 provider 上"的僵尸态(反复热升级后系统把流量交给待卸载的旧实例)。
     case extensionReady(version: String)
+    /// 扩展报告**已落地配置**的指纹(``ConfigFingerprint``,三个时机:apply 落地后防抖上报 /
+    /// 版本回报同批 / 低频心跳)。app 与「用当前 state 生成的期望指纹」比对,不一致 ⟹ 配置分叉
+    /// ⟹ 全量 resync 自愈——推送是 fire-and-forget,这条对账闭环把「静默分叉」压缩到最多
+    /// 一个上报周期。旧版 app 解不出这个 case 会整体丢弃该消息,安全降级。
+    case configFingerprintReported(String)
 }

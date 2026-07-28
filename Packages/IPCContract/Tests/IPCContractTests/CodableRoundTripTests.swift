@@ -124,6 +124,9 @@ struct CodableRoundTripTests {
             )
         )
         #expect(try roundTrip(event) == event)
+
+        let fingerprint = ExtensionToAppMessage.configFingerprintReported(String(repeating: "ab", count: 32))
+        #expect(try roundTrip(fingerprint) == fingerprint)
     }
 
     @Test("ConnectionEventDTO round-trips across phases, with and without a proxy kind")

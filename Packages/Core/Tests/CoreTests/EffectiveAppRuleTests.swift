@@ -17,6 +17,50 @@ struct EffectiveAppRuleTests {
         )
     }
 
+    @Test("自动旁路进程 → 放行(与活动页一致):回环自愈档按可执行文件路径命中,规则表被短路")
+    func loopExcludedProcessShowsObserve() {
+        let action = EffectiveAppRule.action(
+            forProcess: ProcessID("a.out"), executablePath: "/opt/xray",
+            rules: [rule("*", .proxied)],
+            loopAutoExclusions: OriginExclusionDiscovery(executablePaths: ["/opt/xray"]),
+            dynamicOriginExclusion: OriginExclusionDiscovery()
+        )
+        #expect(action == .observe)
+    }
+
+    @Test("自动旁路进程 → 放行:本地代理发现档按签名标识命中")
+    func dynamicExcludedProcessShowsObserve() {
+        let action = EffectiveAppRule.action(
+            forProcess: ProcessID("com.example.yunti"), executablePath: nil,
+            rules: [rule("*", .proxied)],
+            loopAutoExclusions: OriginExclusionDiscovery(),
+            dynamicOriginExclusion: OriginExclusionDiscovery(identifiers: ["com.example.yunti"])
+        )
+        #expect(action == .observe)
+    }
+
+    @Test("不在任何排除集 → 照常回落规则表推导")
+    func unexcludedProcessFallsThroughToRules() {
+        let action = EffectiveAppRule.action(
+            forProcess: app, executablePath: "/Applications/App.app/Contents/MacOS/App",
+            rules: [rule("*", .proxied)],
+            loopAutoExclusions: OriginExclusionDiscovery(executablePaths: ["/opt/xray"]),
+            dynamicOriginExclusion: OriginExclusionDiscovery(identifiers: ["com.example.yunti"])
+        )
+        #expect(action == .proxied)
+    }
+
+    @Test("排除集全空 → 与纯规则表推导等价(nil 含义不变)")
+    func emptyExclusionsMatchLegacyBehavior() {
+        let action = EffectiveAppRule.action(
+            forProcess: app, executablePath: nil,
+            rules: [],
+            loopAutoExclusions: OriginExclusionDiscovery(),
+            dynamicOriginExclusion: OriginExclusionDiscovery()
+        )
+        #expect(action == nil)
+    }
+
     @Test("host-agnostic 规则自上而下首个命中生效")
     func firstMatchWins() {
         let rules = [rule("com.example.app", .direct), rule("*", .proxied)]

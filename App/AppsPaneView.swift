@@ -5,17 +5,26 @@ import AppFeature
 /// 「应用」页(主窗口顶层分段之一)。目录扫描到的应用逐进程列出,**右键设每进程走法**
 /// (走代理 / 直连 / 拦截)——这是「让某个 app 走代理」的入口。右键实际派生一条
 /// 「进程 × * × *」规则置顶进规则表(见 Reducer.assignRule)。
-/// 「规则」列**从规则表推导**(EffectiveAppRule,与扩展路由同一真相):在「规则」页删掉 / 停用
-/// 对应规则,这里立刻回落显示下一条命中(或默认直连)——两页永不失联。有流量的排前面,其余按名字。
+/// 「规则」列**从规则表 + 自动旁路层推导**(EffectiveAppRule 完整推导,与扩展路由同一真相):
+/// 被自动旁路的进程(回环自愈 / 本地代理发现,如 xray/yunti)显示「放行」——与活动页一致,
+/// 绝不显示「代理」(它们在扩展判定里排在规则表之前,catch-all 对它们不生效);其余进程在
+/// 「规则」页删掉 / 停用对应规则后,这里立刻回落显示下一条命中(或默认直连)——两页永不失联。
+/// 有流量的排前面,其余按名字。
 ///
 /// 由旧 `TrafficPane` 底部的「应用」子分段提升为顶层 tab(避免与「活动」底部重复)。
 struct AppsPaneView: View {
     var store: Store
     @State private var selection: Set<MonitoredProcess.ID> = []
 
-    /// 进程在当前规则表下的 app 维度有效动作;nil = 没有任何 host-agnostic 规则命中 → 默认直连。
+    /// 进程的 app 维度有效动作(含自动旁路层:被旁路 → .observe「放行」,同活动页);
+    /// nil = 没有任何 host-agnostic 规则命中 → 默认直连。
     private func effectiveAction(_ p: MonitoredProcess) -> ProxyRule {
-        EffectiveAppRule.action(forProcess: p.id, rules: store.state.rules) ?? .direct
+        EffectiveAppRule.action(
+            forProcess: p.id, executablePath: p.executablePath,
+            rules: store.state.rules,
+            loopAutoExclusions: store.state.loopAutoExclusions,
+            dynamicOriginExclusion: store.state.dynamicOriginExclusion
+        ) ?? .direct
     }
 
     private var processes: [MonitoredProcess] {

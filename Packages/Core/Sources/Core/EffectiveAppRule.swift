@@ -17,6 +17,34 @@ public enum EffectiveAppRule {
         }
         return nil
     }
+
+    /// 含**自动旁路层**的完整推导:回环自愈(`loopAutoExclusions`)或本地代理发现
+    /// (`dynamicOriginExclusion`)命中的进程返回 `.observe`(UI 显示「放行」,与活动页一致)——
+    /// 扩展的真实判定里这两档排在规则表**之前**,被自动旁路的进程绝不走代理,规则表对它不生效;
+    /// 若这里只查规则表,catch-all「* → 代理」会把 xray/yunti 显示成「代理」(真机反馈实锤的误导)。
+    /// 命中判定镜像扩展侧 `ProcessOriginExclusion.shouldBypass` 的两路信号:签名标识精确命中
+    /// (集合建时已滤掉 `a.out` 歧义标识)或可执行文件路径精确命中,任一即算。
+    /// 都不命中时回落纯规则表推导(nil 含义不变 = 默认直连)。
+    public static func action(
+        forProcess id: ProcessID, executablePath: String?,
+        rules: [ProxyMatchRule],
+        loopAutoExclusions: OriginExclusionDiscovery,
+        dynamicOriginExclusion: OriginExclusionDiscovery
+    ) -> ProxyRule? {
+        if isExcluded(id: id, path: executablePath, by: loopAutoExclusions)
+            || isExcluded(id: id, path: executablePath, by: dynamicOriginExclusion) {
+            return .observe
+        }
+        return action(forProcess: id, rules: rules)
+    }
+
+    private static func isExcluded(
+        id: ProcessID, path: String?, by discovery: OriginExclusionDiscovery
+    ) -> Bool {
+        if discovery.identifiers.contains(id.value) { return true }
+        if let path, discovery.executablePaths.contains(path) { return true }
+        return false
+    }
 }
 
 /// 极简 glob:只支持 `*`(匹配任意长度任意字符,含点),大小写不敏感。经典贪心回溯,零依赖。

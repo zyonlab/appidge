@@ -64,6 +64,11 @@ extension Reducer {
             var state = state
             state.isXPCChannelReachable = reachable
             return (state, [])
+        case .configurationReplayCompleted:
+            guard !state.isConfigurationReplayComplete else { return (state, []) }
+            var state = state
+            state.isConfigurationReplayComplete = true
+            return (state, [])
         default:
             return nil
         }

@@ -35,7 +35,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // 先强制同步存盘(退出前把最新配置落地,防 400ms 防抖没触发就退出丢改动),再按路径处置会话。
+        // 第一步先停笔:静默 XPC 通道,濒死实例不再推送任何配置(防「前任迟到覆盖继任」的分叉)。
+        AppTermination.quiesceTransport?()
+        // 再强制同步存盘(退出前把最新配置落地,防 400ms 防抖没触发就退出丢改动),再按路径处置会话。
         AppTermination.persist?()
         switch RelaunchHandoff.terminationPolicy(isHandingOff: AppTermination.isHandingOffToSuccessor) {
         case .stopAllSessions:
@@ -57,6 +59,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @MainActor
 enum AppTermination {
     static var persist: (() -> Void)?
+    /// 退出第一步:同步静默 XPC 通道(invalidate 连接、停掉重连),让濒死实例从此刻起不可能再向
+    /// 扩展推送任何配置——双实例窗口(语言切换交接/快速重开)里「前任迟到的推送覆盖继任的全量
+    /// 推送」正是配置分叉的成因之一。App init 时注入(捕获 transport)。
+    static var quiesceTransport: (() -> Void)?
     /// 本次退出是不是「语言切换交接给接班实例」。只有 `LanguageBootstrap.relaunch()` 在**确认**
     /// 接班实例已启动后才置真；置真时退出不停接管会话（见 `applicationWillTerminate`）。
     /// 默认 false —— 任何其它退出路径（普通退出、Sparkle 升级重启）都照常停光会话。
@@ -138,6 +144,9 @@ struct AppidgeApp: App {
                 preferred: Self.bundledExtensionMachServiceName()
             )
         )
+        // 退出第一步的「停笔」钩子(见 applicationWillTerminate):同步静默 XPC,濒死实例不再
+        // 向扩展推送任何配置——双实例窗口(语言交接/快速重开)「前任迟到覆盖继任」的分叉防线。
+        AppTermination.quiesceTransport = { transport.quiesceForTermination() }
         let connectionLogFileStore = ConnectionLogFileStore()
         self.connectionLogFileStore = connectionLogFileStore
         // 本地代理进程(如 xray/yunti)签名标识查询：libproc 查监听端口 + SecCode 取签名标识，
@@ -248,9 +257,10 @@ struct AppidgeApp: App {
                 // 当前 state 主动评估，「升级后那一次启动」才不会被永久错过。判定幂等。
                 maybeHealStaleBinding()
                 store.dispatch(.appLaunched)
-                // 启动恢复完成后,把最终的完整配置全量重推给扩展一次。onConnect 那次可能发生在
-                // 恢复之前(状态还空);这次确保扩展拿到的是恢复后的最新全量(规则+代理+路由+UDP+
-                // 排除名单)。effect 已串行化,这次 resync 的推送排在恢复推送之后、最终胜出。
+                // 启动恢复完成:先开「恢复门」再全量重推。onConnect 的 resync 可能发生在恢复
+                // 之前——门关着时它是纯 no-op(不再把空 state 当期望态推给扩展,分叉毒药已拔);
+                // 这里开门后的这次 resync 才是第一笔全量,内容必然是恢复后的完整配置。
+                store.dispatch(.configurationReplayCompleted)
                 store.dispatch(.resyncExtension)
                 // 授权：从 Keychain 恢复上次的授权记录（onAction 里据此决定是否需要联网校验）。
                 // 授权服务不可用绝不影响上面的网络接管——两条路径完全独立。

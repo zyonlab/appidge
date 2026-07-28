@@ -7,9 +7,37 @@ import Testing
 @Suite("Reducer — resyncExtension 全量重推当前配置,不改 state")
 struct ResyncExtensionReducerTests {
 
+    @Test("恢复门未开(启动恢复还没完成):resync 纯 no-op——绝不把空/半截 state 当期望态推给扩展")
+    func resyncBeforeReplayCompleteIsNoOp() {
+        var state = AppState()
+        state.rules = [ProxyMatchRule(
+            id: RuleID("r1"), appPattern: "*", hostPattern: "*", portRange: nil, action: .proxied
+        )]
+        let (next, effects) = Reducer.reduce(state, .resyncExtension)
+        #expect(next == state)
+        #expect(effects.isEmpty)
+    }
+
+    @Test("configurationReplayCompleted 开门,幂等")
+    func replayCompletedOpensGateIdempotently() {
+        let (opened, effects1) = Reducer.reduce(AppState(), .configurationReplayCompleted)
+        #expect(opened.isConfigurationReplayComplete)
+        #expect(effects1.isEmpty)
+        let (again, effects2) = Reducer.reduce(opened, .configurationReplayCompleted)
+        #expect(again == opened)
+        #expect(effects2.isEmpty)
+    }
+
+    @Test("resetState(切档案)重新关门:档案重放窗口里的重连 resync 同样被挡住")
+    func resetStateClosesGate() {
+        let (opened, _) = Reducer.reduce(AppState(), .configurationReplayCompleted)
+        let (fresh, _) = Reducer.reduce(opened, .resetState)
+        #expect(!fresh.isConfigurationReplayComplete)
+    }
+
     @Test("resyncExtension 不改动 state")
     func resyncDoesNotMutateState() {
-        var state = AppState()
+        var state = AppState(isConfigurationReplayComplete: true)
         state.rules = [ProxyMatchRule(
             id: RuleID("r1"), appPattern: "*", hostPattern: "*", portRange: nil, action: .proxied
         )]
@@ -20,7 +48,7 @@ struct ResyncExtensionReducerTests {
     @Test("resyncExtension 产出全部六类推送 effect,顺序确定")
     func resyncEmitsAllPushEffectsInOrder() {
         let processID = ProcessID("com.x")
-        var state = AppState()
+        var state = AppState(isConfigurationReplayComplete: true)
         state.processes[processID] = MonitoredProcess(
             id: processID, displayName: "X", executablePath: "/x", rule: .proxied
         )
@@ -56,9 +84,9 @@ struct ResyncExtensionReducerTests {
         ])
     }
 
-    @Test("即使配置为空(全默认),resync 仍然把六条 effect 都发出去——扩展据此清成一致的空配置")
+    @Test("门开后配置真为空(用户确实没配置),resync 照样推六条——真空配置也是要同步的期望态")
     func resyncOnEmptyStateStillPushesEverything() {
-        let (_, effects) = Reducer.reduce(AppState(), .resyncExtension)
+        let (_, effects) = Reducer.reduce(AppState(isConfigurationReplayComplete: true), .resyncExtension)
         #expect(effects.count == 6)
         // 第一条一定是排除名单(空发现)——防环信号先行。
         #expect(effects.first == .applyProcessOriginExclusions(

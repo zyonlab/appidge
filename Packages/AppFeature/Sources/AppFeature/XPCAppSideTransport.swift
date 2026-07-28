@@ -92,6 +92,15 @@ public final class XPCAppSideTransport: NSObject, AppSideTransport, AppXPCProtoc
     }
 
     public func stopListening() async {
+        quiesceForTermination()
+    }
+
+    /// 同步静默:invalidate 当前连接、停止监听与懒重连。**退出路径专用**——
+    /// `applicationWillTerminate` 是同步上下文,async 的 `stopListening` 在进程退出前不保证
+    /// 跑完;这里的全部工作(锁 + invalidate)本就是同步的,直接同步暴露。静默后 `send()`
+    /// 不再懒建连接(见 `currentConnection` 的 `isListening` 门),濒死实例从此刻起不可能
+    /// 再向扩展推送任何配置(双实例分叉的「前任迟到覆盖」防线)。
+    public func quiesceForTermination() {
         let conn: NSXPCConnection? = lock.withLock {
             self.isListening = false
             self.onMessage = nil
@@ -127,6 +136,9 @@ public final class XPCAppSideTransport: NSObject, AppSideTransport, AppXPCProtoc
             if let existing = self.connection {
                 return (existing, false)
             }
+            // 未在监听(还没 start / 已静默退出)不懒建连接:退出路径 quiesce 之后,迟到的
+            // effect send() 若在这里重新建连,静默就白做了(还会触发 onConnect→resync 反向放大)。
+            guard self.isListening else { return (nil, false) }
             guard Date().timeIntervalSince1970 >= self.cooldownUntil else {
                 return (nil, false)
             }

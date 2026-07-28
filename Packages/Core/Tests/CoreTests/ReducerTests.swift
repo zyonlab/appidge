@@ -152,7 +152,7 @@ struct ReducerTests {
 
     @Test("while the engine is unhealthy every rule-set push stays fail-open (empty), including resync")
     func unhealthyPushesStayFailOpen() {
-        var state = AppState(isEngineHealthy: false)
+        var state = AppState(isEngineHealthy: false, isConfigurationReplayComplete: true)
         let a = ProcessID("a")
         state.processes[a] = MonitoredProcess(id: a, displayName: "A", executablePath: "/a", rule: .proxied)
 

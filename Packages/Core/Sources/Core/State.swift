@@ -52,6 +52,12 @@ public struct AppState: Sendable, Equatable {
     /// app 侧 bootstrap look-up 报 "No such process"(2026-07-26 真机实锤,80→81 升级 100% 复现)。
     /// 运行时状态,不持久化。
     public var isXPCChannelReachable: Bool
+    /// 启动恢复(或档案切换重放)是否已完成——**resync 的门**。未完成前 `.resyncExtension` 是
+    /// 纯 no-op:XPC 早连上的 onConnect resync 会拿着还没恢复的空/半截 state 当"期望态"推给
+    /// 扩展(真机实锤的分叉毒药:后续全量推送一旦丢失,扩展就停在被清空的状态)。宁可不推,
+    /// 绝不推空。恢复完成处/档案重放完成处 dispatch `.configurationReplayCompleted` 开门;
+    /// `.resetState` 重新关门(档案重放窗口同样受保护)。运行时状态,不持久化。
+    public var isConfigurationReplayComplete: Bool
 
     /// 授权状态机相位（见 ``LicensePhase`` / CLAUDE.md §5.5）。默认未激活。
     /// **和网络接管完全解耦**：授权服务故障绝不影响转发/路由，付费能力只在 `isLicenseActive` 时开放。
@@ -152,6 +158,7 @@ public struct AppState: Sendable, Equatable {
         runningExtensionVersion: String? = nil,
         bundledExtensionVersion: String? = nil,
         isXPCChannelReachable: Bool = true,
+        isConfigurationReplayComplete: Bool = false,
         licensePhase: LicensePhase = .unlicensed,
         license: LicenseInfo? = nil,
         trialConfig: TrialConfig = .default,
@@ -178,6 +185,7 @@ public struct AppState: Sendable, Equatable {
         self.runningExtensionVersion = runningExtensionVersion
         self.bundledExtensionVersion = bundledExtensionVersion
         self.isXPCChannelReachable = isXPCChannelReachable
+        self.isConfigurationReplayComplete = isConfigurationReplayComplete
         self.licensePhase = licensePhase
         self.license = license
         self.trialConfig = trialConfig

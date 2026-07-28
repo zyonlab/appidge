@@ -242,8 +242,11 @@ public enum Reducer {
     /// 秒级真环窗口(活动栏里 xray 走「代理·SOCKS5」那批)。
     /// 每一条都用现有的推送 effect(和用户改动时走的是同一批),扩展侧幂等接收。
     /// 用途见 `Action.resyncExtension`:XPC(重)连上、或启动恢复完成后触发一次。
+    /// **恢复门**:启动恢复/档案重放完成前是纯 no-op——那时的 state 是空/半截的,推出去等于
+    /// 主动清空扩展(真机实锤的分叉毒药,见 `AppState.isConfigurationReplayComplete`)。
     private static func resyncExtension(_ state: AppState) -> (AppState, [Effect]) {
-        (state, [
+        guard state.isConfigurationReplayComplete else { return (state, []) }
+        return (state, [
             state.originExclusionsPush,
             proxyConfigPush(state),
             .applyRoutingMode(state.proxyRoutingMode),

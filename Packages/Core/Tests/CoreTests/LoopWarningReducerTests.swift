@@ -76,7 +76,7 @@ struct LoopWarningReducerTests {
 
     @Test("resync 下发的排除名单也是并集,且排在首位(防环信号先行)")
     func resyncPushesCombined() {
-        let (state, _) = raise(AppState())
+        let (state, _) = raise(AppState(isConfigurationReplayComplete: true))
         let (_, effects) = Reducer.reduce(state, .resyncExtension)
         #expect(effects.first == state.originExclusionsPush)
         #expect(state.loopAutoExclusions.identifiers.contains("com.example.yunti"))

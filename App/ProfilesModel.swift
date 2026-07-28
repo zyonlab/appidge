@@ -57,6 +57,10 @@ final class ProfilesModel {
             store.dispatch(action)
         }
         store.dispatch(.appLaunched) // 重新扫描目录,刷新进程列表
+        // resetState 关上了「恢复门」(重放窗口里 XPC 重连的 resync 不得把半截 state 推给扩展),
+        // 重放完成后开门 + 全量重推,扩展一步到位拿到新档案的完整配置。
+        store.dispatch(.configurationReplayCompleted)
+        store.dispatch(.resyncExtension)
     }
 
     /// 删除档案(删的是 active 时,active 由集合落到剩下的第一个)。

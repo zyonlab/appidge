@@ -50,6 +50,10 @@ public enum Action: Sendable, Equatable {
     /// 把 state 清回初始值(切换配置档案时用:先 reset 再 dispatch 新档案的 restorationActions,
     /// 干净替换而非叠加)。运行时/会话状态(进程、连接日志等)一并清掉是预期的。
     case resetState
+    /// 启动恢复 / 档案重放完成——打开 `.resyncExtension` 的门(见 `AppState.isConfigurationReplayComplete`:
+    /// 开门前 resync 纯 no-op,防止 XPC 早连的 onConnect resync 把空/半截 state 当期望态推给扩展)。
+    /// 由 App 层在恢复重放的最后一步 dispatch,随后紧跟一次 `.resyncExtension`。
+    case configurationReplayCompleted
     /// 开/关逐连接抓包(.dmp)。下发给扩展。
     case setPacketCaptureEnabled(Bool)
     /// 设置 proxied 进程的 UDP 处理策略(拦截/直连/SOCKS5 代理)。下发给扩展。

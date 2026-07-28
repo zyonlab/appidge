@@ -142,6 +142,14 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
     // 主 App 经 XPC 下发的真实 .app 根路径。安装后的系统扩展位于 /Library/SystemExtensions，
     // 无法从 Bundle.main 向上找到宿主；Sparkle helper 的 bundle-path bypass 必须用这条路径。
     private var storedHostAppBundlePath: String?
+    // 配置对账:最近一次**原样收到**的排除/规则消息(apply 即整体替换,「最后收到」=「已落地」),
+    // 指纹直接对它们计算——与 app 侧期望指纹同一份 ConfigFingerprint 代码、同一套 DTO 字节。
+    // 锁保护;非 private——上报编排在 ConnectionStatsRefreshDriver.swift(跨文件 extension 先例)。
+    var storedExclusionsMessage: ProcessOriginExclusionMessage?
+    var storedRuleSetMessage: RuleSetMessage?
+    // 指纹上报防抖(1s 合并一批 apply)与心跳计数(挂在 2s 统计回填 tick 上,30 tick ≈ 60s)。锁保护。
+    var storedFingerprintReportScheduled = false
+    var storedFingerprintHeartbeatTicks = 0
     // 观测事件的合并+节流:本地代理的高频短连接观测按 (进程×目标) 确定性 id upsert + 同目标
     // 每 2s 最多一条,避免 app 侧连接表被洪流驱动重排(见 EngineKit.ObserveCoalescer)。锁保护。
     // 非 private:emitObservedFlow 在同 target 的跨文件 extension 里访问(同其它 stored 成员先例)。
@@ -282,6 +290,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             for result in results {
                 await transport.deliver(.diagnosticResult(result))
             }
+            return // 诊断不是配置,不触发指纹上报。
         case .applyProxyConfig(let config):
             configLock.withLock { storedProxyConfig = config }
             // active 上游变了，让 upstreamReachable 诊断跟着探新的上游地址。
@@ -298,6 +307,8 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         case .applyProcessOriginExclusions(let message):
             applyOriginExclusionsMessage(message)
         }
+        // 配置对账:任一配置落地后防抖上报当前已落地配置的指纹(见 scheduleConfigFingerprintReport)。
+        scheduleConfigFingerprintReport()
     }
 
     private func applyRuleSetMessage(_ ruleSet: RuleSetMessage) async {
@@ -311,6 +322,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
         configLock.withLock {
             storedPerProcessRules = snapshot
             storedMatchRules = matchRulesSnapshot
+            storedRuleSetMessage = ruleSet // 原样留存,配置指纹对账用(见 configFingerprintLocked)
         }
         // 定位「配置到底有没有下发到扩展」的关键日志:这次收到的规则表长什么样。
         let matchRulesSummary = matchRulesSnapshot.map { rule -> String in
@@ -331,6 +343,7 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             storedHardBypassIdentifiers = Set(message.hardBypassIdentifiers)
             storedHardBypassPaths = Set(message.hardBypassExecutablePaths)
             storedHostAppBundlePath = message.hostAppBundlePath
+            storedExclusionsMessage = message // 原样留存,配置指纹对账用(见 configFingerprintLocked)
         }
         ExtDiag.log(
             "applyProcessOriginExclusions received: direct=\(message.identifiers.joined(separator: ","))"
@@ -339,6 +352,20 @@ final class ProxyExtensionProvider: NETransparentProxyProvider, @unchecked Senda
             + "/\(message.hardBypassExecutablePaths.joined(separator: ","))"
             + " hostAppBundle=\(message.hostAppBundlePath ?? "-")"
         )
+    }
+
+    /// 已落地配置的指纹(**调用方持 configLock**)。与 app 侧 ExpectedConfigFingerprint 调同一份
+    /// `ConfigFingerprint`——指纹相等 ⟺ 两侧配置一致。nil 消息按「从未收到」的空形态计算
+    /// (与 app 侧空配置指纹相等,首推前不误报)。非 private:上报编排在 Routing 文件。
+    func configFingerprintLocked() -> String {
+        ConfigFingerprint.compute(ConfigFingerprint.Input(
+            exclusions: storedExclusionsMessage ?? ProcessOriginExclusionMessage(identifiers: []),
+            proxyConfig: storedProxyConfig,
+            routingMode: storedRoutingMode,
+            packetCaptureEnabled: storedPacketCaptureEnabled,
+            udpPolicy: storedUDPPolicy,
+            ruleSet: storedRuleSetMessage ?? RuleSetMessage(assignments: [])
+        ))
     }
 
     override func handleNewFlow(_ flow: NEAppProxyFlow) -> Bool {

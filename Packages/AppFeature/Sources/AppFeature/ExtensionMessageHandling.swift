@@ -58,6 +58,11 @@ public enum ExtensionMessageHandling {
                 executablePath: executablePath
             )]
 
+        case .configFingerprintReported:
+            // 对账需要「期望指纹」——由 IPCReceiver 拿当前 state 经 ExpectedConfigFingerprint
+            // 算好后注入 action(本层是无状态纯映射,拿不到 state),这里不产 action。
+            return []
+
         case .extensionReady(let version):
             return [.extensionVersionReported(version)]
         }

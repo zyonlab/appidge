@@ -7,6 +7,7 @@ public enum Reducer {
             ?? reduceMatchRules(state, action)
             ?? reduceProcessAndFlow(state, action)
             ?? reduceRuntimeSignals(state, action)
+            ?? reduceConfigSync(state, action)
             ?? reduceSettings(state, action)
             ?? reduceConnectionLog(state, action)
             ?? reduceLicenseFlow(state, action)
@@ -244,7 +245,9 @@ public enum Reducer {
     /// 用途见 `Action.resyncExtension`:XPC(重)连上、或启动恢复完成后触发一次。
     /// **恢复门**:启动恢复/档案重放完成前是纯 no-op——那时的 state 是空/半截的,推出去等于
     /// 主动清空扩展(真机实锤的分叉毒药,见 `AppState.isConfigurationReplayComplete`)。
-    private static func resyncExtension(_ state: AppState) -> (AppState, [Effect]) {
+    /// 非 private:配置对账失配的自愈(ReducerSettings.configFingerprintReported)复用同一份
+    /// 全量推送(跨文件 extension,同 reduceSettings 先例)。
+    static func resyncExtension(_ state: AppState) -> (AppState, [Effect]) {
         guard state.isConfigurationReplayComplete else { return (state, []) }
         return (state, [
             state.originExclusionsPush,

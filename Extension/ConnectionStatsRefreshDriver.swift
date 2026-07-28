@@ -38,6 +38,8 @@ extension ProxyExtensionProvider {
                 try? await Task.sleep(nanoseconds: UInt64(Self.statsRefreshInterval * 1_000_000_000))
                 guard !Task.isCancelled else { return }
                 self?.refreshActiveConnectionStats()
+                // 配置对账心跳搭同一个 2s tick(30 tick ≈ 60s 上报一次指纹),不另起定时器体系。
+                self?.tickConfigFingerprintHeartbeat()
             }
         }
     }
@@ -65,5 +67,46 @@ extension ProxyExtensionProvider {
         for context in due where !context.isClosed {
             emitConnectionEvent(context, phase: .opened)
         }
+    }
+
+    // MARK: - 配置对账上报(第 2 层闭环的扩展侧;心跳挂本文件的 2s tick,故编排也放这里)
+
+    /// 任一配置 apply 落地后调用:1s 防抖合并上报一次「已落地配置」的指纹。app 侧与期望指纹
+    /// 比对,不一致即全量 resync——推送是 fire-and-forget,这条上报把静默分叉压缩到秒级可见。
+    func scheduleConfigFingerprintReport() {
+        let shouldSchedule = configLock.withLock {
+            guard !storedFingerprintReportScheduled else { return false }
+            storedFingerprintReportScheduled = true
+            return true
+        }
+        guard shouldSchedule else { return }
+        Task(priority: .utility) { [weak self] in
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            self?.reportConfigFingerprintNow()
+        }
+    }
+
+    /// 立即计算并上报当前指纹(防抖到点 / 心跳)。transport 未接通时静默跳过(app 不在,无人对账;
+    /// 重连后 app 的 resync 会触发 apply → 防抖上报,闭环自动恢复)。
+    func reportConfigFingerprintNow() {
+        let fingerprint = configLock.withLock {
+            storedFingerprintReportScheduled = false
+            return configFingerprintLocked()
+        }
+        guard let transport else { return }
+        ExtDiag.log("configFingerprint report: \(fingerprint)")
+        Task { await transport.deliver(.configFingerprintReported(fingerprint)) }
+    }
+
+    /// 心跳时机:每 30 个 2s tick(≈60s)上报一次。覆盖「推送丢了且之后再无任何 apply」的
+    /// 静默分叉(2026-07-28 真机事故形态)——apply 防抖上报只能确认收到的,收不到的只有心跳能暴露。
+    func tickConfigFingerprintHeartbeat() {
+        let due = configLock.withLock {
+            storedFingerprintHeartbeatTicks += 1
+            guard storedFingerprintHeartbeatTicks >= 30 else { return false }
+            storedFingerprintHeartbeatTicks = 0
+            return true
+        }
+        if due { reportConfigFingerprintNow() }
     }
 }

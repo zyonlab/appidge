@@ -175,7 +175,11 @@ struct AppidgeApp: App {
         // 就一直空转(每条 flow 回落默认直连、什么都不接管)。[weak store] 断开 store→transport→
         // store 的保留环;dispatch 必须回到主 actor。
         transport.setOnConnect { [weak store] in
-            Task { @MainActor in store?.dispatch(.resyncExtension) }
+            Task { @MainActor in
+                // 留痕 resync 触发源(考古用):onConnect 的 resync 在恢复门开前是纯 no-op。
+                NSLog("appidge: XPC connected — dispatching resyncExtension (gated on replay-complete)")
+                store?.dispatch(.resyncExtension)
+            }
         }
         // XPC 通道可达性翻转沿回灌 store(连续掉线过阈值 → 不可达;收到扩展消息 → 恢复)。
         // 不可达 = 扩展监听器很可能注册失败(升级换血竞态,bootstrap "No such process")——
@@ -185,7 +189,10 @@ struct AppidgeApp: App {
         }
         _store = State(initialValue: store)
         _ipcReceiver = State(initialValue: IPCReceiver(
-            store: store, transport: transport, connectionLogFileStore: connectionLogFileStore
+            store: store, transport: transport, connectionLogFileStore: connectionLogFileStore,
+            // 期望指纹必须与 effectHandler 下发排除名单时的 hostAppBundlePath **同一表达式**
+            // (见 signalMessage 的 applyProcessOriginExclusions 分支),否则对账恒失配。
+            hostAppBundlePath: Bundle.main.bundleURL.resolvingSymlinksInPath().standardizedFileURL.path
         ))
         _profilesModel = State(initialValue: ProfilesModel(
             store: store, profileStore: ProfileStore(), credentialStore: KeychainCredentialStore()

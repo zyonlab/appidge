@@ -22,10 +22,10 @@ struct ConfigFingerprintTests {
         udpPolicy: UDPPolicyDTO = .block,
         ruleSet: RuleSetMessage = RuleSetMessage(assignments: [])
     ) -> String {
-        ConfigFingerprint.compute(
+        ConfigFingerprint.compute(ConfigFingerprint.Input(
             exclusions: exclusions, proxyConfig: proxyConfig, routingMode: routingMode,
             packetCaptureEnabled: packetCapture, udpPolicy: udpPolicy, ruleSet: ruleSet
-        )
+        ))
     }
 
     @Test("同输入恒同指纹(确定性),且是 64 位十六进制(SHA-256)")

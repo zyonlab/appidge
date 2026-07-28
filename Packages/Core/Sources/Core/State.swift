@@ -58,6 +58,10 @@ public struct AppState: Sendable, Equatable {
     /// 绝不推空。恢复完成处/档案重放完成处 dispatch `.configurationReplayCompleted` 开门;
     /// `.resetState` 重新关门(档案重放窗口同样受保护)。运行时状态,不持久化。
     public var isConfigurationReplayComplete: Bool
+    /// 配置指纹**连续失配**次数(对账见 `.configFingerprintReported`)。一致即归零;每次失配都
+    /// 触发全量 resync 自愈,≥3 = resync 也治不好的持续分叉(扩展侧应用失败一类病态),UI/日志
+    /// 可据此升级为显式警告。运行时状态,不持久化。
+    public var configFingerprintMismatchStreak: Int
 
     /// 授权状态机相位（见 ``LicensePhase`` / CLAUDE.md §5.5）。默认未激活。
     /// **和网络接管完全解耦**：授权服务故障绝不影响转发/路由，付费能力只在 `isLicenseActive` 时开放。
@@ -159,6 +163,7 @@ public struct AppState: Sendable, Equatable {
         bundledExtensionVersion: String? = nil,
         isXPCChannelReachable: Bool = true,
         isConfigurationReplayComplete: Bool = false,
+        configFingerprintMismatchStreak: Int = 0,
         licensePhase: LicensePhase = .unlicensed,
         license: LicenseInfo? = nil,
         trialConfig: TrialConfig = .default,
@@ -186,6 +191,7 @@ public struct AppState: Sendable, Equatable {
         self.bundledExtensionVersion = bundledExtensionVersion
         self.isXPCChannelReachable = isXPCChannelReachable
         self.isConfigurationReplayComplete = isConfigurationReplayComplete
+        self.configFingerprintMismatchStreak = configFingerprintMismatchStreak
         self.licensePhase = licensePhase
         self.license = license
         self.trialConfig = trialConfig

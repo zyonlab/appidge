@@ -28,16 +28,22 @@ public final class IPCReceiver {
     private var pendingConnectionEntries: [Core.ConnectionLogEntry] = []
     private var flushTask: Task<Void, Never>?
 
+    /// 排除名单消息里的宿主 app bundle 路径(App 层传 `Bundle.main` 的真实路径)——期望指纹
+    /// 必须与 effectHandler 下发时用的同一个值,否则对账恒失配。测试可注 nil/固定值。
+    private let hostAppBundlePath: String?
+
     public init(
         store: Store,
         transport: any AppSideTransport,
         connectionLogFileStore: ConnectionLogFileStore? = nil,
-        coalesceWindow: Duration = .milliseconds(250)
+        coalesceWindow: Duration = .milliseconds(250),
+        hostAppBundlePath: String? = nil
     ) {
         self.store = store
         self.transport = transport
         self.connectionLogFileStore = connectionLogFileStore
         self.coalesceWindow = coalesceWindow
+        self.hostAppBundlePath = hostAppBundlePath
     }
 
     public func start() async {
@@ -47,8 +53,21 @@ public final class IPCReceiver {
         let enqueue: @MainActor (Core.ConnectionLogEntry) -> Void = { [weak self] entry in
             self?.enqueueConnectionEntry(entry)
         }
+        // 配置对账:指纹上报不走纯映射(需要拿当前 state 算期望指纹再注入 action),在这里
+        // 特殊接线——回主 actor 读 state、算 expected、dispatch 双值 action,比对在 reducer。
+        let reconcile: @MainActor (String) -> Void = { [weak self] reported in
+            guard let self else { return }
+            let expected = ExpectedConfigFingerprint.compute(
+                state: self.store.state, hostAppBundlePath: self.hostAppBundlePath
+            )
+            self.store.dispatch(.configFingerprintReported(reported: reported, expected: expected))
+        }
         let fileStore = connectionLogFileStore
         await transport.startListening { message in
+            if case .configFingerprintReported(let reported) = message {
+                Task { await reconcile(reported) }
+                return
+            }
             let actions = ExtensionMessageHandling.actions(for: message)
             Task {
                 for action in actions {

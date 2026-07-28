@@ -1,5 +1,6 @@
 import Foundation
 import IPCContract
+import os.log
 
 /// 生产路径的真实实现，取代不通的 ``AppGroupAppSideTransport``（App Group UserDefaults +
 /// Darwin 通知——扩展以 root 身份跑，App 以登录用户身份跑，两边解析到的 App Group 容器
@@ -72,10 +73,18 @@ public final class XPCAppSideTransport: NSObject, AppSideTransport, AppXPCProtoc
 
     // MARK: - AppSideTransport
 
+    /// 静默丢弃必须留痕:2026-07-28 的配置分叉考古时,「哪次推送丢了」完全无迹可查——
+    /// ExtDiag 只有收到的,丢掉的这侧从没记过。对账闭环兜底自愈,这条日志负责事后归因。
+    private static let dropLogger = Logger(subsystem: "com.appidge.app", category: "XPCTransport")
+
     public func send(_ message: AppToExtensionMessage) async {
         guard let data = try? JSONEncoder().encode(message) else { return }
-        // 冷却期内拿不到连接:直接丢弃。重连成功后 onConnect → resyncExtension 全量补推,无损。
-        guard let conn = currentConnection() else { return }
+        // 冷却期内/已静默:拿不到连接,丢弃本次发送(重连成功后 onConnect → resync 全量补推;
+        // 对账心跳会暴露任何真的丢了没补上的)。
+        guard let conn = currentConnection() else {
+            Self.dropLogger.warning("app→ext send dropped (cooldown/quiesced); resync-on-reconnect + fingerprint heartbeat will reconcile")
+            return
+        }
         let proxy = conn.remoteObjectProxyWithErrorHandler { _ in
             // 连接错误由 interruptionHandler/invalidationHandler 统一处理（清空存住的
             // connection），下一次 send() 会自动懒重连，这里不需要额外动作。

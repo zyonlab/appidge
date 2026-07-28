@@ -54,6 +54,11 @@ public enum Action: Sendable, Equatable {
     /// 开门前 resync 纯 no-op,防止 XPC 早连的 onConnect resync 把空/半截 state 当期望态推给扩展)。
     /// 由 App 层在恢复重放的最后一步 dispatch,随后紧跟一次 `.resyncExtension`。
     case configurationReplayCompleted
+    /// 配置对账:扩展上报「已落地配置」的指纹(`reported`),接线层(IPCReceiver)在 dispatch 前
+    /// 用当前 state 算好「期望指纹」(`expected`,AppFeature 的 ExpectedConfigFingerprint——Core
+    /// 认不得 wire DTO,故注入而非在 reducer 里算;恢复门没开时为 nil = 不对账)。两者不等 =
+    /// 配置分叉(推送静默丢失/双实例覆盖)→ 全量 resync 自愈 + 连击计数(≥3 = 持续分叉,可升级警告)。
+    case configFingerprintReported(reported: String, expected: String?)
     /// 开/关逐连接抓包(.dmp)。下发给扩展。
     case setPacketCaptureEnabled(Bool)
     /// 设置 proxied 进程的 UDP 处理策略(拦截/直连/SOCKS5 代理)。下发给扩展。

@@ -64,14 +64,46 @@ extension Reducer {
             var state = state
             state.isXPCChannelReachable = reachable
             return (state, [])
+        default:
+            return nil
+        }
+    }
+
+    /// 配置同步(恢复门 + 指纹对账)一组——独立分组保持各组 cyclomatic_complexity 在阈值内。
+    static func reduceConfigSync(_ state: AppState, _ action: Action) -> (AppState, [Effect])? {
+        switch action {
         case .configurationReplayCompleted:
             guard !state.isConfigurationReplayComplete else { return (state, []) }
             var state = state
             state.isConfigurationReplayComplete = true
             return (state, [])
+        case .configFingerprintReported(let reported, let expected):
+            return configFingerprintReported(reported: reported, expected: expected, state)
         default:
             return nil
         }
+    }
+
+    /// 配置对账(第 2 层闭环):`reported` 是扩展上报的已落地配置指纹,`expected` 由接线层用
+    /// 当前 state 注入(恢复门没开为 nil → 不对账)。一致即清连击;失配 = 分叉实锤(推送静默
+    /// 丢失/双实例覆盖),连击 +1 并立刻全量 resync 自愈——上报节奏(防抖/心跳)天然限速,
+    /// reducer 不再叠加自己的限速。resync 幂等,偶发的 in-flight 假失配多推一轮无害。
+    private static func configFingerprintReported(
+        reported: String, expected: String?, _ state: AppState
+    ) -> (AppState, [Effect]) {
+        guard let expected else { return (state, []) }
+        var state = state
+        if reported == expected {
+            guard state.configFingerprintMismatchStreak != 0 else { return (state, []) }
+            state.configFingerprintMismatchStreak = 0
+            return (state, [])
+        }
+        state.configFingerprintMismatchStreak += 1
+        let (_, resyncEffects) = resyncExtension(state)
+        return (state, resyncEffects + [.log(
+            "config fingerprint mismatch #\(state.configFingerprintMismatchStreak): "
+            + "extension=\(reported) expected=\(expected); resyncing"
+        )])
     }
 
     /// 扩展(重新)跑起来 = 新的引擎会话:之前 fail-open 标记的不健康态就此翻篇,恢复健康并把

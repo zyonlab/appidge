@@ -17,15 +17,37 @@ import CryptoKit
 /// - 编码用 JSONEncoder + `.sortedKeys`(键序确定);无浮点字段,跨进程字节确定。
 public enum ConfigFingerprint {
 
-    public static func compute(
-        exclusions: ProcessOriginExclusionMessage,
-        proxyConfig: ProxyConfigMessage?,
-        routingMode: ProxyRoutingModeDTO,
-        packetCaptureEnabled: Bool,
-        udpPolicy: UDPPolicyDTO,
-        ruleSet: RuleSetMessage
-    ) -> String {
-        let config = proxyConfig ?? ProxyConfigMessage(servers: [], activeServerID: nil)
+    /// 六元组入参。默认值 = 「从未收到任何配置」的空形态——扩展侧启动初态与 app 侧空配置
+    /// 指纹相等,首推前的对账不误报方向。
+    public struct Input: Sendable {
+        public var exclusions: ProcessOriginExclusionMessage
+        public var proxyConfig: ProxyConfigMessage?
+        public var routingMode: ProxyRoutingModeDTO
+        public var packetCaptureEnabled: Bool
+        public var udpPolicy: UDPPolicyDTO
+        public var ruleSet: RuleSetMessage
+
+        public init(
+            exclusions: ProcessOriginExclusionMessage = ProcessOriginExclusionMessage(identifiers: []),
+            proxyConfig: ProxyConfigMessage? = nil,
+            routingMode: ProxyRoutingModeDTO = .single,
+            packetCaptureEnabled: Bool = false,
+            udpPolicy: UDPPolicyDTO = .block,
+            ruleSet: RuleSetMessage = RuleSetMessage(assignments: [])
+        ) {
+            self.exclusions = exclusions
+            self.proxyConfig = proxyConfig
+            self.routingMode = routingMode
+            self.packetCaptureEnabled = packetCaptureEnabled
+            self.udpPolicy = udpPolicy
+            self.ruleSet = ruleSet
+        }
+    }
+
+    public static func compute(_ input: Input) -> String {
+        let exclusions = input.exclusions
+        let ruleSet = input.ruleSet
+        let config = input.proxyConfig ?? ProxyConfigMessage(servers: [], activeServerID: nil)
         let canonical = Canonical(
             exclusions: ProcessOriginExclusionMessage(
                 identifiers: exclusions.identifiers.sorted(),
@@ -38,9 +60,9 @@ public enum ConfigFingerprint {
                 servers: config.servers.sorted { $0.id < $1.id },
                 activeServerID: config.activeServerID
             ),
-            routingMode: routingMode,
-            packetCaptureEnabled: packetCaptureEnabled,
-            udpPolicy: udpPolicy,
+            routingMode: input.routingMode,
+            packetCaptureEnabled: input.packetCaptureEnabled,
+            udpPolicy: input.udpPolicy,
             ruleSet: RuleSetMessage(
                 assignments: ruleSet.assignments.sorted { $0.processID.value < $1.processID.value },
                 matchRules: ruleSet.matchRules

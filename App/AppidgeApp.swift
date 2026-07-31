@@ -230,7 +230,7 @@ struct AppidgeApp: App {
                 await restoreRecentConnectionLog()
                 await profilesModel.loadLibrary()
                 // 进入即探测代理环境(系统代理 + 环境变量 + 额外 TUN),UI 据此解释能管哪一层。
-                await detectProxyEnvironment()
+                await EnvironmentSignals.refresh(store: store)
                 // 接线放在两次 restore 之后：restore 本身就是靠重放 processDiscovered/assignRule/
                 // addMatchRule 等"值得存盘"的 action 来灌回状态的,提前接线只会导致启动时又把刚读出来
                 // 的东西原样存回去一次——浪费一次磁盘 I/O,不是错误,但没必要。
@@ -290,6 +290,9 @@ struct AppidgeApp: App {
                         }
                     }
                 }
+                // 环境信号周期对账(30s):代理环境 + 本地代理身份重发现——追「7890 背后监听者
+                // 易主」的唯一路径,动机与实现见 EnvironmentSignals。
+                EnvironmentSignals.startPeriodicRefresh(store: store)
                 // **先查真实状态,再决定要不要激活/起会话**(propertiesRequest 只查询、零 UI):
                 // 扩展被用户在系统设置里**停用**时,activate() 只会打扰、startVPNTunnel 必然失败,
                 // XPC 也无人监听——这种状态下什么都不做,状态栏如实显示「已停用」,把人指向系统
@@ -326,7 +329,8 @@ struct AppidgeApp: App {
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 // 回到前台重探一次代理环境:用户可能刚在系统设置里改了系统代理 / 开关了 yunti。
-                Task { await detectProxyEnvironment() }
+                // 本地代理身份也顺带重发现——切走去换代理软件再切回来是最常见的易主时机。
+                Task { await EnvironmentSignals.refresh(store: store) }
             } else {
                 // 简单的持久化触发点：场景失焦/进后台时落盘一次（覆盖"规则/目录被改过、
                 // app 被关闭或切到后台"的常见路径）。
@@ -362,13 +366,6 @@ struct AppidgeApp: App {
         // .window 而非默认 .menu：内容是「仪表盘」(状态行 + Top-5 列表 + 开关),
         // 需要完整 SwiftUI 排版(语义色 / caption / 对齐),菜单渲染器会把这些收着。
         .menuBarExtraStyle(.window)
-    }
-
-    /// 探测代理环境并回灌 store(reducer 有差分守卫,未变化不产生多余通知)。
-    @MainActor
-    private func detectProxyEnvironment() async {
-        let environment = await SystemProxyEnvironmentProbe().probe()
-        store.dispatch(.proxyEnvironmentDetected(environment))
     }
 
     /// 读 app 包内嵌扩展(`Contents/Library/SystemExtensions/*.systemextension`)的 `CFBundleVersion`
@@ -608,7 +605,7 @@ struct AppidgeApp: App {
             return nil // 结果异步经 IPCReceiver -> diagnosticResultReceived 回灌
         case .applyProxyConfig(let servers, let activeID):
             await transport.send(ProxyConfigMapping.proxyConfigMessage(servers: servers, activeID: activeID))
-            return await Self.resolveProcessOriginExclusions(
+            return await EnvironmentSignals.resolveProcessOriginExclusions(
                 servers: servers, activeID: activeID, using: processIdentityResolver
             )
         case .applyRuleSet(let assignments, let matchRules):
@@ -644,17 +641,4 @@ struct AppidgeApp: App {
         }
     }
 
-    /// applyProxyConfig 下发之后顺带查一次:active 上游若指向本机(如用户配的是本地 xray/yunti),
-    /// 查出它的签名标识 + 可执行文件路径、包成 `.proxyProcessIdentitiesResolved` 供 store 回灌——
-    /// 转发环硬化的「来源进程自动排除」（见 LocalProxyOriginDiscovery）。
-    private static func resolveProcessOriginExclusions(
-        servers: [Core.ProxyServer], activeID: Core.ProxyServerID?, using resolver: any LocalProcessIdentityResolving
-    ) async -> Core.Action {
-        let discoveryState = Core.AppState(
-            proxyServers: Dictionary(uniqueKeysWithValues: servers.map { ($0.id, $0) }),
-            activeProxyServerID: activeID
-        )
-        let discovery = await LocalProxyOriginDiscovery.discover(state: discoveryState, using: resolver)
-        return .proxyProcessIdentitiesResolved(discovery)
-    }
 }

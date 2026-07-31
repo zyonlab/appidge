@@ -261,6 +261,29 @@ struct XPCChannelBrokenBanner: View {
     }
 }
 
+/// TUN 冲突警示条:接管运行中探测到第三方 TUN 虚拟网卡在活跃路由(带 IPv4 的 utun,
+/// 见 Core.AppState.tunnelConflictInterfaces)。双接管层并存时 fake-ip DNS 进黑洞 =
+/// 整机断网(2026-07 Clash Party 真实反馈);但普通 VPN 也是带 IPv4 的 utun,无法做归属
+/// 断言——所以橙色「提醒」+ 可忽略,不自动阻断。
+struct TunnelConflictBanner: View {
+    let interfaces: [String]
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+            Text("检测到其他软件的 TUN 虚拟网卡（\(interfaces.joined(separator: ", "))）正在接管路由。若来自代理软件的 TUN／增强模式，与 appidge 同开可能导致断网——请在该软件中关闭 TUN，仅保留其本地端口作上游；普通 VPN 可忽略。")
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+            Button("忽略", action: onDismiss)
+        }
+        .foregroundStyle(.white)
+        .padding(8)
+        .background(Color.orange)
+    }
+}
+
 /// 主动环检测告警条:贴在主窗口顶部。`internal` 供 MainWindow 引用。
 struct LoopWarningBanner: View {
     let signature: String

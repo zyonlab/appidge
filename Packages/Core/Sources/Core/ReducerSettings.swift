@@ -11,6 +11,11 @@ extension Reducer {
             return loopAutoExclusionsRestored(restored, state)
         case .dismissLoopWarning:
             return dismissLoopWarning(state)
+        case .dismissTunnelConflictWarning:
+            // 只记「当前正在警示」的接口(而非全部 routed)——语义即 UI 所见:忽略我看到的这条。
+            var state = state
+            state.dismissedTunnelInterfaces.formUnion(state.tunnelConflictInterfaces)
+            return (state, [])
         case .resetState:
             // 切档案清运行时/会话状态，但**授权与网络接管解耦**：license 是账号级、非档案级，
             // profile 切换不该把付费状态清掉（Keychain 里那份也还在）。故 license 相位/记录原样带过。

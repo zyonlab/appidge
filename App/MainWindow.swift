@@ -58,6 +58,12 @@ struct MainWindow: View {
                             SystemExtensionActivator.shared.activate()
                             TransparentProxyController.restart()
                         }
+                    } else if !store.state.tunnelConflictInterfaces.isEmpty {
+                        // 第三方 TUN 与 appidge 双接管并存的断网预警(fake-ip DNS 黑洞)。
+                        // 排在环/通道故障之后:那两个是已发生的故障,这个是风险提示。
+                        TunnelConflictBanner(interfaces: store.state.tunnelConflictInterfaces) {
+                            store.dispatch(.dismissTunnelConflictWarning)
+                        }
                     } else if let prompt = approvalPrompt {
                         ExtensionApprovalBanner(text: prompt)
                     }

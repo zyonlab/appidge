@@ -16,6 +16,7 @@
 		22A3DA6409A39E3419084F11 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FEAB61BFC897307C4C2B00D /* main.swift */; };
 		24C1DBFF4621B52825A1FCCA /* EngineKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9A771AE19C7B394D1000B789 /* EngineKit */; };
 		2B4575AB87D6B0C6AA17B41F /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA34ADCCFFBEA044937D573 /* OnboardingView.swift */; };
+		2E70A0E048FDD7413A923B7B /* EnvironmentSignals.swift in Sources */ = {isa = PBXBuildFile; fileRef = 706775126AB10E42358FB400 /* EnvironmentSignals.swift */; };
 		38164F7B624B2901AC7208F6 /* BrandIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44A1CA9827A56CA4EC3E3289 /* BrandIcon.swift */; };
 		3AEE04762DA48819DACBA786 /* UpdaterSessionRelease.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF2786EE264A6D1339E1C750 /* UpdaterSessionRelease.swift */; };
 		401C973E6AB7C68211194E7D /* ProxyExtensionProviderRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2AD25102F3D99F433F9C446 /* ProxyExtensionProviderRouting.swift */; };
@@ -106,6 +107,7 @@
 		6C1DBE5B022F70217A175D0D /* Core */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Core; path = Packages/Core; sourceTree = SOURCE_ROOT; };
 		6DCF5FB636E2A7088A1D6CDF /* TrafficFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrafficFormat.swift; sourceTree = "<group>"; };
 		6FE1FDE2601F854C4AB0FCB4 /* ExtDiag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtDiag.swift; sourceTree = "<group>"; };
+		706775126AB10E42358FB400 /* EnvironmentSignals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvironmentSignals.swift; sourceTree = "<group>"; };
 		7106009A56C24078709224DC /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		7AADB654447DCB49FB372FAE /* AppidgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppidgeApp.swift; sourceTree = "<group>"; };
 		809242278F25BD53EB570961 /* ProxyEnvironmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyEnvironmentView.swift; sourceTree = "<group>"; };
@@ -221,6 +223,7 @@
 				44A1CA9827A56CA4EC3E3289 /* BrandIcon.swift */,
 				9F7A7B0EB0032EB32E342AC4 /* ConnectionsTable.swift */,
 				7106009A56C24078709224DC /* ContentView.swift */,
+				706775126AB10E42358FB400 /* EnvironmentSignals.swift */,
 				9A87A795A5461972CB2EF668 /* ExitIPChecker.swift */,
 				A3B0E63976E8ACBBACCC8C7B /* Info.plist */,
 				5901951F9EA7DCC493280D91 /* Localizable.xcstrings */,
@@ -403,6 +406,7 @@
 				38164F7B624B2901AC7208F6 /* BrandIcon.swift in Sources */,
 				70A50B81E49589C783D3FD3A /* ConnectionsTable.swift in Sources */,
 				5DD53B8CA098AAE20D297B7F /* ContentView.swift in Sources */,
+				2E70A0E048FDD7413A923B7B /* EnvironmentSignals.swift in Sources */,
 				CD510BD7F2C9201A67B92257 /* ExitIPChecker.swift in Sources */,
 				552D5797BCE134EF6D6EE560 /* MainWindow.swift in Sources */,
 				91C491BFD9E3DCBF3A3A4743 /* NWConnectionProxyProbe.swift in Sources */,

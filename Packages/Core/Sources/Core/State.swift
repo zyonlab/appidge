@@ -39,6 +39,9 @@ public struct AppState: Sendable, Equatable {
     /// 进入 / 场景激活时探测到的代理环境(系统代理 + 环境变量 + 额外 TUN)——UI 据此解释
     /// "appidge 能管哪一层、哪些流量会绕过"。运行时状态,不持久化。见 ``ProxyEnvironment``。
     public var proxyEnvironment: ProxyEnvironment
+    /// 用户已「忽略」过的 TUN 冲突警示接口名(见 ``tunnelConflictInterfaces``)。运行时状态,
+    /// 不持久化——重启后冲突若还在,再提醒一次是合理的(与 `dismissedLoopSignatures` 同一取舍)。
+    public var dismissedTunnelInterfaces: Set<String>
     /// **正在服务当前会话的扩展进程**报告的版本(XPC 连上时回报);nil = 还没连上/没回报。
     /// 与 `bundledExtensionVersion` 比对,检测"会话绑在旧 provider 上"的僵尸态(反复热升级后
     /// 系统可能把流量交给待卸载的旧实例 → 黑洞)。运行时状态,不持久化。
@@ -97,6 +100,15 @@ public struct AppState: Sendable, Equatable {
     /// 下发给扩展的两档排除(直连档 = 端口发现;完全旁路档 = 环自愈)。
     public var originExclusionsPush: Effect {
         .applyProcessOriginExclusions(direct: dynamicOriginExclusion, hardBypass: loopAutoExclusions)
+    }
+
+    /// TUN 冲突警示的接口名单(空 = 不显示):接管运行中,且探测到带 IPv4 的第三方 utun
+    /// (见 ``ProxyEnvironment/routedTunnelInterfaces``),排除用户已忽略的。双接管层并存时
+    /// fake-ip DNS 会进黑洞造成整机断网,但正经 VPN 也是带 IPv4 的 utun,所以只提醒不阻断。
+    /// 接管没在跑就不警——没有冲突对象,别打扰。
+    public var tunnelConflictInterfaces: [String] {
+        guard extensionActivation.isRunning else { return [] }
+        return proxyEnvironment.routedTunnelInterfaces.filter { !dismissedTunnelInterfaces.contains($0) }
     }
 
     /// 授权能力是否开放。**只有** licensed/validating/gracePeriod/deactivating 放行——
@@ -159,6 +171,7 @@ public struct AppState: Sendable, Equatable {
         dynamicOriginExclusion: OriginExclusionDiscovery = OriginExclusionDiscovery(),
         loopAutoExclusions: OriginExclusionDiscovery = OriginExclusionDiscovery(),
         proxyEnvironment: ProxyEnvironment = ProxyEnvironment(),
+        dismissedTunnelInterfaces: Set<String> = [],
         runningExtensionVersion: String? = nil,
         bundledExtensionVersion: String? = nil,
         isXPCChannelReachable: Bool = true,
@@ -187,6 +200,7 @@ public struct AppState: Sendable, Equatable {
         self.dynamicOriginExclusion = dynamicOriginExclusion
         self.loopAutoExclusions = loopAutoExclusions
         self.proxyEnvironment = proxyEnvironment
+        self.dismissedTunnelInterfaces = dismissedTunnelInterfaces
         self.runningExtensionVersion = runningExtensionVersion
         self.bundledExtensionVersion = bundledExtensionVersion
         self.isXPCChannelReachable = isXPCChannelReachable

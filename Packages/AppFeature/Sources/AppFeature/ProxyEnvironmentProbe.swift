@@ -65,17 +65,32 @@ public enum ProxyEnvironmentKeys {
     public static let all = ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]
 }
 
+/// utun 分类的纯逻辑(getifaddrs 的枚举本身不可测,判定单独拆出可测):
+/// 同名 utun 任一地址是 IPv4 即算「活跃路由」——系统自带的 utun0-3 只有 IPv6 link-local,
+/// 带 IPv4 的基本是第三方 VPN/TUN 在实际抢流量(Clash 系 fake-ip TUN 典型是 198.18.0.1)。
+public enum TunnelInterfaceClassifier {
+    public static func routedTunnels(_ entries: [(name: String, hasIPv4: Bool)]) -> [String] {
+        var routed: Set<String> = []
+        for entry in entries where entry.name.hasPrefix("utun") && entry.hasIPv4 {
+            routed.insert(entry.name)
+        }
+        return routed.sorted()
+    }
+}
+
 /// 真实探测:系统代理走 `CFNetworkCopySystemProxySettings`,环境变量读自身进程,
 /// TUN 接口枚举 `getifaddrs` 里的 `utun*`。不在自动化测试里跑(需真实系统 API);解析逻辑
-/// 已在 `SystemProxyParser` / `ProxyEnvironmentKeys` 里单独可测。
+/// 已在 `SystemProxyParser` / `ProxyEnvironmentKeys` / `TunnelInterfaceClassifier` 里单独可测。
 public struct SystemProxyEnvironmentProbe: ProxyEnvironmentProbing {
     public init() {}
 
     public func probe() async -> Core.ProxyEnvironment {
-        Core.ProxyEnvironment(
+        let interfaces = currentInterfaceSnapshot()
+        return Core.ProxyEnvironment(
             systemProxy: currentSystemProxy(),
             environmentVariables: currentEnvironmentProxyKeys(),
-            extraTunnelInterfaces: currentTunnelInterfaces()
+            extraTunnelInterfaces: Set(interfaces.filter { $0.name.hasPrefix("utun") }.map(\.name)).sorted(),
+            routedTunnelInterfaces: TunnelInterfaceClassifier.routedTunnels(interfaces)
         )
     }
 
@@ -94,20 +109,22 @@ public struct SystemProxyEnvironmentProbe: ProxyEnvironmentProbing {
         return ProxyEnvironmentKeys.all.filter { env[$0]?.isEmpty == false }
     }
 
-    private func currentTunnelInterfaces() -> [String] {
-        var names: Set<String> = []
+    /// getifaddrs 全量快照:每条地址一项(接口名 + 是否 IPv4)。utun 过滤与活跃判定
+    /// 交给可测的 `TunnelInterfaceClassifier`。
+    private func currentInterfaceSnapshot() -> [(name: String, hasIPv4: Bool)] {
+        var entries: [(name: String, hasIPv4: Bool)] = []
         var ptr: UnsafeMutablePointer<ifaddrs>?
         guard getifaddrs(&ptr) == 0 else { return [] }
         defer { freeifaddrs(ptr) }
         var cursor = ptr
         while let current = cursor {
             if let namePtr = current.pointee.ifa_name {
-                let name = String(cString: namePtr)
-                if name.hasPrefix("utun") { names.insert(name) }
+                let family = current.pointee.ifa_addr?.pointee.sa_family
+                entries.append((String(cString: namePtr), family == sa_family_t(AF_INET)))
             }
             cursor = current.pointee.ifa_next
         }
-        return names.sorted()
+        return entries
     }
 }
 

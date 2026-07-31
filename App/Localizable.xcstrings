@@ -832,6 +832,16 @@
         }
       }
     },
+    "检测到其他软件的 TUN 虚拟网卡（%@）正在接管路由。若来自代理软件的 TUN／增强模式，与 appidge 同开可能导致断网——请在该软件中关闭 TUN，仅保留其本地端口作上游；普通 VPN 可忽略。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Another app's TUN virtual interface (%@) is actively routing traffic. If it comes from a proxy app's TUN/enhanced mode, running it alongside appidge may cut off networking — turn off TUN in that app and keep only its local port as the upstream. A regular VPN can be ignored."
+          }
+        }
+      }
+    },
     "检测到疑似转发环：%@ 被反复捕获，已自动将来源进程旁路直连（见 设置 → 内置规则）。若仍反复出现，请检查上游 / 规则是否形成回路。": {
       "localizations": {
         "en": {

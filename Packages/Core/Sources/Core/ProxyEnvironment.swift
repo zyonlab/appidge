@@ -26,15 +26,23 @@ public struct ProxyEnvironment: Sendable, Equatable, Codable {
     /// 额外的 utun 网络接口名(除 appidge 自己的)——可能是其它 VPN/TUN 型代理(某些 yunti/Clash
     /// TUN 模式)在 IP 层抢流量。best-effort 提示,不做归属断言。
     public var extraTunnelInterfaces: [String]
+    /// `extraTunnelInterfaces` 中**带 IPv4 地址**的子集——系统自带的 utun0-3 只有 IPv6
+    /// link-local,带 IPv4 的 utun 基本是第三方 VPN/TUN 在实际路由流量(Clash 系 fake-ip TUN
+    /// 典型是 198.18.0.1)。与 appidge 接管并存会形成双接管层,fake-ip DNS 进黑洞 = 整机断网
+    /// (2026-07 Clash Party 真实反馈),UI 据此出冲突警示。仍是 best-effort:正经 VPN 也带
+    /// IPv4,所以只「提醒」不阻断。
+    public var routedTunnelInterfaces: [String]
 
     public init(
         systemProxy: SystemProxy = .none,
         environmentVariables: [String] = [],
-        extraTunnelInterfaces: [String] = []
+        extraTunnelInterfaces: [String] = [],
+        routedTunnelInterfaces: [String] = []
     ) {
         self.systemProxy = systemProxy
         self.environmentVariables = environmentVariables
         self.extraTunnelInterfaces = extraTunnelInterfaces
+        self.routedTunnelInterfaces = routedTunnelInterfaces
     }
 
     /// 是否存在"会绕过 appidge 的层":有系统代理、或设了环境变量、或有额外 TUN 接口。

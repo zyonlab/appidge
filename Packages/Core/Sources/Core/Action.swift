@@ -47,6 +47,9 @@ public enum Action: Sendable, Equatable {
     case loopAutoExclusionsRestored(OriginExclusionDiscovery)
     /// 用户关闭环告警。
     case dismissLoopWarning
+    /// 用户忽略 TUN 冲突警示——记下**当前**警示的接口名(见 `dismissedTunnelInterfaces`),
+    /// 之后新出现的 utun 接口照常再警。
+    case dismissTunnelConflictWarning
     /// 把 state 清回初始值(切换配置档案时用:先 reset 再 dispatch 新档案的 restorationActions,
     /// 干净替换而非叠加)。运行时/会话状态(进程、连接日志等)一并清掉是预期的。
     case resetState

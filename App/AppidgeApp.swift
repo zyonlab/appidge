@@ -279,17 +279,9 @@ struct AppidgeApp: App {
                 // 语言切换时前任可能刚好把接班者起的会话停掉（NE 配置按 app 全局一份），
                 // 交接标记只是让这件事不再发生，这里才是兜底。判定是 Core 纯函数、可反复评估。
                 superviseSession()
-                // 周期性时钟推进：本地判定宽限耗尽/订阅到期（防时钟回拨），到期则每日联网校验一次。
-                Task { @MainActor in
-                    while !Task.isCancelled {
-                        try? await Task.sleep(nanoseconds: 3_600_000_000_000) // 1 小时
-                        let now = Date()
-                        store.dispatch(.licenseClockTick(now: now))
-                        if store.state.isValidateDue(now: now) {
-                            store.dispatch(.licenseValidateRequested(now: now))
-                        }
-                    }
-                }
+                // 周期性时钟推进：本地判定宽限耗尽/订阅到期（防时钟回拨），到期则每日联网
+                // 校验一次。幂等闸防窗口重开叠加,见 LicenseClock。
+                LicenseClock.startHourlyTicks(store: store)
                 // 环境信号周期对账(30s):代理环境 + 本地代理身份重发现——追「7890 背后监听者
                 // 易主」的唯一路径,动机与实现见 EnvironmentSignals。
                 EnvironmentSignals.startPeriodicRefresh(store: store)

@@ -13,6 +13,7 @@
 		13292EF7F746994DDBF9B5FE /* TrafficFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DCF5FB636E2A7088A1D6CDF /* TrafficFormat.swift */; };
 		15D73A23468FD91F05399114 /* AppMenuCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = D691CAC126FD68DFD5F6FB1C /* AppMenuCommands.swift */; };
 		1C633C2681666F15F4C8B805 /* TransparentProxyController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 299CCCC8304EDC13E69F6A38 /* TransparentProxyController.swift */; };
+		224DD19B5F1BEECF25BC14E6 /* LicenseClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28BEBC8B1D2F12F3CFAD7E6A /* LicenseClock.swift */; };
 		22A3DA6409A39E3419084F11 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FEAB61BFC897307C4C2B00D /* main.swift */; };
 		24C1DBFF4621B52825A1FCCA /* EngineKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9A771AE19C7B394D1000B789 /* EngineKit */; };
 		2B4575AB87D6B0C6AA17B41F /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA34ADCCFFBEA044937D573 /* OnboardingView.swift */; };
@@ -92,6 +93,7 @@
 		199BAC5919441EDC3576E476 /* StatusBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBar.swift; sourceTree = "<group>"; };
 		1DA718340F1304A9F6ECF582 /* NWConnectionProxyProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NWConnectionProxyProbe.swift; sourceTree = "<group>"; };
 		257879ACD351793C947FA841 /* TrialUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrialUI.swift; sourceTree = "<group>"; };
+		28BEBC8B1D2F12F3CFAD7E6A /* LicenseClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LicenseClock.swift; sourceTree = "<group>"; };
 		299CCCC8304EDC13E69F6A38 /* TransparentProxyController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransparentProxyController.swift; sourceTree = "<group>"; };
 		2ECAC6131EAF25435DC2EF53 /* AppLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLinks.swift; sourceTree = "<group>"; };
 		30697183A781221EDE913CB6 /* EngineKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = EngineKit; path = Packages/EngineKit; sourceTree = SOURCE_ROOT; };
@@ -226,6 +228,7 @@
 				706775126AB10E42358FB400 /* EnvironmentSignals.swift */,
 				9A87A795A5461972CB2EF668 /* ExitIPChecker.swift */,
 				A3B0E63976E8ACBBACCC8C7B /* Info.plist */,
+				28BEBC8B1D2F12F3CFAD7E6A /* LicenseClock.swift */,
 				5901951F9EA7DCC493280D91 /* Localizable.xcstrings */,
 				82D18B41BB8F2680C6E5F6B9 /* MainWindow.swift */,
 				1DA718340F1304A9F6ECF582 /* NWConnectionProxyProbe.swift */,
@@ -408,6 +411,7 @@
 				5DD53B8CA098AAE20D297B7F /* ContentView.swift in Sources */,
 				2E70A0E048FDD7413A923B7B /* EnvironmentSignals.swift in Sources */,
 				CD510BD7F2C9201A67B92257 /* ExitIPChecker.swift in Sources */,
+				224DD19B5F1BEECF25BC14E6 /* LicenseClock.swift in Sources */,
 				552D5797BCE134EF6D6EE560 /* MainWindow.swift in Sources */,
 				91C491BFD9E3DCBF3A3A4743 /* NWConnectionProxyProbe.swift in Sources */,
 				2B4575AB87D6B0C6AA17B41F /* OnboardingView.swift in Sources */,

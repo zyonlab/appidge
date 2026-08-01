@@ -85,6 +85,7 @@ ops/bin/appidge-ops release staging --apply --build-number <N>   # staging 一�
 | `ops/README.md` | staging/production 双环境部署与发布 runbook |
 | `docs/commercialization-status.md` | 商业化阶段历史证据存档（勾选为当时状态） |
 | `docs/polar-integration.md` | ⚠️ 已废弃（Polar 方案，仅历史参考） |
+| `docs/experience-playbook.md` | 开发经验手册：macOS 出包、NE 转发坑、Creem、Cloudflare 免费层（可迁移） |
 
 ## 秘密与安全边界
 

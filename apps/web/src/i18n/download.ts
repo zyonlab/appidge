@@ -8,6 +8,9 @@ export interface DownloadCopy {
   intro: string;
   ctaDownload: string;
   ctaBuy: string;
+  /** Clash 类客户端 TUN 冲突提示(CTA 下方的兼容性 callout)。 */
+  tunNoticeTitle: string;
+  tunNoticeBody: string;
   requirementsTitle: string;
   requirements: string[];
   installTitle: string;
@@ -27,6 +30,9 @@ export const download: Record<'zh' | 'en', DownloadCopy> = {
       'Appidge 是 macOS 应用。下载和购买是两回事：先装上试试，确认那些一直连不上的软件都通了，再买许可证解锁。',
     ctaDownload: '下载 App（macOS）',
     ctaBuy: '购买许可证',
+    tunNoticeTitle: '正在使用 Clash 类代理客户端？',
+    tunNoticeBody:
+      '使用 Appidge 前，请先关闭客户端（如 Clash Party、Clash Verge、mihomo）的 TUN／虚拟网卡／增强模式，只保留本地监听端口（如 127.0.0.1:7890），再在 Appidge 里把它添加为上游代理。TUN 与 Appidge 都会整机接管流量，同时开启会相互冲突，可能导致断网；关闭 TUN 不影响节点与订阅正常使用。',
     requirementsTitle: '系统要求',
     requirements: [
       'macOS 桌面系统。',
@@ -52,6 +58,9 @@ export const download: Record<'zh' | 'en', DownloadCopy> = {
       'Appidge is a macOS app. Download and purchase are separate steps: install it, see whether the apps that never connect finally do, then unlock it with a license.',
     ctaDownload: 'Download for macOS',
     ctaBuy: 'Buy a license',
+    tunNoticeTitle: 'Using a Clash-style proxy client?',
+    tunNoticeBody:
+      'Before using Appidge, turn off the client’s TUN / virtual-interface / enhanced mode (Clash Party, Clash Verge, mihomo, etc.) and keep only its local listening port (e.g. 127.0.0.1:7890), then add it as an upstream proxy in Appidge. TUN and Appidge both take over traffic system-wide; running them together conflicts and can cut off networking. Turning TUN off does not affect your nodes or subscriptions.',
     requirementsTitle: 'System requirements',
     requirements: [
       'macOS (desktop).',

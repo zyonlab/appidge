@@ -18,7 +18,7 @@ const { t } = Astro.props;
     <div class="faq-list">
       {
         t.items.map((item) => (
-          <details>
+          <details open={item.open}>
             <summary>{item.q}</summary>
             <p class="a" set:html={item.aHtml} />
           </details>

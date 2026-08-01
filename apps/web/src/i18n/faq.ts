@@ -5,18 +5,24 @@ export interface FaqCopy {
   metaDescription: string;
   eyebrow: string;
   h2: string;
-  /** aHtml 允许内链与强调标记。 */
-  items: { q: string; aHtml: string }[];
+  /** aHtml 允许内链与强调标记；open 为真时该条默认展开。 */
+  items: { q: string; aHtml: string; open?: boolean }[];
 }
 
 export const faq: Record<'zh' | 'en', FaqCopy> = {
   zh: {
     title: '常见问题',
     metaDescription:
-      'Appidge 常见问题：为什么开了全局代理有些软件还是不走代理、支持哪些代理方式、是不是 VPN、和 Clash/Surge 会不会冲突、和 Proxifier 的区别、试用与激活、离线宽限、退款。',
+      'Appidge 常见问题：能不能开 Clash 的 TUN/虚拟网卡/增强模式、为什么开了全局代理有些软件还是不走代理、支持哪些代理方式、是不是 VPN、和 Clash/Surge 会不会冲突、和 Proxifier 的区别、试用与激活、离线宽限、退款。',
     eyebrow: 'FAQ',
     h2: '常见问题',
     items: [
+      {
+        q: '能开启 Clash 类客户端的 TUN／虚拟网卡／增强模式吗？',
+        open: true,
+        aHtml:
+          '<strong>不能，使用 Appidge 时请关闭这类开关。</strong>TUN／虚拟网卡／增强模式和 Appidge 一样是整机接管流量：两个接管层同时开启会互相抢流量，DNS 查询容易被截进对方的虚拟网卡出不来，典型表现就是整机断网。正确用法是关闭 TUN、只保留代理客户端的本地监听端口（如 127.0.0.1:7890），再到 Appidge 的「代理」页把它添加为上游——接管和按进程分流交给 Appidge，节点与订阅照常由你的代理客户端提供，互不影响。',
+      },
       {
         q: '为什么开了全局代理，有些软件还是不走代理？',
         aHtml:
@@ -35,7 +41,7 @@ export const faq: Record<'zh' | 'en', FaqCopy> = {
       {
         q: '会和 Clash、Surge 这些代理软件冲突吗？',
         aHtml:
-          '不会，它们是搭配着用的。你的代理软件负责出站，Appidge 负责决定哪个进程的哪个连接交给它。代理软件自己的流量会被自动识别放行，不会绕回自己变成死循环。',
+          '不会，它们是搭配着用的。你的代理软件负责出站，Appidge 负责决定哪个进程的哪个连接交给它。代理软件自己的流量会被自动识别放行，不会绕回自己变成死循环。唯一要注意的是关闭它们的 TUN／虚拟网卡／增强模式（见第一条）。',
       },
       {
         q: '和 Proxifier 有什么区别？',
@@ -67,10 +73,16 @@ export const faq: Record<'zh' | 'en', FaqCopy> = {
   en: {
     title: 'FAQ',
     metaDescription:
-      'Appidge FAQ: why some apps bypass your system-wide proxy, which proxy setups are supported, whether it is a VPN, how it works alongside Clash and Surge, how it compares to Proxifier, trial and activation, offline grace period, and refunds.',
+      'Appidge FAQ: whether TUN / enhanced mode can stay on in Clash-style clients, why some apps bypass your system-wide proxy, which proxy setups are supported, whether it is a VPN, how it works alongside Clash and Surge, how it compares to Proxifier, trial and activation, offline grace period, and refunds.',
     eyebrow: 'FAQ',
     h2: 'Frequently asked questions',
     items: [
+      {
+        q: 'Can I keep TUN / virtual-interface / enhanced mode on in Clash-style clients?',
+        open: true,
+        aHtml:
+          '<strong>No — turn it off while using Appidge.</strong> TUN / virtual-interface / enhanced mode takes over traffic system-wide, exactly like Appidge does. With two takeover layers active they fight over the same traffic, and DNS queries easily get trapped inside the other side’s virtual interface — the typical symptom is losing connectivity entirely. The right setup: turn TUN off, keep only the client’s local listening port (e.g. 127.0.0.1:7890), and add it as an upstream proxy on Appidge’s Proxy page. Appidge handles interception and per-process routing; your client keeps providing nodes and subscriptions as usual.',
+      },
       {
         q: 'Why do some apps bypass my system-wide proxy?',
         aHtml:
@@ -89,7 +101,7 @@ export const faq: Record<'zh' | 'en', FaqCopy> = {
       {
         q: 'Will it conflict with Clash or Surge?',
         aHtml:
-          'No — they work together. Your proxy client handles the outbound leg; Appidge decides which process’s connections to hand to it. Your proxy’s own traffic is recognized and passed through, so nothing loops back on itself.',
+          'No — they work together. Your proxy client handles the outbound leg; Appidge decides which process’s connections to hand to it. Your proxy’s own traffic is recognized and passed through, so nothing loops back on itself. The one thing to switch off is their TUN / virtual-interface / enhanced mode (see the first question).',
       },
       {
         q: 'How is it different from Proxifier?',

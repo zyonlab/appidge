@@ -1972,6 +1972,23 @@ h2 {
   margin-top: 0;
 }
 
+/* 警示变体(下载区 TUN 冲突提示):橙色警示底,字号小于正文一档。 */
+.callout.warn {
+  border-color: rgba(231, 114, 59, 0.35);
+  background: rgba(231, 114, 59, 0.07);
+  font-size: 14px;
+}
+
+.callout.warn h3 {
+  font-size: 15px;
+  margin-bottom: 8px;
+}
+
+.callout.warn p {
+  color: var(--muted);
+  line-height: 1.75;
+}
+
 .callout p:last-child,
 .callout ul:last-child {
   margin-bottom: 0;

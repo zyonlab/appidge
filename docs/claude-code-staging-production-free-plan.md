@@ -5,6 +5,9 @@
 > 基线提交：`3bf9522d219b78984a2569d4cf6c78543b2e7a31`
 >
 > 方案：方案 A——两个环境使用相同 macOS Bundle ID、App Group、系统扩展 ID 和签名身份，只隔离网络入口、云资源、Polar 环境和更新通道。
+>
+> **时效更正（2026-08-01）**：MoR 已切回 **Creem**（Polar 废弃）。文中「Polar」按 Creem 理解：
+> Sandbox → Creem test 模式（`test-api.creem.io`），Live → Creem 生产；基线见 `docs/creem-integration.md`。
 > 配套分析：[`environment-release-operations-assessment.md`](environment-release-operations-assessment.md)
 
 ## 0. 给 Claude Code 的直接指令

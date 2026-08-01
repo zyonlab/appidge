@@ -7,15 +7,12 @@
 > `docs/commercialization-status.md` 的勾选状态由主 Agent 维护；本文件只提供可复现命令 + PASS/FAIL + 输出证据。
 > 全程 **MOCK_MODE**，不触真实支付服务商 / 生产 Cloudflare / 真实支付 / 真实 NE 流量。
 
-> **支付服务商迁移中：Creem → Polar.sh（Merchant of Record）。**
-> 官网（`apps/web`）已切换到 Polar Hosted Checkout（`PUBLIC_POLAR_CHECKOUT_URL`）。
-> **本文以下的证据与 runbook 记录的是 `apps/api` 迁移前的 Creem-based MOCK 运行**——其中的环境变量名
-> （`CREEM_API_KEY` / `CREEM_WEBHOOK_SECRET` / `CREEM_API_BASE` / `CREEM_PRODUCT_ID`）、请求头
-> （`creem-signature`）、上游端点（`test-api.creem.io`）、webhook 路由（`/v1/webhooks/creem`）、
-> 事件名（`checkout.completed` / `refund.created`）、fixture 路径（`contracts/fixtures/creem/`）、
-> token 前缀（`creem_test_` / `whsec_`）等，均属 `apps/api` / `contracts` 技术契约，**由对应 owner 迁移**。
-> 迁移到 Polar 后，上述技术标识需按 Polar 实际 API 重新核实并复跑本文证据：`TODO(polar): 待核实`。
-> 为避免伪造 `apps/api` 尚未完成的迁移，本文不改写这些技术标识与已捕获的运行输出。
+> **时效更正（2026-08-01）**：当时计划的「Creem → Polar 迁移」已于 2026-07-24 中止，license 后端
+> **切回并保持 Creem**（现行基线 = `docs/creem-integration.md`）。本文记录的 Creem-based MOCK 运行
+> 证据——环境变量名（`CREEM_API_KEY` / `CREEM_WEBHOOK_SECRET` / `CREEM_API_BASE` / `CREEM_PRODUCT_ID`）、
+> 请求头（`creem-signature`）、上游端点（`test-api.creem.io`）、webhook 路由（`/v1/webhooks/creem`）、
+> 事件名（`checkout.completed` / `refund.created`）、fixture 路径（`contracts/fixtures/creem/`）——
+> 与 `apps/api` 现行实现一致，**证据继续有效**，原「TODO(polar) 待核实」不再适用。
 
 - 分支：`feat/integration-qa`（基于 `feat/commercialization-monorepo` 尖端 `2061592`）
 - 日期：2026-07-21

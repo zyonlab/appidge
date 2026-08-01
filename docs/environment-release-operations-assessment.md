@@ -3,6 +3,9 @@
 > 梳理日期：2026-07-23  
 > 基线提交：`3bf9522d219b78984a2569d4cf6c78543b2e7a31`  
 > 范围：只分析仓库内现状，不验证 Cloudflare、Polar、Apple Developer 后台的实时状态，不执行部署。
+>
+> **时效更正（2026-08-01）**：MoR 已切回 **Creem**（Polar 废弃），文中「Polar」（License API/
+> Hosted Checkout/sandbox 等）一律按 Creem 对应物理解，现行基线见 `docs/creem-integration.md`。
 
 ## 1. 结论摘要
 

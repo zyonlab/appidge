@@ -2,8 +2,11 @@
 
 > 拒付 = 持卡人绕过你、直接找发卡银行强制撤单。一笔 $9.99 拒付实际损失 ≈ 货款 $9.99 + 原手续费 $0.79（不退）+ 约 $25 拒付罚金 ≈ **$35（售价 3.5 倍）**；更严重的是**拒付率**（拒付笔数÷交易笔数）超 ~1% 会触发卡组织罚款 + Polar 限制/冻结账户。
 > **头号策略：把退款做得足够顺畅，让人懒得去银行拒付。** 预防 >> 事后抗辩。
-> 背景与平台风险见 [[polar-integration]] 与 `docs/polar-risk-assessment.md`（如有）。
-> 注：webhook 事件名、Polar 退款/拒付后是否自动 disable license 等**技术行为**以 `apps/api` 迁移实测为准，本文标 `TODO(polar): 待核实` 者不臆造。
+> **时效更正（2026-08-01）**：MoR 已于 2026-07-24 切回 **Creem**（Polar 方案废弃），文中「Polar」
+> 一律按 Creem Dashboard/机制理解，技术基线见 `docs/creem-integration.md`。原「TODO(polar) 待核实」
+> 两项已有 Creem 实测答案（2026-07-21/22）：① 拒付/退款 webhook 事件 = `dispute.created` /
+> `refund.created`，**均不带 license key**；② 退款/拒付**不会**自动 disable license——必须在
+> Dashboard 处理的同时**手动 disable 该 license**，App 每日 validate 才会锁定。这条人工步骤是硬依赖。
 
 ## A. 减少拒付动机（最有效）
 

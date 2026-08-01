@@ -9,11 +9,12 @@
 
 最后更新：2026-07-21（Phase 1 地基 + Wave 1 三 Agent 并行集成完成）
 
-> **支付服务商迁移中：Creem → Polar.sh（Merchant of Record，代收款 + 代缴税）。**
-> 官网（`apps/web`）已完成切换：结账走 Polar Hosted Checkout Link，环境变量已改名
-> `PUBLIC_POLAR_CHECKOUT_URL`。`apps/api`（Worker facade / webhook / D1）与契约的迁移由对应
-> owner 负责，尚未完成——下文历史记录中仍出现的 Creem，以及 API key/webhook secret/token 前缀/
-> 环境变量名等技术标识，均以 `apps/api` 实际迁移结果为准，本文标 `TODO(polar): 待核实` 者不臆造。
+> **时效更正（2026-08-01）**：上一段所述「Creem → Polar 迁移」已于 2026-07-24 **中止并整体切回
+> Creem**（`docs/polar-integration.md` 废弃，现行基线 = `docs/creem-integration.md`）。下文历史记录里的
+> Creem 技术标识（`CREEM_*` 变量、`creem-signature`、`/v1/webhooks/creem`、fixtures 路径等）即当前现实；
+> 文中「Polar」与 `TODO(polar)` 字样是迁移期残留，一律按 Creem 对应物理解，不再逐条核实。
+> 唯一存留的 Polar 痕迹：官网支付链接环境变量名仍叫 `PUBLIC_POLAR_CHECKOUT_URL`（值是 Creem 链接，
+> 已登记技术债，见 `docs/creem-integration.md` §8）。
 
 ## 图例
 - [x] 已自动验证（有命令+输出）

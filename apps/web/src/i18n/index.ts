@@ -64,6 +64,7 @@ export const ui = {
       product: '产品',
       support: '支持',
       legal: '法律',
+      blog: '博客',
       privacy: '隐私政策',
       terms: '服务条款',
       dataUsage: '数据使用',
@@ -97,6 +98,8 @@ export const ui = {
       product: 'Product',
       support: 'Support',
       legal: 'Legal',
+      // 博客 v1 只有中文，所以英文侧标注语言，不假装有英文版。
+      blog: 'Blog (中文)',
       privacy: 'Privacy Policy',
       terms: 'Terms of Service',
       dataUsage: 'Data Usage',

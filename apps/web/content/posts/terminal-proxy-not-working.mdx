@@ -1,0 +1,105 @@
+---
+title: 终端里代理不生效：pip、npm、go、cargo 各认各的
+description: 终端里没有「系统代理」这回事。每个工具各读各的配置，而且读的还不是同一套键。
+slug: terminal-proxy-not-working
+pubDate: 2026-08-05
+category: troubleshooting
+series: why-not-proxied
+seriesOrder: 2
+tags: [macOS, 命令行, 代理, 排障]
+---
+
+终端里没有「系统代理」这回事。
+
+你在系统设置里填的那个地址，命令行工具**一个都不会去读**（原因见
+[为什么有些软件根本不走系统代理](/zh/blog/writing/why-some-apps-ignore-system-proxy/)）。
+它们各读各的配置，而且读的还不是同一套键 —— 这就是为什么你「配好了」之后，
+有的命令通了、有的还是超时。
+
+## 各家认什么
+
+| 工具 | 认环境变量 | 也认自己的配置 |
+| --- | --- | --- |
+| `curl` | `http_proxy` / `https_proxy`（**小写**） | `~/.curlrc` |
+| `git` | `http_proxy` / `https_proxy` | `git config --global http.proxy` |
+| `pip` | `http_proxy` / `https_proxy` | `pip.conf` 的 `proxy=`，或 `--proxy` |
+| `npm` | `http_proxy` / `https_proxy` | `.npmrc` 的 `proxy` 和 **`https-proxy`**（连字符，不是下划线） |
+| `cargo` | `http_proxy` / `https_proxy` | `.cargo/config.toml` 的 `[http] proxy` |
+| Go 程序 | `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY`（大小写都认） | 无统一配置 |
+| Homebrew | 底层是 `curl`，跟着环境变量走 | `HOMEBREW_*` 系列变量 |
+
+看这张表最该记住的一件事：**配置项的名字和环境变量的名字经常不一样**。
+`npm` 的是 `https-proxy`，写成 `https_proxy` 放进 `.npmrc` 不会报错，
+它只是不生效 —— 静默失败，最难查的那种。
+
+## 三个最常见的失效原因
+
+### 一、`export` 的作用域比你以为的小
+
+`export https_proxy=...` 只对**当前这个 shell 会话**有效。新开一个终端标签页、
+新开一个 tmux window、编辑器里的集成终端，都是新的会话，都没有它。
+
+要长期生效就写进 `~/.zshrc`；只想让这一条命令走代理，就写在命令前面：
+
+```bash
+https_proxy=http://127.0.0.1:7890 pip install requests
+```
+
+### 二、`sudo` 会把环境变量丢掉
+
+这条最容易让人怀疑人生：同一条命令，不加 `sudo` 通，加了 `sudo` 就超时。
+
+`sudo` 出于安全考虑默认会清掉大部分环境变量，你的 `https_proxy` 正在被清的那批里。
+要保留就用 `-E`：
+
+```bash
+sudo -E npm install -g something
+```
+
+### 三、`GOPROXY` 不是代理
+
+这个名字骗了很多人。`GOPROXY` 指的是 **Go 模块镜像**，是一个专门分发模块的 HTTP 服务，
+和「把流量转发出去的代理」是两码事。
+
+把 `GOPROXY` 设成你的本地代理端口，只会让 `go mod download` 去那个端口找模块、
+然后失败。Go 程序真正认的是 `HTTPS_PROXY`。
+
+同一类误会还有 `npm config set registry`（换镜像源）—— 换源和走代理是两件事，
+换源不需要代理也能用，但它只解决 registry 这一个域名。
+
+## 怎么定位
+
+先确认代理本身是通的：
+
+```bash
+https_proxy=http://127.0.0.1:7890 curl -I https://example.com
+```
+
+这条不通，问题在代理，不在工具。这条通了再往下走。
+
+然后把同一条环境变量加到出问题的命令前面。加了就通，说明它认环境变量，
+之前只是没被它看见（作用域、`sudo`、或者写进了错的配置文件）。
+
+加了还是不通，说明真正发请求的**不是你启动的这个进程**。构建工具尤其常见：
+`npm install` 会拉起 `node-gyp`，后者可能再拉起别的下载器；到那一层，
+你的环境变量还在不在就不好说了。
+
+## 解法与代价
+
+**一条条配。** 把每个工具的配置文件都填对。最省事，也最脆弱 —— 换台机器、
+换个工具、或者某个工具升级后改了配置项名字，就得重来一遍。而且对上面第三种情况
+（子进程自己发请求）无解。
+
+**按进程接管。** 在系统网络层把某个进程（连同它拉起的子进程）的连接拦下来，
+按规则转发给你已经在跑的上游。工具认不认环境变量不再重要。
+Appidge 做的是这件事 —— 它不带任何节点，出口仍是你自己配的那个上游。
+代价是要装一个系统扩展。
+
+**上 TUN。** 全机流量都接过去，肯定能管住子进程。代价是改路由表、接管 DNS，
+崩了整机断网。
+
+---
+
+下一篇讲容器：`docker pull` 卡住是另一回事，因为拉取动作根本不发生在你这台
+macOS 上。整个系列在[「为什么这个软件不走代理」](/zh/blog/series/why-not-proxied/)，
+其余排查文章在[排查主题](/zh/blog/topics/troubleshooting/)下。

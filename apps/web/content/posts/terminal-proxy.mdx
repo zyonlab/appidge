@@ -1,7 +1,7 @@
 ---
 title: 终端里代理不生效：pip、npm、go、cargo 各认各的
 description: 终端里没有「系统代理」这回事。每个工具各读各的配置，而且读的还不是同一套键。
-slug: terminal-proxy-not-working
+slug: terminal-proxy
 pubDate: 2026-08-05
 category: troubleshooting
 series: why-not-proxied
@@ -12,7 +12,7 @@ tags: [macOS, 命令行, 代理, 排障]
 终端里没有「系统代理」这回事。
 
 你在系统设置里填的那个地址，命令行工具**一个都不会去读**（原因见
-[为什么有些软件根本不走系统代理](/zh/blog/writing/why-some-apps-ignore-system-proxy/)）。
+[为什么有些软件根本不走系统代理](/zh/blog/writing/apps-ignore-system-proxy/)）。
 它们各读各的配置，而且读的还不是同一套键 —— 这就是为什么你「配好了」之后，
 有的命令通了、有的还是超时。
 

@@ -1,7 +1,7 @@
 ---
 title: 开了 TUN 之后整机断网：两个接管层在抢同一份流量
 description: TUN / 虚拟网卡 / 增强模式和按进程接管都是整机级的。两个同时开，DNS 容易被截进对方的网卡里出不来。
-slug: tun-conflict-network-down
+slug: tun-conflict
 pubDate: 2026-08-05
 category: troubleshooting
 series: why-not-proxied
@@ -91,6 +91,6 @@ Wi-Fi 关掉再开，逼系统重新拿一遍网络配置。
 
 这是[「为什么这个软件不走代理」](/zh/blog/series/why-not-proxied/)系列的最后一篇。
 前面三篇分别讲
-[原理](/zh/blog/writing/why-some-apps-ignore-system-proxy/)、
-[命令行](/zh/blog/writing/terminal-proxy-not-working/)、
-[容器](/zh/blog/writing/docker-pull-ignores-proxy/)。
+[原理](/zh/blog/writing/apps-ignore-system-proxy/)、
+[命令行](/zh/blog/writing/terminal-proxy/)、
+[容器](/zh/blog/writing/docker-pull-proxy/)。

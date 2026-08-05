@@ -1,7 +1,7 @@
 ---
 title: 从零上手：装扩展、接上游、写第一条规则
 description: 三步就能让第一个不听话的程序归你的规则管。最容易卡住的是第一步，而且卡住的原因往往不在 Appidge。
-slug: appidge-getting-started
+slug: getting-started
 pubDate: 2026-08-05
 category: getting-started
 tags: [macOS, 上手, 规则]
@@ -18,7 +18,7 @@ tags: [macOS, 上手, 规则]
 
 TUN 和按进程接管都是整机级的流量接管，同时开会互相抢，典型结果是断网。
 关掉 TUN 不影响你的节点和订阅 —— 那些照旧由代理客户端管。
-细节和判别方法在[开了 TUN 之后整机断网](/zh/blog/writing/tun-conflict-network-down/)。
+细节和判别方法在[开了 TUN 之后整机断网](/zh/blog/writing/tun-conflict/)。
 
 ## 第一步：批准网络扩展
 
@@ -63,7 +63,7 @@ TUN 和按进程接管都是整机级的流量接管，同时开会互相抢，�
 
 想要更硬的证据，就在「活动」页看那个进程的连接 —— 目的地和去向会按你写的规则显示。
 规则写了却没变化，先确认两件事：写规则的进程是不是真正发请求的那一个
-（Docker 这类[请求发生在别处](/zh/blog/writing/docker-pull-ignores-proxy/)的情况很常见），
+（Docker 这类[请求发生在别处](/zh/blog/writing/docker-pull-proxy/)的情况很常见），
 以及上游端口本身通不通。
 
 ---

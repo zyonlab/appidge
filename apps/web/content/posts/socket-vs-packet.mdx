@@ -1,7 +1,7 @@
 ---
 title: 按进程分流该在哪一层做：socket 还是网络包
 description: 进程身份是系统在连接建立前就交给你的。到了包那一层，它已经不在里面了，只能事后反查。
-slug: socket-layer-vs-packet-layer
+slug: socket-vs-packet
 pubDate: 2026-08-05
 category: proxy-ecosystem
 tags: [macOS, 架构, TUN, Network Extension]
@@ -43,7 +43,7 @@ socket API 的东西，都不在这一层出现。要「全都管」的场景，
 **UDP 要单独考虑。** socket 层能拿到 UDP 流，但转发它有个硬约束：HTTP CONNECT
 不能代理 UDP，只有 SOCKS5 的 UDP ASSOCIATE 能。所以「走代理的进程，它的 QUIC 怎么办」
 必须显式回答，而不是自动就对了（我们默认拦掉逼它回落 TCP，也可以放行直连或真的走
-SOCKS5，[取舍在这里](/zh/blog/writing/proxifier-macos-alternative/)）。
+SOCKS5，[取舍在这里](/zh/blog/writing/proxifier-alternative/)）。
 
 包层没有这个问题 —— 它眼里 UDP 和 TCP 都只是包。这是包层实打实的优势。
 
@@ -69,7 +69,7 @@ socket 层不改路由表、不建虚拟网卡、不接管 DNS。扩展挂掉，
 socket 层更合适。
 
 **这两者不该同时开着** —— 两个整机接管层会抢同一份流量，典型结果是断网，
-[判别和恢复方法在这里](/zh/blog/writing/tun-conflict-network-down/)。
+[判别和恢复方法在这里](/zh/blog/writing/tun-conflict/)。
 
 ---
 

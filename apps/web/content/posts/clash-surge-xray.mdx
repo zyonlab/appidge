@@ -1,7 +1,7 @@
 ---
 title: 和 Clash、Surge、xray 一起用：谁管出口，谁管分流
 description: 分工清楚就不打架：代理客户端负责节点和出口，Appidge 负责接管和按进程分流。转发环是自动处理的。
-slug: coexist-with-clash-surge-xray
+slug: clash-surge-xray
 pubDate: 2026-08-05
 category: getting-started
 tags: [macOS, Clash, Surge, xray, 代理链]
@@ -17,7 +17,7 @@ tags: [macOS, Clash, Surge, xray, 代理链]
 对任何一家客户端，做法都一样：
 
 1. **关掉 TUN / 虚拟网卡 / 增强模式**。两个整机接管层同时开会抢流量，典型结果是断网
-  （[细节和判别命令](/zh/blog/writing/tun-conflict-network-down/)）
+  （[细节和判别命令](/zh/blog/writing/tun-conflict/)）
 2. 保留它的**本地监听端口**。Clash 系通常是 `127.0.0.1:7890`（HTTP）和 `7891`（SOCKS5），
   Surge 和 xray 的端口在各自配置里看
 3. 到 Appidge 的「代理」页把这个端口填成上游，HTTP 或 SOCKS5 都支持
@@ -62,6 +62,6 @@ Appidge 有两层处理，都是自动的：
 
 ---
 
-活动页的读法在[活动页怎么读](/zh/blog/writing/activity-page-and-rule-override/)，
-上手三步在[从零上手](/zh/blog/writing/appidge-getting-started/)。
+活动页的读法在[活动页怎么读](/zh/blog/writing/rule-override/)，
+上手三步在[从零上手](/zh/blog/writing/getting-started/)。
 更多用法在[上手与日常用法](/zh/blog/topics/getting-started/)。

@@ -9,6 +9,8 @@ seriesOrder: 1
 tags: [macOS, 代理, 排障]
 ---
 
+import Figure from '../../src/components/blog/Figure.astro';
+
 先说结论：macOS 的「系统代理」是一个**约定**，不是强制。
 
 你在「系统设置 → 网络 → 代理」里填的地址，只是被写进了系统配置库里的几个键。
@@ -17,6 +19,37 @@ tags: [macOS, 代理, 排障]
 
 所以「Clash 开着、系统代理也设了，但某个软件照样直连」不是配置错了，是那个软件
 压根没打算看你的配置。知道它属于哪一类，才知道该怎么治。
+
+<Figure caption="系统代理是一张“公告板”：程序愿意看才看得见，没有任何机制强制它读。">
+<svg viewBox="0 0 720 250" role="img" aria-label="系统代理设置是一块公告板，三类程序中只有一类会去读它">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="currentColor" />
+    </marker>
+  </defs>
+  <g fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.85">
+    <rect x="20" y="96" width="180" height="58" rx="10" />
+    <rect x="470" y="16" width="230" height="52" rx="10" />
+    <rect x="470" y="99" width="230" height="52" rx="10" />
+    <rect x="470" y="182" width="230" height="52" rx="10" />
+    <path d="M205 118 H465" marker-end="url(#ar)" />
+  </g>
+  <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 5" opacity="0.4">
+    <path d="M205 128 C 320 128, 340 60, 465 42" />
+    <path d="M205 132 C 320 132, 340 190, 465 208" />
+  </g>
+  <g font-size="14" fill="currentColor">
+    <text x="110" y="121" text-anchor="middle" font-weight="600">系统代理设置</text>
+    <text x="110" y="140" text-anchor="middle" opacity="0.6" font-size="12">几个配置键</text>
+    <text x="585" y="39" text-anchor="middle">自带网络栈的程序</text>
+    <text x="585" y="57" text-anchor="middle" opacity="0.6" font-size="12">不读</text>
+    <text x="585" y="122" text-anchor="middle">用系统网络库的程序</text>
+    <text x="585" y="140" text-anchor="middle" opacity="0.6" font-size="12">默认会读</text>
+    <text x="585" y="205" text-anchor="middle">后台守护进程</text>
+    <text x="585" y="223" text-anchor="middle" opacity="0.6" font-size="12">不读</text>
+  </g>
+</svg>
+</Figure>
 
 ## 谁会读，谁不会
 

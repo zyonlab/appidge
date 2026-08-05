@@ -7,6 +7,8 @@ category: proxy-ecosystem
 tags: [macOS, 架构, TUN, Network Extension]
 ---
 
+import Figure from '../../src/components/blog/Figure.astro';
+
 在 macOS 上拦流量有两个层可选：**socket 层**（拿到的是一条条「流」，附带发起它的进程）
 和**包层**（拿到的是一个个 IP 包，通过一块虚拟网卡）。
 
@@ -14,6 +16,29 @@ TUN 类工具在包层。透明代理类的系统扩展在 socket 层。
 
 如果你要做的是**按进程分流**，这个选择几乎是被决定的 —— 因为**进程身份只在 socket 层
 是现成的**。
+
+<Figure caption="进程身份在 socket 层是随流一起交过来的；到了包这一层，它已经不在里面了。">
+<svg viewBox="0 0 720 210" role="img" aria-label="socket 层拿到的流带进程标识，包层只有四元组没有进程">
+  <g fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.85">
+    <rect x="30" y="26" width="300" height="70" rx="10" />
+    <rect x="30" y="122" width="300" height="70" rx="10" />
+    <rect x="404" y="26" width="286" height="70" rx="10" />
+    <rect x="404" y="122" width="286" height="70" rx="10" />
+  </g>
+  <g font-size="14" fill="currentColor">
+    <text x="46" y="18" font-size="12" opacity="0.6">socket 层拿到一条流</text>
+    <text x="46" y="52">进程签名 / PID</text>
+    <text x="46" y="74" opacity="0.6" font-size="12">系统在连接建立前就给了</text>
+    <text x="46" y="114" font-size="12" opacity="0.6">包层拿到一个 IP 包</text>
+    <text x="46" y="148">源 IP · 端口 · 目的 IP · 端口</text>
+    <text x="46" y="170" opacity="0.6" font-size="12">没有进程</text>
+    <text x="420" y="52" font-weight="600">归因：现成的</text>
+    <text x="420" y="74" opacity="0.6" font-size="12">不需要推断</text>
+    <text x="420" y="148" font-weight="600">归因：事后反查连接表</text>
+    <text x="420" y="170" opacity="0.6" font-size="12">短连接会漏，且失败是静默的</text>
+  </g>
+</svg>
+</Figure>
 
 ## 归因：现成的 vs 事后反查
 

@@ -21,6 +21,7 @@
  *   --single-type  不该发布的归档页一个都没有
  *   --redline      产物里没有「我们提供节点」这类事实错误的自我描述
  *   --theme        博客主题的关键色值与官网 global.css 一致（防两边漂移）
+ *   --no-chrome    不该存在的引擎控件（主题切换、AI 外链）没有出现在产物里
  *   --coverage     三方向篇数下限（【选择性】，不进默认集，见 OPT_IN）
  * 后续任务会加上 --gaps（TOOL-GAPS 的 issue 回填核对）。
  */
@@ -288,6 +289,39 @@ if (only('--theme')) {
     ok(
       want !== undefined && want === got,
       `主题漂移：官网 ${hostToken}=${want}，但博客主题 ${engineToken}=${got}`,
+    );
+  }
+}
+
+// ---- 6.8 砍掉不适用的引擎控件 ----
+// 注意：零外部脚本这条【已经天然满足】（Astro 把这些小脚本内联了，dist/_astro/*.js 为 0），
+// 所以这里砍它们的理由不是脚本数量，是【语义正确性】——逐个判断，不是照单全砍：
+//
+//   ThemeToggle    砍。它切换的"暗色"在 appidge 主题里与浅色完全相同（T-008 的刻意
+//                  设计），点了什么都不变，还会把状态写进 localStorage。
+//                  一个按了没反应的按钮就是 bug。
+//   AIStudyLinks   砍。它把文章 URL/标题/摘要拼进 prompt，链到 chatgpt.com 和
+//                  claude:// 深链。本站零追踪、零外部服务，这类外链是编辑立场问题，
+//                  不是技术问题。
+//   ReadingProgress 留。纯本地 scroll 监听、无网络、aria-hidden，且我们的文章是长篇
+//                  技术文，进度条对它有用。它是 check-site 第 5 条明确放行的那类
+//                  内联脚本。详见 PR 说明。
+//
+// AIStudyLinks 只在文章详情页出现，现在 0 篇文章 ⇒ 这条断言今天是空过的；
+// 等 T-013 写出第一篇才真正生效。留着是回归锁。
+if (only('--no-chrome')) {
+  const walkAll = (dir) =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? walkAll(join(dir, e.name)) : [join(dir, e.name)],
+    );
+  const blogDir = inDist(mountDir);
+  const html = existsSync(blogDir) ? walkAll(blogDir).filter((f) => f.endsWith('.html')) : [];
+  for (const marker of ['theme-toggle', 'ai-study']) {
+    const hits = html.filter((f) => readFileSync(f, 'utf8').includes(marker));
+    ok(
+      hits.length === 0,
+      `产物里仍有 "${marker}" 控件（${hits.length} 个页面）——` +
+        '应由 site/templates/components/ 的空文件覆盖掉',
     );
   }
 }

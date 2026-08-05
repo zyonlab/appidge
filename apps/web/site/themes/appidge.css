@@ -62,7 +62,11 @@
   --code-syntax-constant: #116329;
   --code-syntax-comment: #6e7781;
   --shadow: 0 22px 58px rgba(43, 31, 17, 0.08);
-  --shell-width: min(1880px, calc(100vw - 96px));
+  /* 与官网 src/styles/global.css 的 .container max-width 【逐字相同】。
+     引擎默认是 min(1880px, 100vw - 96px)，几乎满宽——博客和官网并排看会像两个站。
+     BRIEF §4 要求视觉一致，而这两个值分处两个文件、各自手工维护，天然会分叉，
+     所以 check-blog.mjs --width 把它们钉在一起：改一边不改另一边就会红。 */
+  --shell-width: min(90vw, 1920px);
   --rail-left: 240px;
   --rail-right: 340px;
   --content-width: 46rem;
@@ -120,4 +124,298 @@
   --code-syntax-constant: #116329;
   --code-syntax-comment: #6e7781;
   --shadow: 0 22px 58px rgba(43, 31, 17, 0.08);
+}
+
+/**
+ * 落地页大标题的字号上限。
+ *
+ * 引擎的裸 `h1` 是 `clamp(2.7rem, 7.2vw, 5.8rem)` —— 在 1728px 视口上算出 92.8px，
+ * 而官网 hero 的 h1 是 50px。将近两倍，两个页面并排看不像一个站，
+ * 而 BRIEF §4 要求视觉风格与官网一致。
+ *
+ * 特异性说明（这条规则能生效、且只影响该影响的地方，靠的就是它）：
+ *   .site-shell h1      (0,1,1)  ← 本规则，胜过引擎的裸 h1 (0,0,1)
+ *   .article-header h1  (0,1,1)  ← 引擎的，同特异性但在后面，所以文章页标题
+ *                                  仍由 --article-title 决定，不受这条影响
+ *
+ * 只改字号，不碰字重/字距/行高 —— 那些是引擎的排版机制，保留。
+ */
+.site-shell h1 {
+  font-size: clamp(1.9rem, 3.2vw, 3.2rem);
+}
+
+/**
+ * 行内代码的字号。
+ *
+ * 引擎让行内 `code` 继承正文字号（16.64px）。等宽字在相同 px 下视觉上比比例字**更大**，
+ * 夹在中文正文里会把行高顶出参差。0.92em 让它回到与周围文字齐平的观感。
+ * 只调字号，配色仍走 --code-inline-* token。
+ */
+.prose :not(pre) > code {
+  font-size: 0.92em;
+}
+
+/**
+ * 右侧栏首个条目的分隔线。
+ *
+ * 引擎给 `.article-brief-card dl > div` 统一加了 `border-top`，用来隔开摘要段落与
+ * 下面的元信息列表。我们的覆盖去掉了那段重复的摘要（见
+ * site/templates/components/ArticleBrief.astro），于是第一条的上边线失去了它要分隔的
+ * 东西，紧贴在卡片 4px 橙色顶边下面变成一条孤立的横线。
+ *
+ * 条目之间的分隔线保留——那是有意义的。
+ */
+.article-brief-card dl > div:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+/**
+ * 落地页：紧凑页头 + 主题 chips + 系列横幅。
+ *
+ * 配套 site/templates/pages/index.astro。引擎的 global.css 没有这几个类名——
+ * 那一版落地页是 hero + 三段 section 卡片阵，我们换成了"文章置顶"的结构。
+ * 全部走 token，不写字面色值。
+ */
+.blog-intro {
+  padding: var(--space-xl) 0 var(--space-lg);
+  max-width: 46rem;
+}
+
+.blog-intro h1 {
+  margin: 0 0 var(--space-xs);
+}
+
+.blog-intro > p {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* 主题入口：一排 chip，带真实篇数。取代引擎那三张带空装饰球的大卡片—— */
+/* 装饰球不携带任何信息，而篇数告诉读者这个方向有多少东西可读。 */
+.topic-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+  margin-top: var(--space-md);
+}
+
+.topic-chips a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3xs);
+  padding: var(--space-3xs) var(--space-xs);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.topic-chips a:hover,
+.topic-chips a:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.topic-chips-count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85em;
+}
+
+.topic-chips a:hover .topic-chips-count,
+.topic-chips a:focus-visible .topic-chips-count {
+  color: inherit;
+}
+
+/* 系列：一条横幅，不是卡片阵。只有一条系列时，三列网格会显得很空。 */
+.series-band ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.series-band li {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: baseline;
+  gap: var(--space-2xs) var(--space-xs);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--line);
+}
+
+.series-band li > a {
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.series-band li > a:hover,
+.series-band li > a:focus-visible {
+  color: var(--accent);
+}
+
+.series-band li > span {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.series-band li > p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  max-width: 60ch;
+}
+
+@media (max-width: 720px) {
+  .series-band li {
+    grid-template-columns: 1fr auto;
+  }
+}
+
+/**
+ * 博客页眉：与官网同一套视觉语言（通栏平条，不是浮动卡片）。
+ *
+ * 尺寸逐项对齐官网 src/styles/global.css：62px 高、26px logo、17px 品牌字号、
+ * 14px 导航、22px 间距、同一条 backdrop-filter。改官网页眉时这里要跟着改。
+ *
+ * 引擎默认给 .site-header 的是圆角浮动卡片，下面几条把它压掉。
+ */
+.site-header.blog-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  /* 通栏：撑出外壳的左右留白，与官网一致 */
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--header-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: none;
+}
+
+/* 内容对齐外壳：与正文同一条左右边界 */
+.blog-header-inner {
+  width: var(--shell-width);
+  margin: 0 auto;
+  padding: 0 var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  height: 62px;
+}
+
+.blog-header .brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--text);
+  text-decoration: none;
+  flex: none;
+  /* 覆盖引擎给 .brand 的橙色方块底 */
+  background: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+.blog-header .brand-mark {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  display: block;
+  /* 引擎的 .brand-mark 是个色块里放字母；我们放真 logo，把那套样式清掉 */
+  background: none;
+  border-radius: 0;
+  font-size: inherit;
+  line-height: normal;
+}
+
+.blog-nav {
+  display: flex;
+  gap: 22px;
+  margin-left: auto;
+  font-size: 14px;
+}
+
+.blog-nav a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.blog-nav a:hover,
+.blog-nav a:focus-visible {
+  color: var(--text);
+}
+
+.blog-nav a[aria-current='page'] {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.blog-nav-mobile {
+  display: none;
+  margin-left: auto;
+}
+
+.blog-nav-mobile summary {
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--muted);
+  list-style: none;
+}
+
+.blog-nav-mobile summary::-webkit-details-marker {
+  display: none;
+}
+
+.blog-nav-mobile div {
+  position: absolute;
+  right: var(--space-md);
+  display: grid;
+  gap: var(--space-2xs);
+  margin-top: var(--space-2xs);
+  padding: var(--space-sm);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--panel-shadow);
+}
+
+.blog-nav-mobile div a {
+  color: var(--text);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+@media (max-width: 720px) {
+  .blog-nav {
+    display: none;
+  }
+  .blog-nav-mobile {
+    display: block;
+  }
+}
+
+/**
+ * 正文左右边距对齐官网。
+ *
+ * 官网 `.container` 是 `max-width` + `padding: 0 24px`，所以实际内容边缘比外框
+ * 内缩 24px；引擎的 `.site-shell` 只有宽度没有内边距。外框我们已经对齐了
+ * （--shell-width == .container 的 max-width），差的就是这 24px ——
+ * 表现为博客正文比官网正文往外顶出去一截。
+ */
+.site-shell {
+  padding-left: var(--space-md);
+  padding-right: var(--space-md);
 }

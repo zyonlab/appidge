@@ -20,10 +20,10 @@ posts:
   # route 就是 URL 段：/zh/blog/writing/<slug>/。BRIEF 已冻结这个结构，不要改。
   route: writing
   label: 文章
-  listTitle: 全部文章
-  listDescription: >-
-    按进程分流这件事上踩过的坑和查过的故障。三个方向：软件为什么不走代理、
-    Appidge 自己怎么用、以及 macOS 代理生态里那些工具各自的边界。
+  # 引擎的首页按钮是「查看全部{listTitle}」，这里填「全部文章」会得到
+  # 「查看全部全部文章」。填名词即可。
+  listTitle: 文章
+  listDescription: 按进程分流这件事上踩过的坑和查过的故障。三个方向：软件为什么不走代理、 Appidge 自己怎么用、以及 macOS 代理生态里那些工具各自的边界。
   surfaces:
     nav: 10
     home: { limit: 6, order: 20 }

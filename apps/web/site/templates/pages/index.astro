@@ -1,0 +1,141 @@
+---
+/**
+ * 博客落地页 —— 产品博客的信息架构，不是个人品牌站的。
+ *
+ * ## 为什么必须覆盖整页，而不是调意图层
+ *
+ * 引擎版本的区块顺序是写死在 markup 里的：hero（含 FOCUS MAP 面板）→ Topics →
+ * Series → 各内容类型的最新文章。实测下来，**第一篇文章的标题在 y=1688，要滚 1.9 屏
+ * 才看得到**，页面前 54% 没有任何一篇文章。
+ *
+ * 那套顺序服务的是"先认识我"（creator 站）。产品博客的读者是被搜索引擎丢进某篇文章、
+ * 再点过来看"这儿还有什么能解决我的问题"的人 —— 他要的是文章，不是我们的编辑方针。
+ *
+ * 意图层给不了这个：`surfaces.home.order` 只排内容类型之间的顺序，排不到 Topics /
+ * Series 前面去；`.hero-panel`（FOCUS MAP）更是无条件渲染，清空 `signals` 只会留下一个
+ * 空面板加英文标题。所以这是 templates.md 说的那种情况 —— **markup 本身必须不同**，
+ * 不是"只改一个值"。已把这两个缺口提给上游，修好后这个覆盖可以退回意图层配置。
+ *
+ * ## 这一页的顺序
+ *
+ *   1. 一句话说明这是什么 + 主题入口（带真实篇数，不是装饰）
+ *   2. 最新文章 —— 立刻开始
+ *   3. 系列 —— 一条紧凑横幅，放在文章之后
+ *
+ * ## 保留了引擎的什么
+ *
+ * `getStaticPaths`、`jsonLd`（WebSite / Person / ItemList 三段）、`alternates` 全部
+ * 照搬 —— 这些是 SEO 契约，templates.md 专门警告过覆盖页面容易把它们弄丢（C-01 / C-07
+ * 会红）。文章卡片仍用引擎的 `cardFor(type.card)`，所以落地页和列表页的卡片是同一个组件。
+ *
+ * `@layouts/BaseLayout.astro` 是引擎构建期注入的 vite alias（exports 里没有 layouts 的
+ * 公开入口）。`astro check` 不认识它，已在 apps/web/tsconfig.json 补了同名 paths。
+ * 其余一律用公开导出 `aifb-engine/*`。
+ */
+import BaseLayout from '@layouts/BaseLayout.astro';
+import {
+  defaultLocale,
+  hasPage,
+  localeOfPath,
+  localeStaticPaths,
+  locales,
+  pagePath,
+  seriesPath,
+  topicPath,
+} from 'aifb-engine/config/routes';
+import { siteFor } from 'aifb-engine/config/site';
+import { homeTypesFor, entryPath, listPath } from 'aifb-engine/content-types';
+import { alternatesForPath } from 'aifb-engine/lib/alternates';
+import { getEntries, typesWithEntries } from 'aifb-engine/lib/content';
+import { cardFor } from 'aifb-engine/lib/renderers';
+import { getActiveSeries, getActiveTopics } from 'aifb-engine/lib/taxonomy';
+import { itemListSchema, websiteSchema, personSchema } from 'aifb-engine/lib/schema';
+
+export const getStaticPaths = localeStaticPaths;
+
+const locale = localeOfPath(Astro.url.pathname);
+const site = siteFor(locale);
+
+const topicList = hasPage('topics') ? await getActiveTopics(locale) : [];
+const seriesList = hasPage('series') ? await getActiveSeries(locale) : [];
+
+// 与引擎同样的守卫：非默认语言只渲染真有内容的类型，否则会出现指向未构建列表页的死链。
+const populated =
+  locale === defaultLocale
+    ? undefined
+    : new Set((await typesWithEntries(locale)).map((type) => type.name));
+
+const sections = await Promise.all(
+  homeTypesFor(locale)
+    .filter((type) => populated === undefined || populated.has(type.name))
+    .map(async (type) => ({
+      type,
+      Card: cardFor(type.card),
+      entries: (await getEntries(type, locale)).slice(0, type.surfaces.home!.limit),
+    })),
+);
+
+const featured = sections.flatMap(({ type, entries }) =>
+  entries.map((entry) => ({
+    name: entry.data.title as string,
+    description: entry.data.description as string,
+    url: entryPath(type, entry.data.slug, locale),
+  })),
+);
+
+const alternates = alternatesForPath('/', locales);
+
+const jsonLd = [
+  websiteSchema(locale),
+  personSchema(true, locale),
+  itemListSchema(`${site.name} Featured Content`, featured),
+];
+---
+
+<BaseLayout jsonLd={jsonLd} alternates={alternates}>
+  <header class="blog-intro">
+    <h1>{site.hero.title}</h1>
+    <p>{site.hero.description}</p>
+
+    {topicList.length > 0 && (
+      <nav class="topic-chips" aria-label="按主题浏览">
+        {topicList.map((topic) => (
+          <a href={topicPath(topic.slug, locale)}>
+            {topic.title}
+            <span class="topic-chips-count">{topic.count}</span>
+          </a>
+        ))}
+      </nav>
+    )}
+  </header>
+
+  {sections.map(({ type, Card, entries }) => (
+    <section class="section">
+      <div class="section-head">
+        <h2>{type.listTitle}</h2>
+        <a class="button" href={listPath(type, locale)}>全部文章</a>
+      </div>
+      <div class={type.listLayout ?? 'grid'}>
+        {entries.map((entry) => <Card entry={entry} type={type} />)}
+      </div>
+    </section>
+  ))}
+
+  {seriesList.length > 0 && (
+    <section class="section series-band">
+      <div class="section-head">
+        <h2>系列</h2>
+        <a class="button" href={pagePath('series', locale)}>全部系列</a>
+      </div>
+      <ul>
+        {seriesList.map((item) => (
+          <li>
+            <a href={seriesPath(item.slug, locale)}>{item.title}</a>
+            <span>{item.count} 篇</span>
+            <p>{item.description}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+</BaseLayout>

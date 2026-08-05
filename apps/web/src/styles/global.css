@@ -79,7 +79,14 @@ button:focus-visible {
 }
 
 .container {
-  max-width: 1080px;
+  /* 流式：跟着屏幕走，两侧各留 5%，并在 1920 封顶。
+     固定 1440 在 2560 的屏上只占 56%，看着还是窄；纯 90vw 则会在超宽屏上把 hero 和
+     截图拉得过散，所以取 min()。正文行长不受这个值影响——段落另有 em 限宽（44em/46em）。
+     法务页 .doc-layout 另有更窄的固定值（长文阅读宽度），见文件末尾。
+
+     ⚠️ 博客侧 site/themes/appidge.css 的 --shell-width 必须与这里【逐字相同】，
+     否则官网和博客的外壳宽度会分叉。check-blog.mjs --width 断言了这一点。 */
+  max-width: min(90vw, 1920px);
   margin: 0 auto;
   padding: 0 24px;
 }
@@ -2132,4 +2139,52 @@ h2 {
 
 .mt-0 {
   margin-top: 0;
+}
+
+/* ── 宽屏排版：容器变宽时，文案字号跟着走 ─────────────────────────────
+ *
+ * `.container` 现在是 min(90vw, 1920px)，而这套字号刻度是照 1080px 容器画的。
+ * 只加宽容器等于把整套排版按比例缩小——1728px 屏上卡片宽 493px、正文却仍是
+ * 13.5px，读起来明显偏小。所以宽屏下同步放大文案字号。
+ *
+ * ⚠️ 只放大【营销文案】，绝不碰 .amock-*。首页那个活动窗口是模拟的原生 App 界面，
+ * 它的 11–14px 是刻意的原生密度；跟着放大就不像真实截图了。
+ *
+ * 分档而不是 clamp：两档的值来自和产品负责人确认过的具体数字，clamp 的线性插值
+ * 落不到那几个点上。≤1440px 的屏幕完全不受影响，保持既有观感。
+ */
+@media (min-width: 1441px) {
+  h2 {
+    font-size: clamp(25px, 3.2vw, 38px);
+  }
+  .hero-sub {
+    font-size: 18.5px;
+  }
+  .sec-sub {
+    font-size: 17px;
+  }
+  .ucard h3 {
+    font-size: 17.5px;
+  }
+  .ucard p {
+    font-size: 15px;
+  }
+}
+
+@media (min-width: 2000px) {
+  h2 {
+    font-size: clamp(25px, 3.2vw, 42px);
+  }
+  .hero-sub {
+    font-size: 20px;
+  }
+  .sec-sub {
+    font-size: 18px;
+  }
+  .ucard h3 {
+    font-size: 18.5px;
+  }
+  .ucard p {
+    font-size: 16px;
+  }
 }

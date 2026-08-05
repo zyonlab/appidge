@@ -1,7 +1,7 @@
 ---
 title: 找 Proxifier 的 macOS 替代？先分清它做的两件事
 description: Proxifier 既是拦截层，也是代理客户端。你缺的多半只是前一半，看清这点能省很多钱和很多力气。
-slug: proxifier-macos-alternative
+slug: proxifier-alternative
 pubDate: 2026-08-05
 category: proxy-ecosystem
 tags: [macOS, Proxifier, 替代, 选型]
@@ -26,7 +26,7 @@ Proxifier 在一个软件里做了两件事：
 NTLM/Kerberos 这类企业认证的场景。
 
 **分工式**：拦截层只负责把流量转给你已有的本地代理端口，出口仍归代理客户端。
-好处是节点、订阅、规则组这些不用搬家，各管各的（[怎么配](/zh/blog/writing/coexist-with-clash-surge-xray/)）。
+好处是节点、订阅、规则组这些不用搬家，各管各的（[怎么配](/zh/blog/writing/clash-surge-xray/)）。
 代价是你必须**先有**一个能用的代理客户端 —— 分工式工具通常不带任何节点。
 
 Appidge 是后者。它不提供节点，出口永远是你自己配的那个上游。
@@ -43,7 +43,7 @@ macOS 上的旧做法是网络内核扩展（NKE），新做法是系统扩展�
 
 透明代理类的系统扩展还有一个额外好处：**不建虚拟网卡、不改路由表、不接管 DNS**，
 所以它挂掉时流量按原样直连，不会把整机网络带走
-（[和 TUN 的区别](/zh/blog/writing/tun-conflict-network-down/)）。
+（[和 TUN 的区别](/zh/blog/writing/tun-conflict/)）。
 
 ### 进程怎么被识别
 

@@ -1,11 +1,13 @@
 ---
 title: 按进程分流该在哪一层做：socket 还是网络包
 description: 进程身份是系统在连接建立前就交给你的。到了包那一层，它已经不在里面了，只能事后反查。
-slug: socket-layer-vs-packet-layer
+slug: socket-vs-packet
 pubDate: 2026-08-05
 category: proxy-ecosystem
 tags: [macOS, 架构, TUN, Network Extension]
 ---
+
+import Figure from '../../src/components/blog/Figure.astro';
 
 在 macOS 上拦流量有两个层可选：**socket 层**（拿到的是一条条「流」，附带发起它的进程）
 和**包层**（拿到的是一个个 IP 包，通过一块虚拟网卡）。
@@ -14,6 +16,29 @@ TUN 类工具在包层。透明代理类的系统扩展在 socket 层。
 
 如果你要做的是**按进程分流**，这个选择几乎是被决定的 —— 因为**进程身份只在 socket 层
 是现成的**。
+
+<Figure caption="进程身份在 socket 层是随流一起交过来的；到了包这一层，它已经不在里面了。">
+<svg viewBox="0 0 720 210" role="img" aria-label="socket 层拿到的流带进程标识，包层只有四元组没有进程">
+  <g fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.85">
+    <rect x="30" y="26" width="300" height="70" rx="10" />
+    <rect x="30" y="122" width="300" height="70" rx="10" />
+    <rect x="404" y="26" width="286" height="70" rx="10" />
+    <rect x="404" y="122" width="286" height="70" rx="10" />
+  </g>
+  <g font-size="14" fill="currentColor">
+    <text x="46" y="18" font-size="12" opacity="0.6">socket 层拿到一条流</text>
+    <text x="46" y="52">进程签名 / PID</text>
+    <text x="46" y="74" opacity="0.6" font-size="12">系统在连接建立前就给了</text>
+    <text x="46" y="114" font-size="12" opacity="0.6">包层拿到一个 IP 包</text>
+    <text x="46" y="148">源 IP · 端口 · 目的 IP · 端口</text>
+    <text x="46" y="170" opacity="0.6" font-size="12">没有进程</text>
+    <text x="420" y="52" font-weight="600">归因：现成的</text>
+    <text x="420" y="74" opacity="0.6" font-size="12">不需要推断</text>
+    <text x="420" y="148" font-weight="600">归因：事后反查连接表</text>
+    <text x="420" y="170" opacity="0.6" font-size="12">短连接会漏，且失败是静默的</text>
+  </g>
+</svg>
+</Figure>
 
 ## 归因：现成的 vs 事后反查
 
@@ -43,7 +68,7 @@ socket API 的东西，都不在这一层出现。要「全都管」的场景，
 **UDP 要单独考虑。** socket 层能拿到 UDP 流，但转发它有个硬约束：HTTP CONNECT
 不能代理 UDP，只有 SOCKS5 的 UDP ASSOCIATE 能。所以「走代理的进程，它的 QUIC 怎么办」
 必须显式回答，而不是自动就对了（我们默认拦掉逼它回落 TCP，也可以放行直连或真的走
-SOCKS5，[取舍在这里](/zh/blog/writing/proxifier-macos-alternative/)）。
+SOCKS5，[取舍在这里](/zh/blog/writing/proxifier-alternative/)）。
 
 包层没有这个问题 —— 它眼里 UDP 和 TCP 都只是包。这是包层实打实的优势。
 
@@ -69,7 +94,7 @@ socket 层不改路由表、不建虚拟网卡、不接管 DNS。扩展挂掉，
 socket 层更合适。
 
 **这两者不该同时开着** —— 两个整机接管层会抢同一份流量，典型结果是断网，
-[判别和恢复方法在这里](/zh/blog/writing/tun-conflict-network-down/)。
+[判别和恢复方法在这里](/zh/blog/writing/tun-conflict/)。
 
 ---
 

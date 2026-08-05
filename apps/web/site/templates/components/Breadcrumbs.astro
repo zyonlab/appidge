@@ -1,0 +1,37 @@
+---
+/**
+ * 面包屑 —— 只为把根节点的 "Home" 换成「首页」。
+ *
+ * 引擎版本把它写死了（`components/Breadcrumbs.astro:17` 是字面量 `Home`，没走 `t()`），
+ * 所以一个 `locale: zh-CN` 的站点，每一页的面包屑第一项都是英文。已提上游。
+ *
+ * 结构、类名、`aria-label` 与分隔符**逐字保持**引擎原样 —— 引擎的 global.css 按
+ * `.breadcrumbs` 给样式，改类名就会掉样式；而 `<span aria-hidden="true">/</span>`
+ * 的写法决定了屏幕阅读器不会把斜杠念出来，这个也照抄。
+ *
+ * 引用引擎模块用公开导出 `aifb-engine/config/*`，不用 `@config/*`——后者是构建期注入的
+ * vite alias，`astro check` 不认识（T-010 踩过，报 ts(2307)）。
+ */
+import { homePath, localeOfPath } from 'aifb-engine/config/routes';
+
+type Crumb = {
+  href: string;
+  label: string;
+};
+
+type Props = {
+  items: Crumb[];
+};
+
+const { items } = Astro.props;
+---
+
+<nav class="breadcrumbs" aria-label="面包屑">
+  <a href={homePath(localeOfPath(Astro.url.pathname))}>首页</a>
+  {items.map((item) => (
+    <>
+      <span aria-hidden="true">/</span>
+      <a href={item.href}>{item.label}</a>
+    </>
+  ))}
+</nav>

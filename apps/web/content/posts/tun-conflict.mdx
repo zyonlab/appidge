@@ -1,7 +1,7 @@
 ---
 title: 开了 TUN 之后整机断网：两个接管层在抢同一份流量
 description: TUN / 虚拟网卡 / 增强模式和按进程接管都是整机级的。两个同时开，DNS 容易被截进对方的网卡里出不来。
-slug: tun-conflict-network-down
+slug: tun-conflict
 pubDate: 2026-08-05
 category: troubleshooting
 series: why-not-proxied
@@ -9,12 +9,40 @@ seriesOrder: 4
 tags: [macOS, TUN, 断网, 排障]
 ---
 
+import Figure from '../../src/components/blog/Figure.astro';
+
 先说处置：**如果你在用按进程接管的工具，就把代理客户端的 TUN / 虚拟网卡 / 增强模式关掉，
 只保留它的本地监听端口。**
 
 这不是二选一的偏好问题。TUN 和按进程接管都是**整机级**的流量接管，两个同时开，
 就是两层在抢同一份流量。最典型的表现是整机断网 —— 而且断得很没道理：
 Wi-Fi 图标好好的，浏览器转圈，`ping 1.1.1.1` 可能还通。
+
+<Figure caption="TUN 把默认路由指向自己的虚拟网卡；按进程接管不碰路由表。两个同时开，DNS 查询容易进了对方的网卡出不来。">
+<svg viewBox="0 0 720 200" role="img" aria-label="TUN 改路由表抢默认路由，按进程接管不碰路由表，两者叠加时冲突">
+  <g fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.85">
+    <rect x="24" y="30" width="180" height="54" rx="10" />
+    <rect x="24" y="118" width="180" height="54" rx="10" />
+    <rect x="300" y="74" width="150" height="54" rx="10" />
+    <rect x="546" y="74" width="150" height="54" rx="10" />
+  </g>
+  <g fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.7">
+    <path d="M208 57 C 250 57, 258 96, 296 100" />
+    <path d="M208 145 C 250 145, 258 106, 296 102" />
+    <path d="M454 101 H542" />
+  </g>
+  <g font-size="14" fill="currentColor">
+    <text x="114" y="52" text-anchor="middle" font-weight="600">TUN</text>
+    <text x="114" y="70" text-anchor="middle" opacity="0.6" font-size="12">建虚拟网卡 · 改路由表</text>
+    <text x="114" y="140" text-anchor="middle" font-weight="600">按进程接管</text>
+    <text x="114" y="158" text-anchor="middle" opacity="0.6" font-size="12">不建网卡 · 不改路由</text>
+    <text x="375" y="97" text-anchor="middle" font-weight="600">同一份流量</text>
+    <text x="375" y="115" text-anchor="middle" opacity="0.6" font-size="12">两层都想接管</text>
+    <text x="621" y="97" text-anchor="middle">DNS 出不来</text>
+    <text x="621" y="115" text-anchor="middle" opacity="0.6" font-size="12">ping 通，网页打不开</text>
+  </g>
+</svg>
+</Figure>
 
 ## 为什么会断
 
@@ -91,6 +119,6 @@ Wi-Fi 关掉再开，逼系统重新拿一遍网络配置。
 
 这是[「为什么这个软件不走代理」](/zh/blog/series/why-not-proxied/)系列的最后一篇。
 前面三篇分别讲
-[原理](/zh/blog/writing/why-some-apps-ignore-system-proxy/)、
-[命令行](/zh/blog/writing/terminal-proxy-not-working/)、
-[容器](/zh/blog/writing/docker-pull-ignores-proxy/)。
+[原理](/zh/blog/writing/apps-ignore-system-proxy/)、
+[命令行](/zh/blog/writing/terminal-proxy/)、
+[容器](/zh/blog/writing/docker-pull-proxy/)。

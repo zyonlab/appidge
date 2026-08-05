@@ -31,6 +31,7 @@
  *   --origin       origin 级事实仍归官网：robots.txt / 404 未被引擎接管，且博客未被 Disallow
  *   --gaps         TOOL-GAPS.md 里每条未修复的缺口都已提 issue 并回填链接
  *   --inbound      官网页脚有通往博客的入口（中英文页都要有）
+ *   --width        官网容器宽度与博客外壳宽度是同一个表达式（防两边分叉）
  *   --coverage     三方向篇数下限（【选择性】，不进默认集，见 OPT_IN）
  * 后续任务会加上 --gaps（TOOL-GAPS 的 issue 回填核对）。
  */
@@ -467,6 +468,30 @@ if (only('--inbound')) {
         '读者在 appidge.com 上就找不到博客',
     );
   }
+}
+
+// ---- 6.13 官网与博客的外壳宽度不许分叉 ----
+// 官网用 `.container { max-width }`（src/styles/global.css），博客用 `--shell-width`
+// token（site/themes/appidge.css）——两套机制、两个文件、各自手工维护。
+// 引擎的 BaseLayout 不加载官网 CSS，所以没法共享一个变量，只能靠断言把它们钉在一起。
+//
+// 这条是必要的：本轮就是先把官网从 1080 改到 1440，博客还停在引擎默认的
+// min(1880px, 100vw - 96px)，于是两个页面并排看像两个站。改一边忘了另一边，
+// 除了肉眼没有任何东西会发现。
+if (only('--width')) {
+  const hostCss = readFileSync(join(root, 'src', 'styles', 'global.css'), 'utf8');
+  const themeCss = readFileSync(join(root, 'site', 'themes', 'appidge.css'), 'utf8');
+  const norm = (v) => v?.replace(/\s+/g, ' ').trim();
+  const hostWidth = norm(
+    (hostCss.match(/\.container\s*\{[^}]*?max-width:\s*([^;]+);/) ?? [])[1],
+  );
+  const blogWidth = norm((themeCss.match(/--shell-width:\s*([^;]+);/) ?? [])[1]);
+  ok(hostWidth !== undefined, '没能从 global.css 读出 .container 的 max-width');
+  ok(
+    hostWidth === blogWidth,
+    `外壳宽度分叉：官网 .container = "${hostWidth}"，博客 --shell-width = "${blogWidth}"。` +
+      '两者必须逐字相同，否则官网和博客并排看不像一个站',
+  );
 }
 
 // ---- 7. 三方向篇数下限（选择性，见 OPT_IN）----

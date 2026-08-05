@@ -1,0 +1,23 @@
+---
+/**
+ * 文章配图/示意图的统一容器。
+ *
+ * 用 <figure> + <figcaption> —— 引擎 global.css 已经给这两个标签配好了样式
+ * （圆角 20px、边框、阴影、图注色），所以这里不重复定义外观，只负责语义与图注。
+ *
+ * 只接受**内联 SVG**（通过 slot）或 <img>：零外部脚本是硬约束，
+ * Claude Desktop 那种运行时渲染 HTML 的做法在这个站上做不了。
+ * craft-floor 也明确：几何图形、示意图、线条图属于一等媒介，
+ * 而"手绘风格 SVG 场景"不是。
+ */
+interface Props {
+  /** 图注。省略则不渲染 figcaption。 */
+  caption?: string;
+}
+const { caption } = Astro.props;
+---
+
+<figure class="blog-figure">
+  <slot />
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>

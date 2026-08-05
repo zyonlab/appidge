@@ -1,13 +1,15 @@
 ---
 title: docker pull 不走代理：因为请求不是你这台 Mac 发的
 description: 拉镜像的动作发生在 Docker 那台 Linux 虚拟机里。搞不清是谁在发请求，配哪儿都是碰运气。
-slug: docker-pull-ignores-proxy
+slug: docker-pull-proxy
 pubDate: 2026-08-05
 category: troubleshooting
 series: why-not-proxied
 seriesOrder: 3
 tags: [macOS, Docker, 代理, 排障]
 ---
+
+import Figure from '../../src/components/blog/Figure.astro';
 
 `docker pull` 卡住，和前两篇讲的都不一样：这次连**发请求的进程都不在你这台 Mac 上**。
 
@@ -17,6 +19,40 @@ Docker Desktop 在 macOS 上跑着一台 Linux 虚拟机，守护进程在那台
 
 所以「我环境变量都配了怎么还是不行」在这里是必然的 —— 那些配置的作用范围里
 根本不包含它。
+
+<Figure caption="你敲的命令在 macOS 上，真正去连 registry 的守护进程在虚拟机里 —— 它看不见这条竖线左边的任何配置。">
+<svg viewBox="0 0 720 220" role="img" aria-label="docker 命令在 macOS 侧，守护进程在 Linux 虚拟机侧，两者被一条边界隔开">
+  <defs>
+    <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="currentColor" />
+    </marker>
+  </defs>
+  <g fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.85">
+    <rect x="18" y="40" width="150" height="48" rx="10" />
+    <rect x="18" y="120" width="150" height="48" rx="10" />
+    <rect x="392" y="40" width="160" height="48" rx="10" />
+    <rect x="590" y="40" width="112" height="48" rx="10" />
+    <path d="M172 64 H388" marker-end="url(#ar2)" />
+    <path d="M556 64 H586" marker-end="url(#ar2)" />
+  </g>
+  <path d="M300 8 V212" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.5" />
+  <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.32">
+    <path d="M93 116 V96" />
+  </g>
+  <g font-size="14" fill="currentColor">
+    <text x="93" y="62" text-anchor="middle" font-weight="600">docker pull</text>
+    <text x="93" y="79" text-anchor="middle" opacity="0.6" font-size="12">你敲的命令</text>
+    <text x="93" y="142" text-anchor="middle">你的代理设置</text>
+    <text x="93" y="159" text-anchor="middle" opacity="0.6" font-size="12">shell 配置、系统设置</text>
+    <text x="472" y="62" text-anchor="middle" font-weight="600">守护进程</text>
+    <text x="472" y="79" text-anchor="middle" opacity="0.6" font-size="12">发出真正的请求</text>
+    <text x="646" y="68" text-anchor="middle">registry</text>
+    <text x="210" y="24" text-anchor="middle" opacity="0.6" font-size="12">macOS</text>
+    <text x="400" y="24" text-anchor="middle" opacity="0.6" font-size="12">Linux 虚拟机</text>
+    <text x="93" y="196" text-anchor="middle" opacity="0.5" font-size="12">够不到 →</text>
+  </g>
+</svg>
+</Figure>
 
 ## 三个具体的坑
 
@@ -75,6 +111,6 @@ Docker Desktop 的代理设置改完需要重启守护进程才生效。点了�
 
 ---
 
-前两篇：[为什么有些软件根本不走系统代理](/zh/blog/writing/why-some-apps-ignore-system-proxy/)、
-[终端里代理不生效](/zh/blog/writing/terminal-proxy-not-working/)。
+前两篇：[为什么有些软件根本不走系统代理](/zh/blog/writing/apps-ignore-system-proxy/)、
+[终端里代理不生效](/zh/blog/writing/terminal-proxy/)。
 整个系列在[「为什么这个软件不走代理」](/zh/blog/series/why-not-proxied/)。

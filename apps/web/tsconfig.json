@@ -4,6 +4,10 @@
   "exclude": ["dist"],
   "compilerOptions": {
     "strict": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "@layouts/*": ["./node_modules/aifb-engine/layouts/*"],
+      "@components/*": ["./node_modules/aifb-engine/components/*"]
+    }
   }
 }

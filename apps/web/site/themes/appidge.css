@@ -142,3 +142,29 @@
 .site-shell h1 {
   font-size: clamp(1.9rem, 3.2vw, 3.2rem);
 }
+
+/**
+ * 行内代码的字号。
+ *
+ * 引擎让行内 `code` 继承正文字号（16.64px）。等宽字在相同 px 下视觉上比比例字**更大**，
+ * 夹在中文正文里会把行高顶出参差。0.92em 让它回到与周围文字齐平的观感。
+ * 只调字号，配色仍走 --code-inline-* token。
+ */
+.prose :not(pre) > code {
+  font-size: 0.92em;
+}
+
+/**
+ * 右侧栏首个条目的分隔线。
+ *
+ * 引擎给 `.article-brief-card dl > div` 统一加了 `border-top`，用来隔开摘要段落与
+ * 下面的元信息列表。我们的覆盖去掉了那段重复的摘要（见
+ * site/templates/components/ArticleBrief.astro），于是第一条的上边线失去了它要分隔的
+ * 东西，紧贴在卡片 4px 橙色顶边下面变成一条孤立的横线。
+ *
+ * 条目之间的分隔线保留——那是有意义的。
+ */
+.article-brief-card dl > div:first-child {
+  border-top: none;
+  padding-top: 0;
+}

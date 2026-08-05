@@ -1,0 +1,62 @@
+---
+/**
+ * 文章右侧栏 —— 改了两件事，都是可见缺陷。
+ *
+ * 1. **不再重复摘要。** 引擎版本在这里再渲染一遍 `{description}`，而同一句话已经作为
+ *    副标题印在 h1 下面 —— 桌面视口里一屏之内同一句话出现两次。这个栏位的价值是
+ *    「正文之外的元信息」，不是把标题区复述一遍，所以摘要整段去掉。
+ *
+ * 2. **标签翻译成中文。** 引擎把 `Topic` / `Read` / `Series` 和 `min` 写死成英文字面量
+ *    （`components/ArticleBrief.astro` 第 35–50 行），而同一个组件里的
+ *    `t('article.brief')` 却是走 i18n 的 —— 同一张卡片里中英混排。本站只有中文。
+ *
+ * 两处都已提上游；上游修好后这个覆盖可以整个删掉。
+ *
+ * 保留的：`.article-brief` / `.article-brief-card` 类名（引擎 global.css 按它们给样式）、
+ * `aria-label`、`<dl>/<dt>/<dd>` 语义、以及 series 有页面时才做链接的判断。
+ * 去掉的：`AIStudyLinks`（T-009 已用空文件覆盖，本站零外部服务，这里不再引它）。
+ */
+import { hasPage, localeOfPath, seriesPath } from 'aifb-engine/config/routes';
+import { seriesFor, topicsFor } from 'aifb-engine/config/taxonomy';
+import { messages } from 'aifb-engine/i18n';
+
+type Props = {
+  title: string;
+  description: string;
+  category: string;
+  seriesSlug?: string;
+  readingMinutes?: number;
+  articleUrl: string;
+};
+
+const { category, seriesSlug, readingMinutes } = Astro.props;
+const locale = localeOfPath(Astro.url.pathname);
+const t = messages(locale);
+const topic = topicsFor(locale)[category];
+const seriesItem = seriesSlug ? seriesFor(locale)[seriesSlug] : undefined;
+---
+
+<aside class="article-brief" aria-label={t('article.overview')}>
+  <div class="article-brief-card">
+    <dl>
+      <div>
+        <dt>主题</dt>
+        <dd>{topic?.title ?? category}</dd>
+      </div>
+      {readingMinutes && (
+        <div>
+          <dt>篇幅</dt>
+          <dd>{readingMinutes} 分钟</dd>
+        </div>
+      )}
+      {seriesItem && (
+        <div>
+          <dt>系列</dt>
+          <dd>{hasPage('series') && seriesSlug
+            ? <a href={seriesPath(seriesSlug, locale)}>{seriesItem.title}</a>
+            : seriesItem.title}</dd>
+        </div>
+      )}
+    </dl>
+  </div>
+</aside>

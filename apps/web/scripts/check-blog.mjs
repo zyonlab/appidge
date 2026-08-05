@@ -19,6 +19,7 @@
  *   --preflight    aifb planning preflight 已收敛的域
  *   --taxonomy     三个内容方向在 taxonomy 里各有落点
  *   --single-type  不该发布的归档页一个都没有
+ *   --redline      产物里没有「我们提供节点」这类事实错误的自我描述
  *   --coverage     三方向篇数下限（【选择性】，不进默认集，见 OPT_IN）
  * 后续任务会加上 --gaps（TOOL-GAPS 的 issue 回填核对）。
  */
@@ -161,7 +162,7 @@ if (only('--intent')) {
 //
 // 数据来自 validate-report.json 的 readiness 数组（preflight 中止时也会写出），
 // 不解析控制台输出。
-const PREFLIGHT_DONE_AREAS = ['identity', 'domain', 'template', 'taxonomy', 'copy'];
+const PREFLIGHT_DONE_AREAS = ['identity', 'domain', 'template', 'taxonomy', 'copy', 'voice', 'ai'];
 if (only('--preflight')) {
   spawnSync('pnpm', ['exec', 'aifb', 'validate'], { cwd: root, stdio: 'ignore' });
   const reportPath = join(root, 'validate-report.json');
@@ -218,6 +219,43 @@ if (only('--single-type')) {
       `产物里出现了不该发布的归档页 ${MOUNT}/${seg}/ —— ` +
         'content-types.yaml 或 engine({ pages }) 没收敛干净',
     );
+  }
+}
+
+// ---- 6.6 产品红线：绝不把 Appidge 说成它不是的东西 ----
+// BRIEF §2 的红线：不提供节点，不是 VPN、不是机场客户端、不是代理切换器。
+// 出口永远是用户自己配置的上游。
+//
+// 这里只断言【无论上下文都为假】的说法。像"不是 VPN"这种正确表述必须放行，所以
+// 不去正则匹配 VPN 一词——只匹配那几个我们永远不可能提供的东西。软性的口径把关
+// 在 site/voice.md（写作 agent 读得懂上下文，正则读不懂）。
+if (only('--redline')) {
+  // 否定式必须放行："我们不提供节点"是【正确】表述，而它包含子串"提供节点"。
+  // 第一版就是拿子串匹配的，结果对我们自己首屏那句正确文案报了警——这类断言必须
+  // 带否定前瞻，否则它惩罚的恰好是说对话的人。
+  const NEVER_TRUE = [
+    /(?<![不未非无])提供节点/,
+    /(?<![不未非无])内置节点/,
+    /(?<![不未非无])自带节点/,
+    /(?<![不未非无])我们的节点/,
+    /(?<![不未非无])免费节点/,
+  ];
+  const walk = (dir) =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)],
+    );
+  const blogDir = inDist(mountDir);
+  const pages = existsSync(blogDir) ? walk(blogDir).filter((f) => /\.(html|txt|xml)$/.test(f)) : [];
+  for (const file of pages) {
+    const text = readFileSync(file, 'utf8');
+    for (const pattern of NEVER_TRUE) {
+      const hit = text.match(pattern);
+      ok(
+        hit === null,
+        `产物出现违反产品红线的说法 "${hit?.[0]}" @ ${file.replace(dist + '/', '')}——` +
+          'Appidge 不提供节点，出口永远是用户自己配置的上游',
+      );
+    }
   }
 }
 

@@ -13,40 +13,28 @@
 pillars:
   search-entry:
     name: 接住正在排障的人
-    goal: >-
-      目标读者不是在找我们，是在找自己那台机器的毛病。他搜的是"mac xxx 不走代理"，
-      不是产品名。这组主题要在他搜到的那一刻就把原因讲清楚，并给出能当场验证的解法。
+    goal: 目标读者不是在找我们，是在找自己那台机器的毛病。他搜的是"mac xxx 不走代理"，不是产品名。这组主题要在他搜到的那一刻就把原因讲清楚，并给出能当场验证的解法。
   product-fluency:
     name: 让装了的人真的会用
-    goal: >-
-      Appidge 的核心动作（按进程定规则、在活动页当场改、让规则即时生效）不解释一遍
-      是不会自己被发现的。这组主题负责把上手路径和日常工作流写成可照做的步骤。
+    goal: Appidge 的核心动作（按进程定规则、在活动页当场改、让规则即时生效）不解释一遍是不会自己被发现的。这组主题负责把上手路径和日常工作流写成可照做的步骤。
   ecosystem-authority:
     name: 在 macOS 代理生态里说清楚我们是什么
-    goal: >-
-      读者手里已经有 Clash / Surge / xray，也可能用过 Proxifier。这组主题讲我们与
-      它们的关系和边界 —— 顺带覆盖长尾搜索，也顺带反复讲清"我们不提供节点"。
+    goal: 读者手里已经有 Clash / Surge / xray，也可能用过 Proxifier。这组主题讲我们与它们的关系和边界 —— 顺带覆盖长尾搜索，也顺带反复讲清"我们不提供节点"。
 
 topics:
   troubleshooting:
     title: 排查：软件不走代理
-    description: >-
-      某个软件死活不走你配好的代理 —— 自带网络栈的客户端、命令行工具链、后台守护进程。
-      这里讲每一类为什么会这样，以及怎么让它归你的规则管。
+    description: 某个软件死活不走你配好的代理 —— 自带网络栈的客户端、命令行工具链、后台守护进程。这里讲每一类为什么会这样，以及怎么让它归你的规则管。
     pillar: search-entry
 
   getting-started:
     title: 上手与日常用法
-    description: >-
-      从装上系统扩展、接上你自己的上游，到写下第一条规则。以及活动页怎么读、
-      看到某个进程时怎么当场改掉它的去向。
+    description: 从装上系统扩展、接上你自己的上游，到写下第一条规则。以及活动页怎么读、看到某个进程时怎么当场改掉它的去向。
     pillar: product-fluency
 
   proxy-ecosystem:
     title: macOS 代理生态与周边工具
-    description: >-
-      与 Clash、Surge、xray、Proxifier 这些工具的关系和边界：谁负责出口、谁负责分流、
-      透明代理和 TUN 各自的代价，以及它们放在一起时会打什么架。
+    description: 与 Clash、Surge、xray、Proxifier 这些工具的关系和边界：谁负责出口、谁负责分流、透明代理和 TUN 各自的代价，以及它们放在一起时会打什么架。
     pillar: ecosystem-authority
 
 # 有序阅读路径。文章用 frontmatter 的 `series` + `seriesOrder` 加入。
@@ -55,7 +43,5 @@ topics:
 series:
   why-not-proxied:
     title: 为什么这个软件不走代理
-    description: >-
-      按"软件属于哪一类"来分的四篇排查路径：自带网络栈的图形客户端、命令行工具链、
-      容器与守护进程，以及装了 TUN 之后的冲突。看现象对号入座。
+    description: 按"软件属于哪一类"来分的四篇排查路径：自带网络栈的图形客户端、命令行工具链、容器与守护进程，以及装了 TUN 之后的冲突。看现象对号入座。
     topic: troubleshooting

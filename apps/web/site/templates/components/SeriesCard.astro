@@ -1,0 +1,41 @@
+---
+/**
+ * 系列卡片 —— 只为把 eyebrow 从**主题 slug** 换成**主题标题**。
+ *
+ * 引擎版本是 `<div class="eyebrow">{item.topic}</div>`
+ * （`components/SeriesCard.astro:21`），而 `item.topic` 传进来的是 taxonomy 的键。
+ * 于是 `/zh/blog/series/` 和首页的系列卡片上，读者看到的是一个原始英文 slug
+ * `troubleshooting`，而不是它的中文标题「排查：软件不走代理」。
+ *
+ * 同一个仓库里 TopicCard 和文章页的 eyebrow 都是显示标题的，所以这更像是漏改而非有意。
+ * 已提上游；修好后这个覆盖可以删掉。
+ *
+ * 结构、类名、heading 级别的语义**逐字保持**引擎原样 —— `.card` / `.series-card` /
+ * `.eyebrow` 都由引擎 global.css 供样式，改名就掉样式。
+ * 引擎模块用公开导出 `aifb-engine/config/*`，不用构建期 alias `@config/*`。
+ */
+import { localeOfPath, seriesPath } from 'aifb-engine/config/routes';
+import { topicsFor } from 'aifb-engine/config/taxonomy';
+
+type Props = {
+  item: {
+    slug: string;
+    title: string;
+    description: string;
+    topic: string;
+  };
+  headingLevel?: 2 | 3;
+};
+
+const { item, headingLevel = 3 } = Astro.props;
+const Heading = `h${headingLevel}` as 'h2' | 'h3';
+const locale = localeOfPath(Astro.url.pathname);
+// 解析不出来就退回原值——宁可显示 slug，也不要显示空白。
+const topicLabel = topicsFor(locale)[item.topic]?.title ?? item.topic;
+---
+
+<article class="card series-card">
+  <div class="eyebrow">{topicLabel}</div>
+  <Heading><a href={seriesPath(item.slug, locale)}>{item.title}</a></Heading>
+  <p>{item.description}</p>
+</article>

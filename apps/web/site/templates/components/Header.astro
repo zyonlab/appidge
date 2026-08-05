@@ -1,0 +1,78 @@
+---
+/**
+ * 博客页眉 —— 与官网同一套视觉语言。
+ *
+ * ## 为什么要覆盖
+ *
+ * 引擎版本和官网页眉是两套完全不同的东西（实测）：
+ *
+ *            官网                    引擎
+ *   形态     通栏平条 0→1713         浮动卡片 79→1634
+ *   圆角     0                       24px
+ *   标识     白鸽 logo (icon-64.png) 橙色方块里一个字母「A」
+ *
+ * 读者从官网点进博客，页眉整个换了个样子。BRIEF §4 要求视觉与官网一致。
+ *
+ * ## 为什么不转发官网的 Header 组件
+ *
+ * 两个独立原因（T-010 已实测）：
+ *   1. 官网 Header **一个 scoped `<style>` 都没有**，样式全在 src/styles/global.css，
+ *      而博客页不加载那份 —— 转发过来是一堆裸标签。
+ *   2. 官网 Header 带**语言切换器**，博客只有中文，切到英文会指向 /blog/... 这种
+ *      不存在的 URL，每页一条死链。
+ *
+ * 所以这里是**自带样式的重写**：结构与尺寸照抄官网（同 62px 高、同 26px logo、
+ * 同 17px 品牌字号、同 14px 导航字号），内容用博客自己的导航。
+ *
+ * ## 保留引擎的什么
+ *
+ * `.site-header` 类名保留（引擎 global.css 与我们的主题都按它给样式）、
+ * 导航项仍来自 `navItemsFor()`（所以 site.yaml 的 nav 改了这里跟着变）、
+ * `isActiveHref` 的当前页判断、移动端 `<details>` 折叠。
+ * 去掉 ThemeToggle（T-009 已空覆盖）和语言切换（本站单语）。
+ */
+import { navItemsFor } from 'aifb-engine/config/nav';
+import { homePath, localeOfPath } from 'aifb-engine/config/routes';
+import { siteFor } from 'aifb-engine/config/site';
+import { navTypesFor } from 'aifb-engine/content-types';
+import { messages } from 'aifb-engine/i18n';
+
+const currentPath = Astro.url.pathname;
+const locale = localeOfPath(currentPath);
+const site = siteFor(locale);
+const t = messages(locale);
+
+const navItems = navItemsFor(locale, navTypesFor(locale));
+const home = homePath(locale);
+// 引擎原样：根路径要精确匹配，否则每个子页都会把它点亮。
+const isActiveHref = (href: string) =>
+  href === home ? currentPath === home : currentPath.startsWith(href);
+---
+
+<header class="site-header blog-header">
+  <div class="blog-header-inner">
+    <a class="brand" href={home} aria-label={site.name}>
+      <img class="brand-mark" src="/icon-64.png" alt="" width="26" height="26" />
+      <span>{site.name}</span>
+    </a>
+
+    <nav class="blog-nav" aria-label={t('nav.primary')}>
+      {navItems.map((item) => (
+        <a href={item.href} aria-current={isActiveHref(item.href) ? 'page' : undefined}>
+          {item.label}
+        </a>
+      ))}
+    </nav>
+
+    <details class="blog-nav-mobile">
+      <summary aria-label="菜单">菜单</summary>
+      <div>
+        {navItems.map((item) => (
+          <a href={item.href} aria-current={isActiveHref(item.href) ? 'page' : undefined}>
+            {item.label}
+          </a>
+        ))}
+      </div>
+    </details>
+  </div>
+</header>

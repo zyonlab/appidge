@@ -97,15 +97,14 @@ social: {}
 # /zh/blog/ 的首屏。读者多半是被搜索引擎丢进某一篇文章的，会点到这里的人是
 # "这篇有用，他们还写了什么"——所以首屏说清楚这个站按什么归档，而不是再推销一次产品。
 # actions 的 href 写引擎路由的原样（/writing/），引擎会自动补 mount 前缀。
+# /zh/blog/ 的页头。落地页由 site/templates/pages/index.astro 渲染，它只用
+# title 和 description 两项：
+#   · 没有 eyebrow —— 标题上方再顶一行小字是纯装饰，标题自己撑得住
+#   · 没有 signals —— 那四条是编辑方针（"只写查过的故障"之类），是写给我们自己看的。
+#     一个搜「docker 不走代理」进来的人不关心我们的价值观，那块面积该留给文章。
 hero:
-  eyebrow: Appidge 博客
-  title: 那个软件为什么不走代理
-  description: macOS 上代理配了、系统代理也设了，可总有软件当没看见。这里按软件的类别讲清楚每一种为什么会这样，怎么让它归你的规则管；顺带记录 Appidge 自己怎么用，以及这套生态里各个工具的边界在哪。
-  signals:
-    - 只写实际查过的故障，不写没验证过的猜测
-    - 出口永远是你自己配的上游 —— 我们不提供节点
-    - 透明代理，不改路由表、不接管 DNS
-    - 中文，面向 macOS 上的开发者
+  title: Appidge 博客
+  description: 按进程分流的排查笔记。哪些软件不读系统代理、为什么、怎么让它归你的规则管；以及 Appidge 自己怎么用。
 
 # 没有 services 块：/work-with-me/ 不在 engine({ pages }) 白名单里，这个站不接活。
 # 引擎对 services 的每个字段都有默认值（config/site.ts 的 `?? ''`），删掉是安全的。

@@ -18,6 +18,7 @@
  *   --intent       意图层不变量（site.yaml 不得声明 locales）
  *   --preflight    aifb planning preflight 已收敛的域
  *   --taxonomy     三个内容方向在 taxonomy 里各有落点
+ *   --single-type  不该发布的归档页一个都没有
  *   --coverage     三方向篇数下限（【选择性】，不进默认集，见 OPT_IN）
  * 后续任务会加上 --gaps（TOOL-GAPS 的 issue 回填核对）。
  */
@@ -160,9 +161,7 @@ if (only('--intent')) {
 //
 // 数据来自 validate-report.json 的 readiness 数组（preflight 中止时也会写出），
 // 不解析控制台输出。
-// taxonomy 域同时覆盖 taxonomy.yaml 与 content-types.yaml（引擎 readiness.ts 的 SOURCES）。
-// 后者归 T-006（它要把四个内容类型收敛成一个），所以 taxonomy 域在 T-006 才加进来。
-const PREFLIGHT_DONE_AREAS = ['identity', 'domain', 'template'];
+const PREFLIGHT_DONE_AREAS = ['identity', 'domain', 'template', 'taxonomy', 'copy'];
 if (only('--preflight')) {
   spawnSync('pnpm', ['exec', 'aifb', 'validate'], { cwd: root, stdio: 'ignore' });
   const reportPath = join(root, 'validate-report.json');
@@ -202,6 +201,24 @@ if (only('--taxonomy')) {
     ok(keys.includes(key), `site/taxonomy.yaml 缺少 topic "${key}"（${DIRECTIONS[key].label}方向）`);
   }
   ok(!/TODO/.test(yaml), 'site/taxonomy.yaml 仍有 TODO 占位');
+}
+
+// ---- 6.5 单一内容类型：不该存在的归档页一个都不许有 ----
+// 骨架带了四个内容类型（posts/videos/projects/case-studies）和六个固定页。
+// 我们只发 posts（route: writing）+ topics/series 两个归档页。多出来的每一个都是
+// 空归档页：对读者没用，对搜索引擎是薄内容，还会被 C-04 判成孤儿页。
+if (only('--single-type')) {
+  const forbidden = [
+    'videos', 'projects', 'case-studies',   // 多余的内容类型
+    'about', 'uses', 'newsletter', 'work-with-me', // pages 白名单外的固定页
+  ];
+  for (const seg of forbidden) {
+    ok(
+      !existsSync(inDist(mountDir, seg)),
+      `产物里出现了不该发布的归档页 ${MOUNT}/${seg}/ —— ` +
+        'content-types.yaml 或 engine({ pages }) 没收敛干净',
+    );
+  }
 }
 
 // ---- 7. 三方向篇数下限（选择性，见 OPT_IN）----

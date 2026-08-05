@@ -79,7 +79,10 @@ button:focus-visible {
 }
 
 .container {
-  max-width: 1080px;
+  /* 1440：1080 是设计原型 v5 定的，在 1440–1600 的屏上正常，但到 2560 就只占 42%，
+     左右各留白 733px。正文行长不受这个值影响——段落另有 em 限宽（44em/46em），
+     所以加宽容器不会让文字变得难读。法务页的 .doc-layout 另有更窄的值，见文件末尾。 */
+  max-width: 1440px;
   margin: 0 auto;
   padding: 0 24px;
 }

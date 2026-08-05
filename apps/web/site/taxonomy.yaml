@@ -1,35 +1,61 @@
-# What this site is about — yours to decide.
+# Appidge 博客写什么 —— 主题与支柱的单一真相源。
 #
-# The `category` vocabulary is derived from the topic keys, so there is nothing
-# to keep in sync. A topic key is also the URL of its page and the `category`
-# of every article using it: renaming one later means rewriting frontmatter and
-# leaving dead URLs behind. Decide them before writing, not after.
+# category 词表是从 topics 的键派生的（引擎 config/taxonomy.ts），所以这里改一个键，
+# 文章 frontmatter 的 category 就跟着变。**topic key 同时是 URL**
+# （/zh/blog/topics/<key>/），一旦有流量就不好改了 —— 三个键由 check-blog.mjs 的
+# --taxonomy 断言钉住。
 #
-# Worked example: examples/agent-native-engineer/site/taxonomy.yaml
-#
-# Contract: docs/specs/taxonomy.md
+# 三个 topic 对应 BRIEF §3 的三个内容方向，一一对应，好让篇数覆盖度能直接计数。
+# 契约：aifb docs/specs/taxonomy.md
 
-# Why the topics below exist. Every pillar must own at least one topic, or the
-# build fails — a plan nothing implements is the failure mode this replaces.
+# 支柱 = 一组主题服务的策略。每个支柱至少拥有一个主题，否则 build 失败
+# （"一个没人实现的计划"是这条规则要消灭的失败模式）。
 pillars:
-  foundations:
-    name: TODO 支柱名称
-    goal: TODO 这组主题要达成什么。
+  search-entry:
+    name: 接住正在排障的人
+    goal: >-
+      目标读者不是在找我们，是在找自己那台机器的毛病。他搜的是"mac xxx 不走代理"，
+      不是产品名。这组主题要在他搜到的那一刻就把原因讲清楚，并给出能当场验证的解法。
+  product-fluency:
+    name: 让装了的人真的会用
+    goal: >-
+      Appidge 的核心动作（按进程定规则、在活动页当场改、让规则即时生效）不解释一遍
+      是不会自己被发现的。这组主题负责把上手路径和日常工作流写成可照做的步骤。
+  ecosystem-authority:
+    name: 在 macOS 代理生态里说清楚我们是什么
+    goal: >-
+      读者手里已经有 Clash / Surge / xray，也可能用过 Proxifier。这组主题讲我们与
+      它们的关系和边界 —— 顺带覆盖长尾搜索，也顺带反复讲清"我们不提供节点"。
 
 topics:
-  todo-first-topic:
-    title: TODO 主题名称
-    description: TODO 一句话说清这个主题写什么。它会成为主题页的 meta description 和 llms.txt 里的条目。
-    pillar: foundations
+  troubleshooting:
+    title: 排查：软件不走代理
+    description: >-
+      某个软件死活不走你配好的代理 —— 自带网络栈的客户端、命令行工具链、后台守护进程。
+      这里讲每一类为什么会这样，以及怎么让它归你的规则管。
+    pillar: search-entry
 
-  notes:
-    title: TODO 兜底分类名称
-    description: TODO 还没想清楚就先记下来的东西放这里。
-    pillar: foundations
-    # A valid category that gets no page and stays out of listings — use it for
-    # catch-alls that would otherwise compete with real topics for the same query.
-    listed: false
+  getting-started:
+    title: 上手与日常用法
+    description: >-
+      从装上系统扩展、接上你自己的上游，到写下第一条规则。以及活动页怎么读、
+      看到某个进程时怎么当场改掉它的去向。
+    pillar: product-fluency
 
-# Ordered reading paths. Optional: delete the block if you do not need them.
-# Each `topic` must be a key above.
-series: {}
+  proxy-ecosystem:
+    title: macOS 代理生态与周边工具
+    description: >-
+      与 Clash、Surge、xray、Proxifier 这些工具的关系和边界：谁负责出口、谁负责分流、
+      透明代理和 TUN 各自的代价，以及它们放在一起时会打什么架。
+    pillar: ecosystem-authority
+
+# 有序阅读路径。文章用 frontmatter 的 `series` + `seriesOrder` 加入。
+# 只开一条：排查方向是四篇，恰好构成一条"从现象到定位"的路径；另外两个方向各三篇，
+# 彼此是并列关系，串成序列反而是硬凑。
+series:
+  why-not-proxied:
+    title: 为什么这个软件不走代理
+    description: >-
+      按"软件属于哪一类"来分的四篇排查路径：自带网络栈的图形客户端、命令行工具链、
+      容器与守护进程，以及装了 TUN 之后的冲突。看现象对号入座。
+    topic: troubleshooting

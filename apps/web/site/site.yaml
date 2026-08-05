@@ -46,13 +46,15 @@ locale: zh-CN
 #   en-US: en
 
 theme:
-  # Token file under site/themes/.
-  name: default
-  # Mode used before a visitor chooses. Must match the theme's :root block.
-  defaultMode: dark
-  # Browser chrome colour per mode. Must match the theme's --bg (checked).
-  colorDark: '#070b14'
-  colorLight: '#f7f8fb'
+  # site/themes/appidge.css —— 官网 21 个 token 到引擎全量 token 集的映射。
+  name: appidge
+  # 官网是单一浅色，博客同理。引擎的内联主题脚本只读 localStorage、不读
+  # prefers-color-scheme，加上 ThemeToggle 被空覆盖掉，所以这里就是最终长相。
+  defaultMode: light
+  # 浏览器 chrome 色。preflight 会核对它等于主题 :root 的 --bg（不等会在移动端
+  # 首屏渲染前露出一条色缝）。两个模式同值，因为主题的两个 block 本来就同值。
+  colorDark: '#ffffff'
+  colorLight: '#ffffff'
   # localStorage key for the mode toggle. Change it so two sites on one domain
   # do not fight over the same light/dark preference.
   # 宿主官网是单一浅色（global.css 里 color-scheme: light），不存任何主题偏好，

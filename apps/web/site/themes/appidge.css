@@ -1,0 +1,123 @@
+/**
+ * Appidge 主题 —— 把官网的 21 个设计 token 映射到引擎的完整 token 集。
+ *
+ * 唯一真相源是 `src/styles/global.css`（官网自己的 token）。这里是【映射】不是改名：
+ * 两边的命名几乎不重合（我们 --ink/--primary/--faint，引擎 --accent/--line/--surface-2）。
+ * 值必须与官网一致，否则博客和官网并排看会是两个牌子——check-blog.mjs 的 --theme
+ * 断言核对了其中几个关键值，防止两边悄悄漂移。
+ *
+ * 未映射的 token（间距刻度、栏宽、阅读节奏、字号）保留引擎默认：它们是排版机制，
+ * 不是品牌，照抄官网反而会把博客的正文排版搞坏。
+ *
+ * ## 关于"暗色"
+ *
+ * 官网是【单一浅色】（global.css 里 color-scheme: light，BaseLayout 还硬写了
+ * <meta name="color-scheme" content="light">）。博客是官网的一部分，不该有第二种长相。
+ *
+ * 所以下面的 :root[data-theme='dark'] 块【故意与浅色完全相同】。它存在只是因为：
+ *   1. C-12 要求两个 block 都定义全量 token（缺一个就是"暗色模式继承了浅色的值"）；
+ *   2. preflight 没有 alternate block 会告警。
+ * 实际上它不可达 —— T-009 会用空文件覆盖掉 ThemeToggle，而引擎的内联主题脚本只读
+ * localStorage、不读 prefers-color-scheme，没有东西会把 data-theme 设成 dark。
+ *
+ * 不要"顺手把它改成真正的暗色"：那会让博客在某天变成和官网不一样的长相，
+ * 而这正是我们要避免的。
+ */
+:root {
+  color-scheme: light;
+  --bg: #ffffff;
+  --surface: #fbfaf8;
+  --surface-2: #f4f1ec;
+  --text: #453c30;
+  --muted: #6b6256;
+  --line: rgba(43, 31, 17, 0.13);
+  --accent: #e7723b;
+  --accent-2: #b45320;
+  --accent-ink: #ffffff;
+  --code-bg: #faf8f5;
+  --code-text: #2b2317;
+  --body-gradient-end: #ffffff;
+  --glow-cyan: rgba(231, 114, 59, 0.09);
+  --glow-green: rgba(26, 138, 60, 0.06);
+  --card-gradient: linear-gradient(180deg, #ffffff, #fbfaf8);
+  --panel-bg: #fbfaf8;
+  --panel-bg-soft: #fdfcfa;
+  --chip-bg: #f4f1ec;
+  --quote-bg: linear-gradient(90deg, rgba(231, 114, 59, 0.07), transparent);
+  --header-bg: rgba(255, 255, 255, 0.86);
+  --image-shadow: 0 18px 40px rgba(43, 31, 17, 0.08);
+  --panel-shadow: 0 18px 42px rgba(43, 31, 17, 0.07);
+  --inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --warn: #b45320;
+  --error-line: rgba(192, 57, 43, 0.5);
+  --orb-gradient: linear-gradient(135deg, rgba(231, 114, 59, 0.2), rgba(180, 83, 32, 0.1));
+  --embed-bg: #f4f1ec;
+  --code-inline-text: #2b2317;
+  --code-inline-bg: #f4f1ec;
+  --quote-text: #453c30;
+  --code-syntax-entity: #0550ae;
+  --code-syntax-keyword: #cf222e;
+  --code-syntax-function: #8250df;
+  --code-syntax-string: #0a3069;
+  --code-syntax-constant: #116329;
+  --code-syntax-comment: #6e7781;
+  --shadow: 0 22px 58px rgba(43, 31, 17, 0.08);
+  --shell-width: min(1880px, calc(100vw - 96px));
+  --rail-left: 240px;
+  --rail-right: 340px;
+  --content-width: 46rem;
+  --space-3xs: 4px;
+  --space-2xs: 8px;
+  --space-xs: 12px;
+  --space-sm: 16px;
+  --space-md: 24px;
+  --space-lg: 32px;
+  --space-xl: clamp(36px, 3.4vw, 52px);
+  --space-2xl: clamp(56px, 5vw, 80px);
+  --space-3xl: clamp(72px, 7vw, 112px);
+  --prose-leading: 1.85;
+  --prose-paragraph-gap: 1.4em;
+  --prose-heading-lead: 2.6em;
+  --article-title: clamp(2rem, 4.2vw, 3rem);
+}
+
+/* 见上：与浅色完全相同，是刻意的。 */
+:root[data-theme='dark'] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --surface: #fbfaf8;
+  --surface-2: #f4f1ec;
+  --text: #453c30;
+  --muted: #6b6256;
+  --line: rgba(43, 31, 17, 0.13);
+  --accent: #e7723b;
+  --accent-2: #b45320;
+  --accent-ink: #ffffff;
+  --code-bg: #faf8f5;
+  --code-text: #2b2317;
+  --body-gradient-end: #ffffff;
+  --glow-cyan: rgba(231, 114, 59, 0.09);
+  --glow-green: rgba(26, 138, 60, 0.06);
+  --card-gradient: linear-gradient(180deg, #ffffff, #fbfaf8);
+  --panel-bg: #fbfaf8;
+  --panel-bg-soft: #fdfcfa;
+  --chip-bg: #f4f1ec;
+  --quote-bg: linear-gradient(90deg, rgba(231, 114, 59, 0.07), transparent);
+  --header-bg: rgba(255, 255, 255, 0.86);
+  --image-shadow: 0 18px 40px rgba(43, 31, 17, 0.08);
+  --panel-shadow: 0 18px 42px rgba(43, 31, 17, 0.07);
+  --inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --error-line: rgba(192, 57, 43, 0.5);
+  --orb-gradient: linear-gradient(135deg, rgba(231, 114, 59, 0.2), rgba(180, 83, 32, 0.1));
+  --embed-bg: #f4f1ec;
+  --code-inline-text: #2b2317;
+  --code-inline-bg: #f4f1ec;
+  --quote-text: #453c30;
+  --code-syntax-entity: #0550ae;
+  --code-syntax-keyword: #cf222e;
+  --code-syntax-function: #8250df;
+  --code-syntax-string: #0a3069;
+  --code-syntax-constant: #116329;
+  --code-syntax-comment: #6e7781;
+  --shadow: 0 22px 58px rgba(43, 31, 17, 0.08);
+}

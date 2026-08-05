@@ -20,6 +20,7 @@
  *   --taxonomy     三个内容方向在 taxonomy 里各有落点
  *   --single-type  不该发布的归档页一个都没有
  *   --redline      产物里没有「我们提供节点」这类事实错误的自我描述
+ *   --theme        博客主题的关键色值与官网 global.css 一致（防两边漂移）
  *   --coverage     三方向篇数下限（【选择性】，不进默认集，见 OPT_IN）
  * 后续任务会加上 --gaps（TOOL-GAPS 的 issue 回填核对）。
  */
@@ -256,6 +257,38 @@ if (only('--redline')) {
           'Appidge 不提供节点，出口永远是用户自己配置的上游',
       );
     }
+  }
+}
+
+// ---- 6.7 主题不漂移：博客的关键色值必须等于官网的 ----
+// 官网 token 在 src/styles/global.css，博客 token 在 site/themes/appidge.css，
+// 是两份文件。引擎的 BaseLayout 不加载官网那份，所以主题里只能写字面值，
+// 于是品牌色就有了两个副本。这条断言是那两个副本之间唯一的绳子——
+// 少了它，某天有人只改一边，博客和官网并排看就成了两个牌子。
+if (only('--theme')) {
+  const hostCss = readFileSync(join(root, 'src', 'styles', 'global.css'), 'utf8');
+  const themeCss = readFileSync(join(root, 'site', 'themes', 'appidge.css'), 'utf8');
+  const valueOf = (css, token) => {
+    const block = (css.match(/:root\s*\{([\s\S]*?)\}/) ?? [])[1] ?? '';
+    return (block.match(new RegExp(`${token}\\s*:\\s*([^;]+);`)) ?? [])[1]?.trim();
+  };
+  // 官网 token → 引擎 token。只钉【品牌识别性】的那几个，不钉全部：
+  // 间距、栏宽这些排版机制照抄官网反而会把博客正文搞坏。
+  const PAIRS = [
+    ['--bg', '--bg'],
+    ['--text', '--text'],
+    ['--muted', '--muted'],
+    ['--primary', '--accent'],
+    ['--primary-deep', '--accent-2'],
+    ['--border', '--line'],
+  ];
+  for (const [hostToken, engineToken] of PAIRS) {
+    const want = valueOf(hostCss, hostToken);
+    const got = valueOf(themeCss, engineToken);
+    ok(
+      want !== undefined && want === got,
+      `主题漂移：官网 ${hostToken}=${want}，但博客主题 ${engineToken}=${got}`,
+    );
   }
 }
 

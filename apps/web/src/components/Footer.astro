@@ -16,6 +16,12 @@ const productLinks = [
   { path: '/#pricing', label: t.nav.pricing },
 ];
 const supportLinks = [{ path: '/#faq', label: t.nav.faq }];
+// 博客：排查类文章天然属于「支持」，所以并进这一列。
+//
+// **不走 localePath**：博客 v1 只有中文（挂在 /zh/blog），localePath('en', '/blog')
+// 会产出 /blog/ —— 一个不存在的页面，每个英文页一条死链。所以这里写绝对路径，
+// 并在英文侧的标签里标注「(中文)」，不假装有英文版。
+const BLOG_HREF = '/zh/blog/';
 const legalLinks = [
   { path: '/refund', label: t.nav.refund },
   { path: '/privacy', label: t.footer.privacy },
@@ -43,6 +49,7 @@ const legalLinks = [
         <h2>{t.footer.support}</h2>
         <ul>
           {supportLinks.map((l) => <li><a href={localePath(locale, l.path)}>{l.label}</a></li>)}
+          <li><a href={BLOG_HREF}>{t.footer.blog}</a></li>
           <li><a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a></li>
         </ul>
       </nav>

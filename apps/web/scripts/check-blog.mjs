@@ -30,6 +30,7 @@
  *   --footer       博客页脚把读者带得回官网（法务页、产品锚点、联系方式）
  *   --origin       origin 级事实仍归官网：robots.txt / 404 未被引擎接管，且博客未被 Disallow
  *   --gaps         TOOL-GAPS.md 里每条未修复的缺口都已提 issue 并回填链接
+ *   --inbound      官网页脚有通往博客的入口（中英文页都要有）
  *   --coverage     三方向篇数下限（【选择性】，不进默认集，见 OPT_IN）
  * 后续任务会加上 --gaps（TOOL-GAPS 的 issue 回填核对）。
  */
@@ -441,6 +442,30 @@ if (only('--gaps')) {
       );
     }
     console.log(`· TOOL-GAPS：${sections.length} 条缺口，均已提 issue 并回填链接。`);
+  }
+}
+
+// ---- 6.12 官网要能走到博客 ----
+// --footer 守的是「博客能回官网」，这条守反方向：**官网能走到博客**。
+// 两条都在才算真正接进站点，少一条博客就是个只能靠搜索引擎进的孤岛。
+//
+// 博客 v1 只有中文，所以链接是写死的 /zh/blog/ 而不是 localePath(locale, '/blog')——
+// 后者在英文页会产出 /blog/，一个不存在的页面（每页一条死链）。
+// 因此这里【中英文页都要断言】：英文页也必须指向 /zh/blog/，不能各指各的。
+if (only('--inbound')) {
+  for (const page of ['index.html', 'zh/index.html', 'privacy/index.html', 'zh/privacy/index.html']) {
+    const file = inDist(page);
+    if (!existsSync(file)) {
+      failures.push(`宿主页产物缺失，无法检查博客入口：${page}`);
+      continue;
+    }
+    const html = readFileSync(file, 'utf8');
+    const foot = html.slice(html.lastIndexOf('<footer'));
+    ok(
+      foot.includes(`href="${MOUNT}/"`),
+      `官网 ${page} 的页脚没有通往博客的入口（应含 href="${MOUNT}/"）——` +
+        '读者在 appidge.com 上就找不到博客',
+    );
   }
 }
 

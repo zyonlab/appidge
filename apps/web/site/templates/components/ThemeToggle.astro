@@ -1,0 +1,15 @@
+---
+/*
+ * 空覆盖：不提供主题切换。
+ *
+ * 官网是单一浅色（src/styles/global.css 的 color-scheme: light），博客是官网的一部分，
+ * 不该有第二种长相。site/themes/appidge.css 的暗色块因此与浅色完全相同（T-008 的刻意设计）。
+ *
+ * 于是这个按钮切换的两个模式看起来一模一样：点了什么都不变，还会把 data-theme 写进
+ * localStorage 持久化下来。一个按了没反应的按钮是 bug，不是功能。
+ *
+ * 引擎 BaseLayout 里那段【无 src 的内联主题脚本】保留着——它只读 localStorage 决定
+ * data-theme，没有它反而会在某些历史 localStorage 值下渲染错。check-site.mjs 第 5 条
+ * 明确放行无 src 的内联脚本。
+ */
+---

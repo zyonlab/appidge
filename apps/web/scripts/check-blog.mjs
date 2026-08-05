@@ -29,6 +29,7 @@
  *   --no-chrome    不该存在的引擎控件（主题切换、AI 外链）没有出现在产物里
  *   --footer       博客页脚把读者带得回官网（法务页、产品锚点、联系方式）
  *   --origin       origin 级事实仍归官网：robots.txt / 404 未被引擎接管，且博客未被 Disallow
+ *   --gaps         TOOL-GAPS.md 里每条未修复的缺口都已提 issue 并回填链接
  *   --coverage     三方向篇数下限（【选择性】，不进默认集，见 OPT_IN）
  * 后续任务会加上 --gaps（TOOL-GAPS 的 issue 回填核对）。
  */
@@ -410,6 +411,36 @@ if (only('--origin')) {
       !/rel="alternate"\s+hreflang/.test(readFileSync(notFound, 'utf8')),
       '404.html 又开始输出 hreflang 了 —— 它指向的 /404 与 /zh/404 并不是构建产物（C-30）',
     );
+  }
+}
+
+// ---- 6.11 上游缺口都已提 issue ----
+// BRIEF §6：aifb 的缺口累积后统一提 issue，`TOOL-GAPS.md` 是暂存区。
+// 这条断言防的是"记了缺口、workaround 一直留着、issue 从没提"——那样 workaround 就
+// 变成了永久技术债，而上游修一次所有人受益。
+//
+// TOOL-GAPS.md 在仓库根的 .ralph/ 下，那个目录不进 git。文件不在就【跳过并说明】，
+// 不算通过也不算失败——沿用 aifb 自己 "skipped ≠ passed" 的立场。
+if (only('--gaps')) {
+  const gapsPath = join(root, '..', '..', '.ralph', 'TOOL-GAPS.md');
+  if (!existsSync(gapsPath)) {
+    console.log('· 跳过 --gaps：未找到 .ralph/TOOL-GAPS.md（该目录不进 git）。跳过不等于通过。');
+  } else {
+    const text = readFileSync(gapsPath, 'utf8');
+    // 每个 "## TOOL-GAP-xxx" 段落到下一个 "## " 或文末为止。
+    const sections = text.split(/^## (?=TOOL-GAP-)/m).slice(1);
+    ok(sections.length > 0, 'TOOL-GAPS.md 里没有任何 TOOL-GAP 条目（格式变了？）');
+    for (const section of sections) {
+      const id = (section.match(/^(TOOL-GAP-\d+)/) ?? [])[1] ?? '(未知)';
+      const status = (section.match(/\*\*状态\*\*：(\S+)/) ?? [])[1] ?? '';
+      if (status.startsWith('FIXED')) continue; // 上游已修，不必再有链接
+      ok(
+        /https:\/\/github\.com\/[^/]+\/[^/]+\/issues\/\d+/.test(section),
+        `${id} 状态是「${status || '未标注'}」却没有回填 issue 链接 —— ` +
+          'workaround 留着不提 issue，就会变成永久技术债',
+      );
+    }
+    console.log(`· TOOL-GAPS：${sections.length} 条缺口，均已提 issue 并回填链接。`);
   }
 }
 

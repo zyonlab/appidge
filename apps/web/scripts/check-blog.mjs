@@ -23,6 +23,7 @@
  *   --theme        博客主题的关键色值与官网 global.css 一致（防两边漂移）
  *   --no-chrome    不该存在的引擎控件（主题切换、AI 外链）没有出现在产物里
  *   --footer       博客页脚把读者带得回官网（法务页、产品锚点、联系方式）
+ *   --origin       origin 级事实仍归官网：robots.txt / 404 未被引擎接管，且博客未被 Disallow
  *   --coverage     三方向篇数下限（【选择性】，不进默认集，见 OPT_IN）
  * 后续任务会加上 --gaps（TOOL-GAPS 的 issue 回填核对）。
  */
@@ -356,6 +357,54 @@ if (only('--footer')) {
     const head = html.slice(0, html.indexOf('</header>') + 1);
     ok(/href="\/zh\/"/.test(head), '博客页眉缺少回官网的链接（site.yaml 的 nav 里加一条非引擎路由即可）');
     ok(foot.includes('rss.xml'), '博客页脚丢了 RSS 链接（引擎原本有，覆盖时不要弄丢）');
+  }
+}
+
+// ---- 6.10 origin 级事实仍归官网 ----
+// 引擎在 mount 下【不发】/404 和 /robots.txt（ADR 0005：一个 host 只有一个 robots.txt、
+// 一个 404，那是关于 origin 的事实，归拥有 origin 的人）。这是它现在的设计，
+// 但我们的官网依赖这一点——所以钉住，别指望它永远不变。
+//
+// 同时守住两条只会【悄悄】坏掉的事：
+//   · robots.txt 停止指向 sitemap-index（比如有人往 public/ 放了个静态 robots.txt
+//     盖掉我们的构建期端点）——搜索引擎从此发现不了任何新文章，且没有任何报错。
+//   · 博客被 Disallow——同样静默，且是我们自己写规则时最容易误伤的路径。
+if (only('--origin')) {
+  for (const orphan of ['robots.txt', '404.html', '404/index.html']) {
+    ok(
+      !existsSync(inDist(mountDir, orphan)),
+      `引擎在 mount 下发了 ${MOUNT}/${orphan} —— origin 级事实应归官网所有`,
+    );
+  }
+
+  const robotsPath = inDist('robots.txt');
+  if (!existsSync(robotsPath)) {
+    failures.push('缺少 robots.txt');
+  } else {
+    const robots = readFileSync(robotsPath, 'utf8');
+    ok(
+      /^Sitemap:\s*https?:\/\/\S+\/sitemap-index\.xml\s*$/m.test(robots),
+      'robots.txt 没有指向 sitemap-index.xml —— 新文章将不会被发现，而且不会报任何错',
+    );
+    for (const line of robots.split('\n')) {
+      const m = /^Disallow:\s*(\S+)/.exec(line.trim());
+      if (!m) continue;
+      const path = m[1];
+      ok(
+        path === '' || !(`${MOUNT}/`).startsWith(path),
+        `robots.txt 的 "Disallow: ${path}" 把博客也挡住了`,
+      );
+    }
+  }
+
+  // T-011 修掉了 404 的假 hreflang（指向并不产出的 /404 与 /zh/404）。
+  // 这条守它不被改回去。
+  const notFound = inDist('404.html');
+  if (existsSync(notFound)) {
+    ok(
+      !/rel="alternate"\s+hreflang/.test(readFileSync(notFound, 'utf8')),
+      '404.html 又开始输出 hreflang 了 —— 它指向的 /404 与 /zh/404 并不是构建产物（C-30）',
+    );
   }
 }
 

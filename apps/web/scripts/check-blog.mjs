@@ -11,6 +11,11 @@
  * 用与 check-site.mjs 同一套「生产式公开配置」重建站点，避免两个脚本因构建环境不同
  * 而对同一份产物得出不同结论。
  *
+ * ⚠️ `aifb validate` 必须跑在【本脚本产出的 dist】上。它是独立进程，读不到
+ * PUBLIC_SITE_URL，只按 site/site.yaml 的 url 判 canonical 同源（C-07）与 hreflang
+ * （C-30）。而本地 .env 通常指向 staging —— 直接 `astro build` 再 validate，会得到
+ * 几十条纯属构建环境不一致的假错误。`pnpm blog:validate` 已经把顺序绑好了。
+ *
  * 用法（不带参数 = 全部断言）：
  *   --routes       引擎路由产物齐全
  *   --build-info   .aifb/build.json 的 mount / pages 正确

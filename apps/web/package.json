@@ -11,7 +11,7 @@
     "typecheck": "astro check",
     "lint": "node scripts/lint.mjs",
     "test": "node scripts/check-site.mjs && node scripts/check-blog.mjs && aifb validate",
-    "blog:validate": "aifb validate"
+    "blog:validate": "node scripts/check-blog.mjs --routes && aifb validate"
   },
   "dependencies": {
     "@astrojs/mdx": "^4.3.14",

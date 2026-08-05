@@ -14,9 +14,18 @@ interface Props {
   locale?: Locale;
   /** 页面级 JSON-LD（对象）。默认注入 WebSite。 */
   jsonld?: Record<string, unknown>;
+  /**
+   * 是否输出 hreflang 互指。默认输出。
+   *
+   * 404 要传 false：Cloudflare 全站共用【一个】 404.html，我们并不产出 `/404`
+   * 和 `/zh/404` 两个页面。对不存在的 URL 宣告 hreflang，等于给搜索引擎一个
+   * "有翻译版"的承诺，点进去却是软 404——比不声明糟得多。
+   * 这与"404 是 origin 级事实、每个 host 只有一个"是同一个道理。
+   */
+  alternates?: boolean;
 }
 
-const { title, description, path = '/', locale = 'en', jsonld } = Astro.props;
+const { title, description, path = '/', locale = 'en', jsonld, alternates = true } = Astro.props;
 
 const t = ui[locale];
 const canonical = new URL(localePath(locale, path), SITE_URL).href;
@@ -47,21 +56,26 @@ const structuredData = jsonld ?? defaultJsonld;
     <meta name="color-scheme" content="light" />
     <meta name="robots" content="index, follow" />
 
-    {/* 双语互指 + x-default（默认指英文，与路径策略一致） */}
+    {/* 双语互指 + x-default（默认指英文，与路径策略一致）。alternates=false 的页面不输出。 */}
     {
-      LOCALES.map((l) => (
+      alternates &&
+        LOCALES.map((l) => (
+          <link
+            rel="alternate"
+            hreflang={HREFLANG[l]}
+            href={new URL(localePath(l, path), SITE_URL).href}
+          />
+        ))
+    }
+    {
+      alternates && (
         <link
           rel="alternate"
-          hreflang={HREFLANG[l]}
-          href={new URL(localePath(l, path), SITE_URL).href}
+          hreflang="x-default"
+          href={new URL(localePath('en', path), SITE_URL).href}
         />
-      ))
+      )
     }
-    <link
-      rel="alternate"
-      hreflang="x-default"
-      href={new URL(localePath('en', path), SITE_URL).href}
-    />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />

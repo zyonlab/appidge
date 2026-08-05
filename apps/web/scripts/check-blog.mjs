@@ -13,8 +13,8 @@
  *
  * 用法：
  *   node scripts/check-blog.mjs              # 全部断言
- *   node scripts/check-blog.mjs --coverage   # 只跑内容方向覆盖度
- *   node scripts/check-blog.mjs --gaps       # 只核对 TOOL-GAPS 的 issue 回填
+ *   node scripts/check-blog.mjs --routes     # 只跑路由产物
+ * 后续任务会加上 --coverage（三方向篇数下限）与 --gaps（TOOL-GAPS 的 issue 回填核对）。
  */
 import { spawnSync } from 'node:child_process';
 import { readFileSync, existsSync, rmSync } from 'node:fs';

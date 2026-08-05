@@ -28,6 +28,10 @@ node_modules/
 # 构建产物
 apps/*/dist/
 apps/*/.astro/
+# aifb 博客引擎：.aifb/build.json 是构建期事实（mount/pages/locales），闸门读它做 URL 换算；
+# validate-report.json 是每次 `aifb validate` 的报告。两者都是产物，不进 git。
+apps/*/.aifb/
+apps/*/validate-report.json
 apps/*/.wrangler/
 apps/**/coverage/
 # Worker/前端本地秘密（含 mock 值）绝不进 git；只提交 *.example

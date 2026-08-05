@@ -1,0 +1,10 @@
+---
+/*
+ * 空覆盖：引擎的 MermaidRenderer 会 `await import('mermaid')`，这对我们是双重不可接受——
+ *   1. 零外部脚本是官网硬约束（CLAUDE.md §5.2，check-site.mjs 第 5 条在守）；
+ *   2. `mermaid` 并未在 aifb-engine 的 dependencies 里声明，客户端构建直接解析失败
+ *      （TOOL-GAP-002）。
+ * 引擎的 templatesDir 机制约定：同路径文件覆盖引擎自己的文件。空文件即"不要这个组件"。
+ * 代价：博客不支持 mermaid 图。需要图就用静态 SVG/图片。
+ */
+---

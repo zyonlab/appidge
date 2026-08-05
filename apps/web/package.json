@@ -13,8 +13,12 @@
     "test": "node scripts/check-site.mjs"
   },
   "dependencies": {
-    "astro": "5.12.0",
-    "@astrojs/sitemap": "3.4.1"
+    "@astrojs/mdx": "^4.3.14",
+    "@astrojs/rss": "^4.0.19",
+    "@astrojs/sitemap": "3.4.1",
+    "aifb-cli": "0.4.0",
+    "aifb-engine": "0.4.0",
+    "astro": "5.12.0"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.4",

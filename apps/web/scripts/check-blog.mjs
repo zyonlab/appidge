@@ -352,6 +352,9 @@ if (only('--footer')) {
       );
     }
     ok(foot.includes('support@appidge.com'), '博客页脚缺少联系邮箱');
+    // 页眉也要有一条回官网的路：读者不该为了回官网先滚到页脚。
+    const head = html.slice(0, html.indexOf('</header>') + 1);
+    ok(/href="\/zh\/"/.test(head), '博客页眉缺少回官网的链接（site.yaml 的 nav 里加一条非引擎路由即可）');
     ok(foot.includes('rss.xml'), '博客页脚丢了 RSS 链接（引擎原本有，覆盖时不要弄丢）');
   }
 }

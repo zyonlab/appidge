@@ -1,0 +1,142 @@
+---
+/**
+ * 博客页脚 —— 把读者带得回 appidge.com。
+ *
+ * ## 为什么不直接转发 src/components/Footer.astro
+ *
+ * 官网的 Header/Footer **一个 scoped `<style>` 块都没有**：它们的样式全部在
+ * `src/styles/global.css` 里，而博客页加载的是【引擎的】global.css + 我们的
+ * `site/themes/appidge.css`，不加载官网那份。把官网组件转发过来，渲染出的是一堆
+ * 没有样式的裸标签。
+ *
+ * 要让转发成立，就得把官网的 global.css 也加载进博客页 —— 那意味着两份完整样式表
+ * 在同一页上争 `:root` / `body` / `a` / `h1..h6`，谁赢由层叠顺序决定。这正是
+ * BRIEF 反复警告的"两套设计系统打架"。视觉一致已经由 T-008 的 token 映射达成了，
+ * 不需要再赌一次层叠。
+ *
+ * 所以这里是**自带样式的重写**，不是转发：内容对齐官网页脚（同样的法务页、同样的
+ * 产品锚点、同样的联系邮箱），样式只用引擎 token（C-13 禁止 site/templates 里出现
+ * 字面色值）。`check-blog.mjs --footer` 断言这几条链接确实在，是两边之间的防漂移绳。
+ *
+ * ## 保留引擎原有的东西
+ *
+ * RSS 链接是引擎页脚本来就有的，覆盖时不要弄丢 —— 断言里也钉了。
+ */
+import { site } from '@config/site';
+
+const year = new Date().getFullYear();
+
+// 与官网页脚同一组链接。官网是 /zh/ 前缀的中文页，博客也是中文，所以直接写 /zh/。
+const productLinks = [
+  { href: '/zh/#download', label: '下载' },
+  { href: '/zh/#pricing', label: '定价' },
+  { href: '/zh/#faq', label: '常见问题' },
+];
+const legalLinks = [
+  { href: '/zh/refund', label: '退款政策' },
+  { href: '/zh/privacy', label: '隐私政策' },
+  { href: '/zh/terms', label: '服务条款' },
+  { href: '/zh/data-usage', label: '数据使用' },
+];
+---
+
+<footer class="blog-footer">
+  <div class="blog-footer-grid">
+    <div class="blog-footer-brand">
+      <a href="/zh/">{site.name}</a>
+      <p>{site.brand.tagline}</p>
+      <a class="blog-footer-rss" href="/zh/blog/rss.xml">RSS</a>
+    </div>
+
+    <nav aria-label="产品">
+      <h2>产品</h2>
+      <ul>
+        {productLinks.map((l) => <li><a href={l.href}>{l.label}</a></li>)}
+      </ul>
+    </nav>
+
+    <nav aria-label="法务">
+      <h2>法务</h2>
+      <ul>
+        {legalLinks.map((l) => <li><a href={l.href}>{l.label}</a></li>)}
+      </ul>
+    </nav>
+
+    <div>
+      <h2>联系</h2>
+      <ul>
+        <li><a href={`mailto:${site.author.email}`}>{site.author.email}</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="blog-footer-legal">© {year} {site.name}</p>
+</footer>
+
+<style>
+  /* 只用 token，不写字面色值 —— C-13 扫 site/templates/。 */
+  .blog-footer {
+    border-top: 1px solid var(--line);
+    margin-top: var(--space-3xl);
+    padding: var(--space-xl) 0 var(--space-lg);
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .blog-footer-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: var(--space-lg);
+  }
+
+  @media (max-width: 720px) {
+    .blog-footer-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  .blog-footer-brand > a:first-child {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .blog-footer-brand p {
+    margin: var(--space-2xs) 0 var(--space-xs);
+    max-width: 32ch;
+  }
+
+  .blog-footer-rss {
+    font-variant: all-small-caps;
+    letter-spacing: 0.04em;
+  }
+
+  .blog-footer h2 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0 0 var(--space-2xs);
+  }
+
+  .blog-footer ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-3xs);
+  }
+
+  .blog-footer a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .blog-footer a:hover,
+  .blog-footer a:focus-visible {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+
+  .blog-footer-legal {
+    margin: var(--space-lg) 0 0;
+  }
+</style>

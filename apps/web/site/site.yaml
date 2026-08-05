@@ -120,6 +120,10 @@ hero:
 # `pages: ['topics','series']` 里已经声明不发布——nav 是站点自己写的，引擎不会替我们
 # 删（它只对"是引擎路由"的 href 补 mount 前缀，不是引擎路由的原样保留）。留着就是
 # 指向不存在页面的死链，check-site.mjs 第 3 条会红。
+# 前两条是引擎路由（会自动补 /zh/blog 前缀）；第三条不是引擎路由，引擎【原样保留】，
+# 这正是挂载站从同一份 nav 链回宿主页面的官方做法（engine-options.md）。
+# 有了它，读者在博客任意一页都能一步回到官网，不必先滚到页脚。
 nav:
-  - { href: /series/, label: Series, order: 20 }
-  - { href: /topics/, label: Topics, order: 30 }
+  - { href: /series/, label: 系列, order: 20 }
+  - { href: /topics/, label: 主题, order: 30 }
+  - { href: /zh/, label: 官网, order: 90 }

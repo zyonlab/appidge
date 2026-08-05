@@ -230,7 +230,16 @@ if (only('--single-type')) {
 // 不去正则匹配 VPN 一词——只匹配那几个我们永远不可能提供的东西。软性的口径把关
 // 在 site/voice.md（写作 agent 读得懂上下文，正则读不懂）。
 if (only('--redline')) {
-  const NEVER_TRUE = ['提供节点', '内置节点', '自带节点', '我们的节点', '免费节点'];
+  // 否定式必须放行："我们不提供节点"是【正确】表述，而它包含子串"提供节点"。
+  // 第一版就是拿子串匹配的，结果对我们自己首屏那句正确文案报了警——这类断言必须
+  // 带否定前瞻，否则它惩罚的恰好是说对话的人。
+  const NEVER_TRUE = [
+    /(?<![不未非无])提供节点/,
+    /(?<![不未非无])内置节点/,
+    /(?<![不未非无])自带节点/,
+    /(?<![不未非无])我们的节点/,
+    /(?<![不未非无])免费节点/,
+  ];
   const walk = (dir) =>
     readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
       e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)],
@@ -239,10 +248,11 @@ if (only('--redline')) {
   const pages = existsSync(blogDir) ? walk(blogDir).filter((f) => /\.(html|txt|xml)$/.test(f)) : [];
   for (const file of pages) {
     const text = readFileSync(file, 'utf8');
-    for (const phrase of NEVER_TRUE) {
+    for (const pattern of NEVER_TRUE) {
+      const hit = text.match(pattern);
       ok(
-        !text.includes(phrase),
-        `产物出现违反产品红线的说法 "${phrase}" @ ${file.replace(dist + '/', '')}——` +
+        hit === null,
+        `产物出现违反产品红线的说法 "${hit?.[0]}" @ ${file.replace(dist + '/', '')}——` +
           'Appidge 不提供节点，出口永远是用户自己配置的上游',
       );
     }

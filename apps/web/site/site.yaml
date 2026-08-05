@@ -10,13 +10,18 @@
 #
 # Contract: docs/specs/site-config-contract.md
 
-name: TODO 站点名称
-title: TODO 站点名称 · 一句话说清这个站是干什么的
-description: TODO 一句话描述这个站写什么、给谁看。这句会成为首页的 meta description 和 llms.txt 的开头。
+# 与宿主官网同名。博客不是独立品牌，它是 appidge.com 的一部分。
+name: Appidge
+# /zh/blog/ 这一页自己的 <title>（不走 titleTemplate）。35 显示列，C-05 上限 60。
+title: Appidge 博客 · 按进程分流的排查笔记
+# /zh/blog/ 的 meta description，也是 llms.txt 的开头。131 显示列，C-06 要求 36–160。
+# 口径继承 src/config/site.ts 的 SITE_TAGLINE：说"转发到你自己的代理"，不说"代理工具"。
+description: macOS 上按进程决定每条连接走直连、走你自己的上游代理，还是拦截。这里记录 Appidge 的用法、常见故障的排查过程，以及周边工具踩过的坑。
 
-# The canonical origin. PUBLIC_SITE_URL overrides it at build time (CI sets it).
-# Changing this after traffic arrives resets every indexed URL — decide it now.
-url: https://TODO-your-domain.example
+# canonical origin。**构建时 PUBLIC_SITE_URL 覆盖它**（引擎 config/site.ts 实测：
+# `import.meta.env.PUBLIC_SITE_URL ?? process.env.PUBLIC_SITE_URL ?? url`），
+# 所以 staging 构建拿到的是 staging 域名，这里只是兜底值。
+url: https://appidge.com
 
 # Must have a matching engine/i18n/<locale>.ts. Shipped: zh-CN, en-US.
 # How every page title is composed. {title} is the page's own title.
@@ -50,12 +55,14 @@ theme:
   colorLight: '#f7f8fb'
   # localStorage key for the mode toggle. Change it so two sites on one domain
   # do not fight over the same light/dark preference.
-  storageKey: TODO-your-site-theme
+  # 宿主官网是单一浅色（global.css 里 color-scheme: light），不存任何主题偏好，
+  # 所以这个 key 只属于博客，不会跟官网抢。
+  storageKey: appidge-blog-theme
 
 og:
-  # Site-wide fallback Open Graph image. Must be raster and must exist.
-  # `pnpm og:default` regenerates the shipped placeholder.
-  default: /og-default.png
+  # 复用官网已有的 OG 图（public/og.png，1200×630 raster）。
+  # 引擎会检查这个文件真实存在，所以不能指向骨架自带的 /og-default.png——我们没有那个文件。
+  default: /og.png
 
 brand:
   initial: T
@@ -63,11 +70,15 @@ brand:
   keywords:
     - TODO 关键词
 
+# 署名到团队而不是个人：这个博客写的是产品自己的排查经验，署名对象就是做它的人，
+# 且不必把某个人的姓名/私人邮箱放进公开的结构化数据。
+# email 用官网早已公开的 support@appidge.com（Footer、退款政策、隐私政策都在用），
+# 不新增任何对外暴露的联系方式。
 author:
-  name: TODO 你的名字
-  title: TODO 你的头衔
-  bio: TODO 一两句自我介绍。它会进 About 页和 Person 结构化数据。
-  email: TODO@your-domain.example
+  name: Appidge 团队
+  title: macOS 网络工具开发
+  bio: 我们做 Appidge —— macOS 上的按进程透明代理。它在系统网络层接管进程流量，按你的规则决定每条连接走直连、走你自己的上游代理，还是拦截。这个博客记录它怎么用、出问题时怎么查，以及一路踩过的坑。
+  email: support@appidge.com
 
 # Profile URLs, published as `sameAs` in the Person schema. Omit a network
 # rather than pointing at its home page — a bare domain claims an identity it

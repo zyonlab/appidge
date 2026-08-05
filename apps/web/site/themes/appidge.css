@@ -169,3 +169,111 @@
   border-top: none;
   padding-top: 0;
 }
+
+/**
+ * 落地页：紧凑页头 + 主题 chips + 系列横幅。
+ *
+ * 配套 site/templates/pages/index.astro。引擎的 global.css 没有这几个类名——
+ * 那一版落地页是 hero + 三段 section 卡片阵，我们换成了"文章置顶"的结构。
+ * 全部走 token，不写字面色值。
+ */
+.blog-intro {
+  padding: var(--space-xl) 0 var(--space-lg);
+  max-width: 46rem;
+}
+
+.blog-intro h1 {
+  margin: 0 0 var(--space-xs);
+}
+
+.blog-intro > p {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* 主题入口：一排 chip，带真实篇数。取代引擎那三张带空装饰球的大卡片—— */
+/* 装饰球不携带任何信息，而篇数告诉读者这个方向有多少东西可读。 */
+.topic-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+  margin-top: var(--space-md);
+}
+
+.topic-chips a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3xs);
+  padding: var(--space-3xs) var(--space-xs);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.topic-chips a:hover,
+.topic-chips a:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.topic-chips-count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85em;
+}
+
+.topic-chips a:hover .topic-chips-count,
+.topic-chips a:focus-visible .topic-chips-count {
+  color: inherit;
+}
+
+/* 系列：一条横幅，不是卡片阵。只有一条系列时，三列网格会显得很空。 */
+.series-band ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.series-band li {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: baseline;
+  gap: var(--space-2xs) var(--space-xs);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--line);
+}
+
+.series-band li > a {
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.series-band li > a:hover,
+.series-band li > a:focus-visible {
+  color: var(--accent);
+}
+
+.series-band li > span {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.series-band li > p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  max-width: 60ch;
+}
+
+@media (max-width: 720px) {
+  .series-band li {
+    grid-template-columns: 1fr auto;
+  }
+}

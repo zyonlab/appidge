@@ -141,6 +141,33 @@ if (only('--intent')) {
   );
 }
 
+// ---- 5. aifb planning preflight：逐个域收敛 ----
+// 引擎的闸门在跑任何内容规则之前，先问"这个站规划过没有"，七个域全绿才放行。
+// 我们是分几个任务把 site/ 填完的，所以这里按域断言，而不是等 `aifb validate` 整体变绿——
+// 否则在填完最后一个域之前，这个脚本什么都测不到。
+//
+// 数据来自 validate-report.json 的 readiness 数组（preflight 中止时也会写出），
+// 不解析控制台输出。
+const PREFLIGHT_DONE_AREAS = ['identity', 'domain', 'template'];
+if (only('--preflight')) {
+  spawnSync('pnpm', ['exec', 'aifb', 'validate'], { cwd: root, stdio: 'ignore' });
+  const reportPath = join(root, 'validate-report.json');
+  if (!existsSync(reportPath)) {
+    failures.push('aifb validate 未写出 validate-report.json');
+  } else {
+    const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+    const blocking = (report.readiness ?? []).filter((i) => i.severity === 'error');
+    for (const area of PREFLIGHT_DONE_AREAS) {
+      const hits = blocking.filter((i) => i.area === area);
+      ok(
+        hits.length === 0,
+        `planning preflight 的 ${area} 域仍有 ${hits.length} 项未决：` +
+          hits.map((i) => `${i.key}（${i.kind}）`).join('、'),
+      );
+    }
+  }
+}
+
 // ---- 汇总 ----
 if (failures.length) {
   console.error(`\n博客验收失败（${failures.length}）:`);

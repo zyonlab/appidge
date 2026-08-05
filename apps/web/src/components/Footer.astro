@@ -34,20 +34,20 @@ const legalLinks = [
         <p class="footer-blurb">{t.footer.blurb}</p>
       </div>
       <nav aria-label={t.footer.product}>
-        <h4>{t.footer.product}</h4>
+        <h2>{t.footer.product}</h2>
         <ul>
           {productLinks.map((l) => <li><a href={localePath(locale, l.path)}>{l.label}</a></li>)}
         </ul>
       </nav>
       <nav aria-label={t.footer.support}>
-        <h4>{t.footer.support}</h4>
+        <h2>{t.footer.support}</h2>
         <ul>
           {supportLinks.map((l) => <li><a href={localePath(locale, l.path)}>{l.label}</a></li>)}
           <li><a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a></li>
         </ul>
       </nav>
       <nav aria-label={t.footer.legal}>
-        <h4>{t.footer.legal}</h4>
+        <h2>{t.footer.legal}</h2>
         <ul>
           {legalLinks.map((l) => <li><a href={localePath(locale, l.path)}>{l.label}</a></li>)}
         </ul>

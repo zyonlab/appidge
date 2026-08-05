@@ -79,10 +79,14 @@ button:focus-visible {
 }
 
 .container {
-  /* 1440：1080 是设计原型 v5 定的，在 1440–1600 的屏上正常，但到 2560 就只占 42%，
-     左右各留白 733px。正文行长不受这个值影响——段落另有 em 限宽（44em/46em），
-     所以加宽容器不会让文字变得难读。法务页的 .doc-layout 另有更窄的值，见文件末尾。 */
-  max-width: 1440px;
+  /* 流式：跟着屏幕走，两侧各留 5%，并在 1920 封顶。
+     固定 1440 在 2560 的屏上只占 56%，看着还是窄；纯 90vw 则会在超宽屏上把 hero 和
+     截图拉得过散，所以取 min()。正文行长不受这个值影响——段落另有 em 限宽（44em/46em）。
+     法务页 .doc-layout 另有更窄的固定值（长文阅读宽度），见文件末尾。
+
+     ⚠️ 博客侧 site/themes/appidge.css 的 --shell-width 必须与这里【逐字相同】，
+     否则官网和博客的外壳宽度会分叉。check-blog.mjs --width 断言了这一点。 */
+  max-width: min(90vw, 1920px);
   margin: 0 auto;
   padding: 0 24px;
 }

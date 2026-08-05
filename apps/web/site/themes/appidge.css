@@ -62,10 +62,11 @@
   --code-syntax-constant: #116329;
   --code-syntax-comment: #6e7781;
   --shadow: 0 22px 58px rgba(43, 31, 17, 0.08);
-  /* 对齐官网的 .container：1440px + 左右各 24px padding。
+  /* 与官网 src/styles/global.css 的 .container max-width 【逐字相同】。
      引擎默认是 min(1880px, 100vw - 96px)，几乎满宽——博客和官网并排看会像两个站。
-     BRIEF §4 要求视觉风格与官网一致，所以这个排版 token 必须跟着官网走。 */
-  --shell-width: min(1440px, calc(100vw - 48px));
+     BRIEF §4 要求视觉一致，而这两个值分处两个文件、各自手工维护，天然会分叉，
+     所以 check-blog.mjs --width 把它们钉在一起：改一边不改另一边就会红。 */
+  --shell-width: min(90vw, 1920px);
   --rail-left: 240px;
   --rail-right: 340px;
   --content-width: 46rem;

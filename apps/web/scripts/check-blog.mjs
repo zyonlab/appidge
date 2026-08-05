@@ -16,10 +16,13 @@
  *   --build-info   .aifb/build.json 的 mount / pages 正确
  *   --sitemap      sitemap 收录博客，且不给博客伪造 hreflang
  *   --intent       意图层不变量（site.yaml 不得声明 locales）
- * 后续任务会加上 --coverage（三方向篇数下限）与 --gaps（TOOL-GAPS 的 issue 回填核对）。
+ *   --preflight    aifb planning preflight 已收敛的域
+ *   --taxonomy     三个内容方向在 taxonomy 里各有落点
+ *   --coverage     三方向篇数下限（【选择性】，不进默认集，见 OPT_IN）
+ * 后续任务会加上 --gaps（TOOL-GAPS 的 issue 回填核对）。
  */
 import { spawnSync } from 'node:child_process';
-import { readFileSync, existsSync, rmSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -40,7 +43,16 @@ const BUILD_ENV = {
 };
 
 const args = new Set(process.argv.slice(2));
-const only = (flag) => args.size === 0 || args.has(flag);
+
+/**
+ * `--coverage` 是【选择性】的，不进默认集。
+ *
+ * 它断言三个方向的篇数下限（3/4/3）。文章是一篇一个任务写出来的，所以在写完最后一篇
+ * 之前它必然是红的——而本脚本已经接进 `pnpm test`，放进默认集会让仓库连续红十几轮，
+ * 那样谁都不会再看它。KR4 的验收是显式跑 `check-blog.mjs --coverage`。
+ */
+const OPT_IN = new Set(['--coverage']);
+const only = (flag) => (OPT_IN.has(flag) ? args.has(flag) : args.size === 0 || args.has(flag));
 
 const failures = [];
 const ok = (cond, msg) => {
@@ -148,6 +160,8 @@ if (only('--intent')) {
 //
 // 数据来自 validate-report.json 的 readiness 数组（preflight 中止时也会写出），
 // 不解析控制台输出。
+// taxonomy 域同时覆盖 taxonomy.yaml 与 content-types.yaml（引擎 readiness.ts 的 SOURCES）。
+// 后者归 T-006（它要把四个内容类型收敛成一个），所以 taxonomy 域在 T-006 才加进来。
 const PREFLIGHT_DONE_AREAS = ['identity', 'domain', 'template'];
 if (only('--preflight')) {
   spawnSync('pnpm', ['exec', 'aifb', 'validate'], { cwd: root, stdio: 'ignore' });
@@ -166,6 +180,55 @@ if (only('--preflight')) {
       );
     }
   }
+}
+
+// ---- 6. 内容分类学：三个方向各有一个 topic ----
+// BRIEF §3 定的三个方向必须在 taxonomy 里各有一个落点，否则文章的 category 无处可归，
+// --coverage 也就无从计数。topic key 同时是 URL 和 category 值，改名会留下死链，
+// 所以这里把它们钉死。
+const DIRECTIONS = {
+  'getting-started': { label: '使用', min: 3 },
+  troubleshooting: { label: '排查', min: 4 },
+  'proxy-ecosystem': { label: '长尾/周边', min: 3 },
+};
+const readTaxonomy = () => readFileSync(join(root, 'site', 'taxonomy.yaml'), 'utf8');
+
+if (only('--taxonomy')) {
+  const yaml = readTaxonomy();
+  // 顶层 topics: 下的二级键（两个空格缩进），够用且不引入 YAML 依赖。
+  const topicsBlock = (yaml.match(/^topics:\n([\s\S]*?)(?=^\S)/m) ?? [])[1] ?? '';
+  const keys = [...topicsBlock.matchAll(/^ {2}([a-z0-9-]+):/gm)].map((m) => m[1]);
+  for (const key of Object.keys(DIRECTIONS)) {
+    ok(keys.includes(key), `site/taxonomy.yaml 缺少 topic "${key}"（${DIRECTIONS[key].label}方向）`);
+  }
+  ok(!/TODO/.test(yaml), 'site/taxonomy.yaml 仍有 TODO 占位');
+}
+
+// ---- 7. 三方向篇数下限（选择性，见 OPT_IN）----
+if (only('--coverage')) {
+  const postsDir = join(root, 'content', 'posts');
+  const files = existsSync(postsDir)
+    ? readdirSync(postsDir).filter((f) => f.endsWith('.mdx') || f.endsWith('.md'))
+    : [];
+  const counts = Object.fromEntries(Object.keys(DIRECTIONS).map((k) => [k, 0]));
+  for (const file of files) {
+    const raw = readFileSync(join(postsDir, file), 'utf8');
+    if (/^draft:\s*true\s*$/m.test(raw)) continue; // 草稿不产页，不算数
+    const category = (raw.match(/^category:\s*(\S+)\s*$/m) ?? [])[1];
+    if (category && category in counts) counts[category] += 1;
+  }
+  for (const [key, { label, min }] of Object.entries(DIRECTIONS)) {
+    ok(
+      counts[key] >= min,
+      `${label}方向（category: ${key}）只有 ${counts[key]} 篇，下限 ${min} 篇`,
+    );
+  }
+  console.log(
+    `· 内容覆盖：` +
+      Object.entries(DIRECTIONS)
+        .map(([k, v]) => `${v.label} ${counts[k]}/${v.min}`)
+        .join('，'),
+  );
 }
 
 // ---- 汇总 ----

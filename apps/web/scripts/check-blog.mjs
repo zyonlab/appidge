@@ -22,6 +22,7 @@
  *   --redline      产物里没有「我们提供节点」这类事实错误的自我描述
  *   --theme        博客主题的关键色值与官网 global.css 一致（防两边漂移）
  *   --no-chrome    不该存在的引擎控件（主题切换、AI 外链）没有出现在产物里
+ *   --footer       博客页脚把读者带得回官网（法务页、产品锚点、联系方式）
  *   --coverage     三方向篇数下限（【选择性】，不进默认集，见 OPT_IN）
  * 后续任务会加上 --gaps（TOOL-GAPS 的 issue 回填核对）。
  */
@@ -323,6 +324,38 @@ if (only('--no-chrome')) {
       `产物里仍有 "${marker}" 控件（${hits.length} 个页面）——` +
         '应由 site/templates/components/ 的空文件覆盖掉',
     );
+  }
+}
+
+// ---- 6.9 页脚要把读者带得回官网 ----
+// 博客是 appidge.com 的一部分，不是一个孤岛。引擎自带的页脚只有一个 support 邮箱
+// 和一条 RSS——读者读完一篇排查文章，没有任何一条路径回到产品、定价或法务页。
+//
+// 这里不【转发】官网的 Footer 组件：官网组件一个 scoped <style> 都没有，样式全在
+// src/styles/global.css，而博客页不加载那份。转发过去就是一堆没有样式的裸标签。
+// 详见 site/templates/components/Footer.astro 的说明。
+//
+// 所以断言的是【链接集合】而不是组件来源：博客页脚必须含官网页脚那几条真实链接。
+// 这同时是一条防漂移的绳子——法务页改了路径，两边都得改。
+if (only('--footer')) {
+  const mustLink = ['/zh/', '/zh/refund', '/zh/privacy', '/zh/terms', '/zh/data-usage'];
+  const page = inDist(mountDir, 'index.html');
+  if (!existsSync(page)) {
+    failures.push('博客挂载点页不存在，无法检查页脚');
+  } else {
+    const html = readFileSync(page, 'utf8');
+    const foot = html.slice(html.lastIndexOf('<footer'));
+    for (const href of mustLink) {
+      ok(
+        new RegExp(`href="${href}(/|")`).test(foot),
+        `博客页脚缺少回官网的链接 ${href} —— 读者读完文章没有路径回到产品和法务页`,
+      );
+    }
+    ok(foot.includes('support@appidge.com'), '博客页脚缺少联系邮箱');
+    // 页眉也要有一条回官网的路：读者不该为了回官网先滚到页脚。
+    const head = html.slice(0, html.indexOf('</header>') + 1);
+    ok(/href="\/zh\/"/.test(head), '博客页眉缺少回官网的链接（site.yaml 的 nav 里加一条非引擎路由即可）');
+    ok(foot.includes('rss.xml'), '博客页脚丢了 RSS 链接（引擎原本有，覆盖时不要弄丢）');
   }
 }
 

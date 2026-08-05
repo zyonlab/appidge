@@ -65,10 +65,17 @@ og:
   default: /og.png
 
 brand:
-  initial: T
-  tagline: TODO 一句话标语
+  initial: A
+  # 口径与 src/config/site.ts 的 SITE_TAGLINE 一致：说"转发到你自己的代理"，
+  # 不说"代理工具"——后者读起来像"我们就是代理"，与"不提供节点"的红线自相矛盾。
+  tagline: 按进程把流量转发到你自己的代理
+  # 进 About 页与结构化数据。写读者会搜的词，不是我们内部的说法。
   keywords:
-    - TODO 关键词
+    - macOS 按进程分流
+    - 透明代理
+    - 软件不走代理
+    - Network Extension
+    - Proxifier 替代
 
 # 署名到团队而不是个人：这个博客写的是产品自己的排查经验，署名对象就是做它的人，
 # 且不必把某个人的姓名/私人邮箱放进公开的结构化数据。
@@ -85,23 +92,24 @@ author:
 # does not prove.
 social: {}
 
+# /zh/blog/ 的首屏。读者多半是被搜索引擎丢进某一篇文章的，会点到这里的人是
+# "这篇有用，他们还写了什么"——所以首屏说清楚这个站按什么归档，而不是再推销一次产品。
+# actions 的 href 写引擎路由的原样（/writing/），引擎会自动补 mount 前缀。
 hero:
-  eyebrow: TODO 首页标题上方的一行
-  title: TODO 首页大标题
-  description: TODO 首屏第一句。读者读到的第一句话，值得单独想清楚。
-  actions:
-    - { label: 看文章, href: /writing/, variant: primary }
-    - { label: 成系列的, href: /series/ }
+  eyebrow: Appidge 博客
+  title: 那个软件为什么不走代理
+  description: >-
+    macOS 上代理配了、系统代理也设了，可总有软件当没看见。这里按软件的类别讲清楚每一种
+    为什么会这样，怎么让它归你的规则管；顺带记录 Appidge 自己怎么用，以及这套生态里
+    各个工具的边界在哪。
   signals:
-    - TODO 这个站的三到四个特征
+    - 只写实际查过的故障，不写没验证过的猜测
+    - 出口永远是你自己配的上游 —— 我们不提供节点
+    - 透明代理，不改路由表、不接管 DNS
+    - 中文，面向 macOS 上的开发者
 
-services:
-  title: Work With Me
-  description: TODO 你提供什么、给谁。不接活就把这段和 /work-with-me/ 导航一起删掉。
-  serviceName: TODO 服务名称
-  serviceTypes:
-    - TODO 服务类型
-  contactText: TODO 怎么联系你最有效。
+# 没有 services 块：/work-with-me/ 不在 engine({ pages }) 白名单里，这个站不接活。
+# 引擎对 services 的每个字段都有默认值（config/site.ts 的 `?? ''`），删掉是安全的。
 
 # Static navigation. Content types register themselves via `surfaces.nav` in
 # site/content-types.yaml; `order` interleaves the two lists.

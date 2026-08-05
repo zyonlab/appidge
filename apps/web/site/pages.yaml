@@ -1,47 +1,24 @@
-# Copy for the static pages.
+# 固定页的文案。
 #
-# Site-owner content, not UI chrome: a new owner rewrites this rather than
-# translating it. That is why it lives here and not in engine/i18n/.
-# The dividing line: docs/specs/site-config-contract.md
+# 站点主人写的内容，不是 UI 词条：换个主人是重写这份，不是翻译它。
+# 这就是它住在 site/ 而不是 engine/i18n/ 的原因。
 #
-# Keep descriptions under the 160 display-column ceiling (rule C-06). There is a
-# floor too, but do not write toward it — padding a sentence to clear a
-# threshold is how an earlier version of this file ended up with trailing
-# clauses that said nothing.
+# 只保留我们发布的两个页面。about / newsletter / uses / workWithMe 已删——
+# astro.config.mjs 的 `pages: ['topics','series']` 已经声明不发布它们，
+# 未发布的页面不需要文案（引擎文档：a page the site does not publish needs no copy）。
+# 关于我们、联系方式这些，宿主官网自己有，博客不该在 /zh/blog 下再开一套。
+#
+# description 守 160 显示列上限（C-06）。有下限，但不要朝着下限写——
+# 为凑长度加的从句一句都不值。
 
 topics:
-  title: Topics
-  description: TODO /topics/ 页的说明：你按什么归档，为什么这样分。
+  title: 主题
+  description: >-
+    三个方向：软件为什么不走代理、Appidge 怎么用、以及 macOS 代理生态里那些工具的边界。
+    按你现在卡在哪里挑一个。
 
 series:
-  title: Series
-  description: TODO /series/ 页的说明。
-
-about:
-  title: About
-  # `body` selects what the engine renders under each heading:
-  #   siteDescription · authorBio · keywords · services
-  sections:
-    - { heading: 这个站是干嘛的, body: siteDescription }
-    - { heading: 谁在写, body: authorBio }
-    - { heading: 主要写什么, body: keywords }
-    - { heading: 想合作的话, body: services }
-
-newsletter:
-  title: Newsletter
-  description: TODO 订阅这件事你怎么做。
-  body: TODO 正文。没有订阅服务就直说，比放一个假表单好。
-  action: 发邮件订阅
-
-uses:
-  title: Uses
-  description: TODO /uses/ 页的说明。不写这一页就把它和导航一起删掉。
-  items:
-    - name: TODO 工具类别
-      body: TODO 用什么，为什么是它。
-
-workWithMe:
-  action: 发邮件
-  services:
-    - name: TODO 服务名称
-      body: TODO 你具体做什么，交付什么。
+  title: 系列
+  description: >-
+    有先后顺序的几篇，按顺序读比单看一篇更有用。目前只有一条：按软件类别排查"这东西
+    为什么不走代理"。

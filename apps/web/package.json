@@ -10,7 +10,7 @@
     "preview": "astro preview",
     "typecheck": "astro check",
     "lint": "node scripts/lint.mjs",
-    "test": "node scripts/check-site.mjs && node scripts/check-blog.mjs",
+    "test": "node scripts/check-site.mjs && node scripts/check-blog.mjs && aifb validate",
     "blog:validate": "aifb validate"
   },
   "dependencies": {

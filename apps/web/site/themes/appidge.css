@@ -62,7 +62,10 @@
   --code-syntax-constant: #116329;
   --code-syntax-comment: #6e7781;
   --shadow: 0 22px 58px rgba(43, 31, 17, 0.08);
-  --shell-width: min(1880px, calc(100vw - 96px));
+  /* 对齐官网的 .container：1440px + 左右各 24px padding。
+     引擎默认是 min(1880px, 100vw - 96px)，几乎满宽——博客和官网并排看会像两个站。
+     BRIEF §4 要求视觉风格与官网一致，所以这个排版 token 必须跟着官网走。 */
+  --shell-width: min(1440px, calc(100vw - 48px));
   --rail-left: 240px;
   --rail-right: 340px;
   --content-width: 46rem;
@@ -120,4 +123,22 @@
   --code-syntax-constant: #116329;
   --code-syntax-comment: #6e7781;
   --shadow: 0 22px 58px rgba(43, 31, 17, 0.08);
+}
+
+/**
+ * 落地页大标题的字号上限。
+ *
+ * 引擎的裸 `h1` 是 `clamp(2.7rem, 7.2vw, 5.8rem)` —— 在 1728px 视口上算出 92.8px，
+ * 而官网 hero 的 h1 是 50px。将近两倍，两个页面并排看不像一个站，
+ * 而 BRIEF §4 要求视觉风格与官网一致。
+ *
+ * 特异性说明（这条规则能生效、且只影响该影响的地方，靠的就是它）：
+ *   .site-shell h1      (0,1,1)  ← 本规则，胜过引擎的裸 h1 (0,0,1)
+ *   .article-header h1  (0,1,1)  ← 引擎的，同特异性但在后面，所以文章页标题
+ *                                  仍由 --article-title 决定，不受这条影响
+ *
+ * 只改字号，不碰字重/字距/行高 —— 那些是引擎的排版机制，保留。
+ */
+.site-shell h1 {
+  font-size: clamp(1.9rem, 3.2vw, 3.2rem);
 }

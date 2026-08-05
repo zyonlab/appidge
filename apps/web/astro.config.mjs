@@ -53,6 +53,11 @@ export default defineConfig({
   integrations: [
     // 博客用 MDX。宿主站自己的页面仍是 .astro，不受影响。
     mdx(),
+    // sitemap 仍然归站点自己管（引擎文档也是这个立场：宿主站可能早就有一份）。
+    // 这里【不】调用引擎导出的 `sitemapOptions()`：它只在 site/site.yaml 声明了多个
+    // locale 时才返回内容，而我们永远不会声明——语言已经由 mount(/zh/blog) 承载了。
+    // 调用它等于留一个"看起来在适配、实际恒为空"的接口，反而误导。
+    // 这个不变量由 check-blog.mjs 的 --intent 断言钉住。
     sitemap({
       i18n: {
         defaultLocale: 'en',

@@ -1,6 +1,8 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
+import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
+import { engine } from 'aifb-engine';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -49,11 +51,28 @@ export default defineConfig({
   // sitemap i18n：英文在根路径（默认），中文在 /zh/ 前缀；hreflang 与 BaseLayout 内的
   // <link rel="alternate"> 保持同一映射。
   integrations: [
+    // 博客用 MDX。宿主站自己的页面仍是 .astro，不受影响。
+    mdx(),
     sitemap({
       i18n: {
         defaultLocale: 'en',
         locales: { en: 'en', zh: 'zh-Hans' },
       },
+    }),
+    // aifb 博客引擎，挂在 /zh/blog。四个选项的理由：
+    //   mount       —— 宿主站已双语，中文在 /zh 前缀下；博客是这个站的一部分，不新建站点。
+    //                  语言已经在 mount 里了，所以 site/site.yaml 【不再声明 locales】，
+    //                  否则会产出 /zh/blog/zh/（见 aifb docs/specs/engine-options.md）。
+    //   pages       —— 只要 topics/series 两个归档页。about/uses/newsletter/work-with-me
+    //                  是宿主站自己的事，引擎不该在 /zh/blog 下再开一套。
+    //   site: false —— canonical origin 归 astro.config 上面那段 fail-closed 校验管。
+    //                  让引擎设 site 会把 site.yaml 的 url 兜底进来，正好绕过那道闸。
+    //   cloudflare  —— 我们是 Workers 静态资源托管，不读 _redirects / _headers（不是 Pages）。
+    engine({
+      mount: '/zh/blog',
+      pages: ['topics', 'series'],
+      site: false,
+      cloudflare: false,
     }),
   ],
   devToolbar: { enabled: false },

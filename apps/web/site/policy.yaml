@@ -1,0 +1,70 @@
+# Publishing policy — the thresholds the gate enforces.
+#
+# The third layer, between intent and mechanism: the engine ships a sensible
+# default for every value here, and you override the ones your site disagrees
+# with. Overrides are recorded in the report, so a green run always says which
+# numbers it was green against.
+#
+# Rules and rationale: docs/specs/content-contract.md
+
+# Promote warnings to errors. Equivalent to always passing `--strict`.
+strict: false
+
+seo:
+  # Display columns, not characters — a CJK character occupies two columns in a
+  # search result. One threshold stays correct in any language.
+  titleMaxWidth: 60
+  # The ceiling is the bound that matters; Google truncates past it.
+  descriptionMaxWidth: 160
+  # The floor only catches stubs. It has been lowered twice because it flagged
+  # good writing — 36 columns (~18 CJK characters) is where a description stops
+  # being a sentence. Raising it does not buy quality, it buys padding.
+  descriptionMinWidth: 36
+  # Deepest URL allowed, in path segments. /writing/my-post/ is 2.
+  maxUrlDepth: 3
+  # A listing page needs some prose of its own, or it is a stack of links
+  # competing with the entries it links to. Display columns, cards excluded.
+  listingIntroMinWidth: 40
+
+content:
+  # Rule C-02. Below this an article is a dead end for readers and crawlers.
+  minInternalLinks: 2
+
+  # Rule C-26. Display columns of prose, code excluded. Set to catch a stub, not
+  # to enforce a length — ~400 columns is about 200 CJK characters, below which
+  # an article has not made an argument. 0 turns the rule off.
+  minBodyWidth: 400
+
+  # Rule C-24, Chinese typography via zhlint: full-width punctuation, and a
+  # space between CJK and Latin text. `auto` enables it for zh-* locales only.
+  # It checks convention; site/voice.md checks whether the prose reads like a
+  # template. The two do not overlap.
+  typography: auto          # auto | on | off
+  typographySeverity: warn  # warn | error
+  typographyMaxPerFile: 20  # cap the noise from one badly-typeset file
+
+style:
+  # Which voice to write in. Resolves to site/<file>.
+  voice: voice.md
+  # Style scoring is reported, never blocking: the score flags mechanical tells,
+  # and a number cannot tell good writing from bad. Set a floor only once you
+  # have calibrated it against your own published articles.
+  minScore: null
+  # Severity of rule C-27 once a floor is set.
+  severity: warn
+
+metrics:
+  # Targets for `pnpm metrics`. Reported, not enforced.
+  avgInternalLinks: 3
+
+# Planning preflight. `pnpm validate` refuses to run the content gate until the
+# site is planned: identity, domain, copy, taxonomy, template, voice, ai.
+# Validating an article against an unplanned site checks rules that mean
+# nothing — its category belongs to someone else's taxonomy and its canonical
+# points at a template domain.
+#
+# List an area here to say "this default is deliberate". The opt-out is printed
+# on every run, so it stays a decision rather than an oversight.
+#   acknowledged: [template]
+planning:
+  acknowledged: []

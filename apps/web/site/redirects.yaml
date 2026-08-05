@@ -1,0 +1,18 @@
+# URL history — where old addresses should send people now.
+#
+# Emitted as `_redirects` at build time. Every `to` is checked against the pages
+# the build actually produced: a redirect pointing at a 404 turns one dead link
+# into two hops, so it fails the build instead of shipping.
+#
+# `pnpm migrate:ghost` appends here automatically whenever it changes a slug —
+# that is the whole reason this file exists. A migration that renames URLs and
+# leaves no redirects is a link-loss event that nothing else in the pipeline
+# would notice, because the new pages are all perfectly valid.
+#
+#   redirects:
+#     - from: /old-ghost-slug/        # the URL people and search engines know
+#       to: /writing/the-new-slug/    # where it lives now
+#       status: 301                   # default; use 302 only for the temporary
+#       note: renamed during the Ghost migration
+
+redirects: []

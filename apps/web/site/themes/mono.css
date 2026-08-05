@@ -1,0 +1,131 @@
+/**
+ * mono — a monospace, light-first, flat theme.
+ *
+ * Modelled on the terminal-plain school of personal sites: one typeface for
+ * everything, 13px at generous leading, a narrow measure, hairline rules and no
+ * shadows, cards or rounded corners. Colour does almost nothing; hierarchy
+ * comes from weight, indentation and whitespace.
+ *
+ * The shadow and gradient tokens are all set to `none`/flat values rather than
+ * removed — every theme must define the full token set (rule C-12), and a flat
+ * theme is one that answers "nothing" to those questions rather than leaving
+ * components to fall back to another theme's answer.
+ */
+
+:root {
+  color-scheme: light;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Courier New', monospace;
+
+  /* Surfaces — paper white, no tint. */
+  --bg: #ffffff;
+  --body-gradient-end: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #fafafa;
+  --panel-bg: #ffffff;
+  --panel-bg-soft: #fafafa;
+  --chip-bg: #f4f4f4;
+  --header-bg: rgba(255, 255, 255, 0.92);
+  --embed-bg: #f4f4f4;
+  --quote-bg: #fafafa;
+  --code-bg: #fafafa;
+  --code-inline-bg: #f0f0f0;
+
+  /* Text — near-black on white, one muted grey for everything secondary. */
+  --text: #111111;
+  --muted: #5a5a5a;
+  --quote-text: #5a5a5a;
+  --code-text: #111111;
+  --code-inline-text: #111111;
+
+  /* Accents. Links are the muted grey, underlined; the accent is used sparingly. */
+  --accent: #111111;
+  --accent-2: #5a5a5a;
+  --accent-ink: #ffffff;
+  --warn: #8a5a00;
+  --line: #e4e4e4;
+  --error-line: #c0392b;
+
+  /* Flat by design: no glow, no gradient, no elevation. */
+  --glow-cyan: transparent;
+  --glow-green: transparent;
+  --orb-gradient: linear-gradient(135deg, #f0f0f0, #e4e4e4);
+  --card-gradient: none;
+  --shadow: none;
+  --panel-shadow: none;
+  --image-shadow: none;
+  --inset-highlight: transparent;
+
+  /* Syntax — greys with one restrained hue, so code sits inside the prose. */
+  --code-syntax-entity: #111111;
+  --code-syntax-keyword: #7a3e9d;
+  --code-syntax-function: #1a5fb4;
+  --code-syntax-string: #2a6b3f;
+  --code-syntax-constant: #8a5a00;
+  --code-syntax-comment: #8c8c8c;
+
+  /* Layout — a narrow measure and a lot of air. */
+  --shell-width: 860px;
+  --content-width: 760px;
+  --rail-left: 0px;
+  --rail-right: 0px;
+
+  --space-3xs: 2px;
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 20px;
+  --space-lg: 32px;
+  --space-xl: 48px;
+  --space-2xl: 72px;
+  --space-3xl: 104px;
+
+  --prose-leading: 1.75;
+  --prose-paragraph-gap: 1.25em;
+  --prose-heading-lead: 2.4em;
+  --article-title: clamp(1.15rem, 1rem + 0.7vw, 1.5rem);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #0e0e0e;
+  --body-gradient-end: #0e0e0e;
+  --surface: #141414;
+  --surface-2: #191919;
+  --panel-bg: #141414;
+  --panel-bg-soft: #191919;
+  --chip-bg: #1f1f1f;
+  --header-bg: rgba(14, 14, 14, 0.92);
+  --embed-bg: #1f1f1f;
+  --quote-bg: #161616;
+  --code-bg: #161616;
+  --code-inline-bg: #1f1f1f;
+
+  --text: #e8e8e8;
+  --muted: #9a9a9a;
+  --quote-text: #9a9a9a;
+  --code-text: #e8e8e8;
+  --code-inline-text: #e8e8e8;
+
+  --accent: #e8e8e8;
+  --accent-2: #9a9a9a;
+  --accent-ink: #0e0e0e;
+  --line: #2a2a2a;
+  --error-line: #e06c5d;
+
+  --glow-cyan: transparent;
+  --glow-green: transparent;
+  --orb-gradient: linear-gradient(135deg, #242424, #1a1a1a);
+  --card-gradient: none;
+  --shadow: none;
+  --panel-shadow: none;
+  --image-shadow: none;
+  --inset-highlight: transparent;
+
+  --code-syntax-entity: #e8e8e8;
+  --code-syntax-keyword: #c9a0dc;
+  --code-syntax-function: #8ab4f8;
+  --code-syntax-string: #8bc99a;
+  --code-syntax-constant: #e0b070;
+  --code-syntax-comment: #7a7a7a;
+}

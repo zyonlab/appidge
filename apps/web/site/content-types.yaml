@@ -1,0 +1,71 @@
+# What kinds of content this site publishes, and where each kind shows up.
+#
+# Worked example: examples/agent-native-engineer/site/content-types.yaml
+#
+# This is the half of a content type you own: what it is called, what URL it
+# lives at, and which surfaces it appears on. The other half — its frontmatter
+# schema, JSON-LD and card/detail components — is mechanism and lives in
+# engine/content-types/<name>.ts.
+#
+# The engine offers content types; this file decides which ones are published.
+# An engine type nobody declares here is simply not published — that is how a
+# site declines a type it does not want, without deleting anything the engine
+# ships. Only the reverse fails the build by name: a key here with no engine
+# module means the site asked for something that does not exist.
+#
+# `surfaces`: omitting one means "not there".
+#   nav    sort weight in the main navigation; omit to stay out of the nav
+#   home   section on the home page — limit + sort weight between sections
+#   rss    include entries in /rss.xml
+#   llms   include entries in /llms.txt, capped at `limit`  ← the GEO surface
+#   sitemap  defaults to true
+#
+# Walkthrough: docs/recipes/add-content-type.md
+
+posts:
+  route: writing
+  label: Writing
+  listTitle: Writing
+  listDescription: TODO 这个分区写什么。它是 /writing/ 的 meta description 和 llms.txt 的分区说明。
+  surfaces:
+    nav: 10
+    home: { limit: 6, order: 20 }
+    rss: true
+    llms: { limit: 12 }
+    sitemap: true
+
+videos:
+  route: videos
+  label: Video
+  listTitle: Videos
+  listDescription: TODO 这个分区写什么。不做视频就删掉整个 videos 块，引擎那半边不用动。
+  surfaces:
+    nav: 40
+    home: { limit: 3, order: 30 }
+    rss: true
+    llms: { limit: 8 }
+    sitemap: true
+
+projects:
+  route: projects
+  label: Project
+  listTitle: Projects
+  listDescription: TODO 这个分区写什么。
+  surfaces:
+    nav: 50
+    home: { limit: 3, order: 40 }
+    rss: false
+    llms: { limit: 6 }
+    sitemap: true
+
+case-studies:
+  route: case-studies
+  label: Case Study
+  listTitle: Case Studies
+  listDescription: TODO 这个分区写什么。
+  surfaces:
+    nav: 60
+    home: { limit: 2, order: 50 }
+    rss: true
+    llms: { limit: 6 }
+    sitemap: true

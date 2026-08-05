@@ -1,0 +1,35 @@
+# What this site is about — yours to decide.
+#
+# The `category` vocabulary is derived from the topic keys, so there is nothing
+# to keep in sync. A topic key is also the URL of its page and the `category`
+# of every article using it: renaming one later means rewriting frontmatter and
+# leaving dead URLs behind. Decide them before writing, not after.
+#
+# Worked example: examples/agent-native-engineer/site/taxonomy.yaml
+#
+# Contract: docs/specs/taxonomy.md
+
+# Why the topics below exist. Every pillar must own at least one topic, or the
+# build fails — a plan nothing implements is the failure mode this replaces.
+pillars:
+  foundations:
+    name: TODO 支柱名称
+    goal: TODO 这组主题要达成什么。
+
+topics:
+  todo-first-topic:
+    title: TODO 主题名称
+    description: TODO 一句话说清这个主题写什么。它会成为主题页的 meta description 和 llms.txt 里的条目。
+    pillar: foundations
+
+  notes:
+    title: TODO 兜底分类名称
+    description: TODO 还没想清楚就先记下来的东西放这里。
+    pillar: foundations
+    # A valid category that gets no page and stays out of listings — use it for
+    # catch-alls that would otherwise compete with real topics for the same query.
+    listed: false
+
+# Ordered reading paths. Optional: delete the block if you do not need them.
+# Each `topic` must be a key above.
+series: {}

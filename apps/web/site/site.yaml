@@ -1,0 +1,104 @@
+# Brand and identity — yours to decide.
+#
+# Every TODO below is a decision the pipeline will not make for you:
+# `pnpm validate` refuses to run until they are gone. That is deliberate —
+# a canonical URL, a category system and a voice are cheap to choose now and
+# expensive to change once articles exist.
+#
+# Want a worked example instead of a blank form?
+#   cp -r examples/agent-native-engineer/site/. site/
+#
+# Contract: docs/specs/site-config-contract.md
+
+name: TODO 站点名称
+title: TODO 站点名称 · 一句话说清这个站是干什么的
+description: TODO 一句话描述这个站写什么、给谁看。这句会成为首页的 meta description 和 llms.txt 的开头。
+
+# The canonical origin. PUBLIC_SITE_URL overrides it at build time (CI sets it).
+# Changing this after traffic arrives resets every indexed URL — decide it now.
+url: https://TODO-your-domain.example
+
+# Must have a matching engine/i18n/<locale>.ts. Shipped: zh-CN, en-US.
+# How every page title is composed. {title} is the page's own title.
+# The suffix costs columns out of the ~60 a search result shows (rule C-05):
+# with a long site name, '{title}' alone is often the better choice.
+titleTemplate: '{title} · {name}'
+
+locale: zh-CN
+
+# Publishing in more than one language? Uncomment `locales` — the default above
+# stays at the root and every other one is served under its prefix:
+#
+#   /            /writing/       zh-CN
+#   /en/         /en/writing/    en-US
+#
+# Translations go in content/<type>/en/, paired by `translationKey`. Copy is
+# translated by an `i18n:` block on any mapping in site/. Leave this out and the
+# site is one language, exactly as before. See docs/specs/i18n.md.
+#
+# locales:
+#   zh-CN: zh
+#   en-US: en
+
+theme:
+  # Token file under site/themes/.
+  name: default
+  # Mode used before a visitor chooses. Must match the theme's :root block.
+  defaultMode: dark
+  # Browser chrome colour per mode. Must match the theme's --bg (checked).
+  colorDark: '#070b14'
+  colorLight: '#f7f8fb'
+  # localStorage key for the mode toggle. Change it so two sites on one domain
+  # do not fight over the same light/dark preference.
+  storageKey: TODO-your-site-theme
+
+og:
+  # Site-wide fallback Open Graph image. Must be raster and must exist.
+  # `pnpm og:default` regenerates the shipped placeholder.
+  default: /og-default.png
+
+brand:
+  initial: T
+  tagline: TODO 一句话标语
+  keywords:
+    - TODO 关键词
+
+author:
+  name: TODO 你的名字
+  title: TODO 你的头衔
+  bio: TODO 一两句自我介绍。它会进 About 页和 Person 结构化数据。
+  email: TODO@your-domain.example
+
+# Profile URLs, published as `sameAs` in the Person schema. Omit a network
+# rather than pointing at its home page — a bare domain claims an identity it
+# does not prove.
+social: {}
+
+hero:
+  eyebrow: TODO 首页标题上方的一行
+  title: TODO 首页大标题
+  description: TODO 首屏第一句。读者读到的第一句话，值得单独想清楚。
+  actions:
+    - { label: 看文章, href: /writing/, variant: primary }
+    - { label: 成系列的, href: /series/ }
+  signals:
+    - TODO 这个站的三到四个特征
+
+services:
+  title: Work With Me
+  description: TODO 你提供什么、给谁。不接活就把这段和 /work-with-me/ 导航一起删掉。
+  serviceName: TODO 服务名称
+  serviceTypes:
+    - TODO 服务类型
+  contactText: TODO 怎么联系你最有效。
+
+# Static navigation. Content types register themselves via `surfaces.nav` in
+# site/content-types.yaml; `order` interleaves the two lists.
+#
+# 只留引擎实际注入的两个归档页。about / work-with-me 我们在 astro.config.mjs 的
+# `pages: ['topics','series']` 里已经声明不发布——nav 是站点自己写的，引擎不会替我们
+# 删（它只对"是引擎路由"的 href 补 mount 前缀，不是引擎路由的原样保留）。留着就是
+# 指向不存在页面的死链，check-site.mjs 第 3 条会红。
+nav:
+  - { href: /series/, label: Series, order: 20 }
+  - { href: /topics/, label: Topics, order: 30 }

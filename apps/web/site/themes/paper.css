@@ -1,0 +1,114 @@
+/**
+ * Paper — a light-first, editorial alternative to the default theme.
+ *
+ * This file exists as a working example of the theme contract: it defines the
+ * same token set as default.css and nothing else. Activate it by setting
+ * `theme.name: 'paper'` in src/data/site.ts.
+ *
+ * `pnpm validate` rule C-12 fails the build if a theme drops a token.
+ */
+:root {
+  color-scheme: light;
+  --bg: #fbfaf7;
+  --surface: #ffffff;
+  --surface-2: #f3f0e9;
+  --text: #1b1917;
+  --muted: #6b6459;
+  --line: rgba(27, 25, 23, 0.14);
+  --accent: #b45309;
+  --accent-2: #15803d;
+  --accent-ink: #fffbeb;
+  --code-bg: #f5f2ec;
+  --code-text: #292524;
+  --body-gradient-end: #f5f2ec;
+  --glow-cyan: rgba(180, 83, 9, 0.08);
+  --glow-green: rgba(21, 128, 61, 0.06);
+  --card-gradient: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(250, 248, 244, 0.72));
+  --panel-bg: rgba(255, 255, 255, 0.86);
+  --panel-bg-soft: rgba(255, 255, 255, 0.7);
+  --chip-bg: rgba(243, 240, 233, 0.8);
+  --quote-bg: linear-gradient(90deg, rgba(180, 83, 9, 0.08), rgba(180, 83, 9, 0.02) 58%, transparent);
+  --header-bg: rgba(251, 250, 247, 0.82);
+  --image-shadow: 0 16px 36px rgba(27, 25, 23, 0.1);
+  --panel-shadow: 0 16px 40px rgba(27, 25, 23, 0.08);
+  --inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --warn: #b45309;
+  --error-line: rgba(220, 38, 38, 0.5);
+  --orb-gradient: linear-gradient(135deg, rgba(180, 83, 9, 0.22), rgba(21, 128, 61, 0.12));
+  --embed-bg: #ece7dd;
+  --code-inline-text: #292524;
+  --code-inline-bg: #f0ebe2;
+  --quote-text: #57534e;
+  /* Shiki github-dark remap for a light surface. */
+  --code-syntax-entity: #0550ae;
+  --code-syntax-keyword: #b91c1c;
+  --code-syntax-function: #7c3aed;
+  --code-syntax-string: #0a3069;
+  --code-syntax-constant: #15803d;
+  --code-syntax-comment: #78716c;
+  --shadow: 0 20px 50px rgba(27, 25, 23, 0.12);
+  /* Outer page container. Widen or narrow the whole site from here. */
+  --shell-width: min(1760px, calc(100vw - 96px));
+  --rail-left: 230px;
+  --rail-right: 320px;
+  /* rem, not ch: `ch` resolves against whichever element reads the token,
+     so the grid track and .prose computed two different widths. */
+  --content-width: 44rem;
+  /* Spacing scale. Every gap/padding in global.css comes from here, so a theme
+     can set its own density instead of the values being scattered as literals. */
+  --space-3xs: 4px;
+  --space-2xs: 8px;
+  --space-xs: 12px;
+  --space-sm: 16px;
+  --space-md: 26px;
+  --space-lg: 32px;
+  --space-xl: clamp(36px, 3.4vw, 52px);
+  --space-2xl: clamp(56px, 5vw, 80px);
+  --space-3xl: clamp(72px, 7vw, 112px);
+  /* Reading rhythm */
+  --prose-leading: 1.9;
+  --prose-paragraph-gap: 1.5em;
+  --prose-heading-lead: 2.6em;
+  --article-title: clamp(2rem, 4vw, 2.85rem);
+  font-family: ui-serif, Georgia, "Times New Roman", "Songti SC", "Noto Serif CJK SC", serif;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #16140f;
+  --surface: #1f1c16;
+  --surface-2: #29251d;
+  --text: #f0ece3;
+  --muted: #a89f8f;
+  --line: rgba(240, 236, 227, 0.16);
+  --accent: #f0b429;
+  --accent-2: #86efac;
+  --accent-ink: #16140f;
+  --code-bg: #14120e;
+  --code-text: #e7e2d7;
+  --body-gradient-end: #100e0a;
+  --glow-cyan: rgba(240, 180, 41, 0.1);
+  --glow-green: rgba(134, 239, 172, 0.08);
+  --card-gradient: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+  --panel-bg: color-mix(in srgb, var(--surface), transparent 12%);
+  --panel-bg-soft: color-mix(in srgb, var(--surface), transparent 34%);
+  --chip-bg: color-mix(in srgb, var(--surface-2), transparent 32%);
+  --quote-bg: linear-gradient(90deg, rgba(240, 180, 41, 0.1), transparent);
+  --header-bg: rgba(22, 20, 15, 0.72);
+  --image-shadow: 0 18px 45px rgba(0, 0, 0, 0.24);
+  --panel-shadow: 0 20px 55px rgba(0, 0, 0, 0.24);
+  --inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+  --error-line: rgba(248, 113, 113, 0.55);
+  --orb-gradient: linear-gradient(135deg, rgba(240, 180, 41, 0.25), rgba(134, 239, 172, 0.12));
+  --embed-bg: #14120e;
+  --code-inline-text: var(--text);
+  --code-inline-bg: var(--surface-2);
+  --quote-text: var(--text);
+  --code-syntax-entity: #f0b429;
+  --code-syntax-keyword: #fca5a5;
+  --code-syntax-function: #d8b4fe;
+  --code-syntax-string: #fde68a;
+  --code-syntax-constant: #86efac;
+  --code-syntax-comment: #a8a29e;
+}

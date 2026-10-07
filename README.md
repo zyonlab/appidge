@@ -12,7 +12,8 @@
   <a href="#quick-start">快速开始</a> •
   <a href="#release">环境与发布</a> •
   <a href="#architecture">架构</a> •
-  <a href="#docs">关键文档</a>
+  <a href="#docs">关键文档</a> •
+  <a href="#license">许可证</a>
 </p>
 
 <p align="center">
@@ -21,12 +22,12 @@
   <img src="https://img.shields.io/badge/Network%20Extension-Transparent%20Proxy-5856D6.svg" alt="Network Extension transparent proxy">
   <img src="https://img.shields.io/badge/Astro-5.12-BC52EE.svg?logo=astro&logoColor=white" alt="Astro 5.12">
   <img src="https://img.shields.io/badge/Cloudflare-Workers%20%2B%20D1-F38020.svg?logo=cloudflare&logoColor=white" alt="Cloudflare Workers + D1">
-  <img src="https://img.shields.io/badge/License-Proprietary-lightgrey.svg" alt="License: Proprietary">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg" alt="License: PolyForm Noncommercial 1.0.0"></a>
 </p>
 
 很多软件从不读 macOS 系统代理设置——自带网络栈的客户端、pip/npm/Go 工具链、Docker 等后台进程。Appidge 用 Network Extension 在系统网络层接管进程流量，按用户规则决定每个进程的每条连接走**直连**、**上游代理**（单台/代理链/故障转移/负载均衡）还是**拦截**，让它们的流量也归你的规则管。
 
-官网：<https://appidge.com> · 商业闭源，本仓库为私有 monorepo。
+官网：<https://appidge.com> · **源码公开**（[PolyForm Noncommercial 1.0.0](LICENSE)）：个人非商业用途可自行编译、修改、自用；商业使用或直接使用官方签名版需[购买授权](https://appidge.com)。
 
 ## 核心亮点
 
@@ -93,6 +94,14 @@ xcodebuild -project appidge.xcodeproj -scheme App -configuration Debug build
 ```
 
 > **提示**：macOS 工程由 XcodeGen 生成。改了 `project.yml` 或增删源文件后跑 `xcodegen generate` 并提交 `project.pbxproj`。做签名/公证构建才需要根 `.env`（模板 `.env.example`）+ `./scripts/gen-signing-xcconfig.sh`。
+
+<a id="self-build"></a>
+### 自行编译使用
+
+许可证允许你出于**个人、非商业**目的编译、修改并自用本仓库代码。
+
+- 上面的 Debug build 能编译通过，但 Network Extension 系统扩展要真正被 macOS 加载，需要用带 Network Extension 能力的 Apple 开发者身份签名（签名配置见 [`docs/public-distribution-signing.md`](./docs/public-distribution-signing.md) 与 `.env.example`）；或在关闭 SIP 的开发机上执行 `systemextensionsctl developer on` 后调试。
+- 不想折腾签名，或需要在工作/商业场景使用：请在 [appidge.com](https://appidge.com) 购买官方签名、公证并支持自动更新的版本。
 
 > **质量闸门**：Swift 6 并发零 warning、SwiftLint strict、五包测试全绿、`pnpm check` 全绿；TDD 约定与完整闸门见 [`CLAUDE.md`](./CLAUDE.md)。
 
@@ -212,8 +221,15 @@ docs/                         设计与运营文档（见下）
 
 ## 参与说明
 
-本仓库为私有仓库，仅限受邀协作者。开工前先读 [`CLAUDE.md`](./CLAUDE.md)（开工顺序、文件所有权、TDD 与质量闸门）；push/PR、生产部署、真实退款等改变外部状态的操作需当次明确授权。
+欢迎提 Issue 反馈问题。由于官方版本是付费产品，暂不接受外部代码 PR。开发约定（开工顺序、文件所有权、TDD 与质量闸门）见 [`CLAUDE.md`](./CLAUDE.md)。
 
+<a id="license"></a>
 ## 许可证
 
-商业闭源软件，版权所有，保留一切权利。未经授权不得复制、分发或使用本仓库代码。
+本项目以 [PolyForm Noncommercial License 1.0.0](LICENSE) 发布——**源码公开，但不是 OSI 意义上的开源**：
+
+- ✅ 个人学习、研究、爱好与其他非商业用途：可自由使用、编译、修改。
+- ❌ 任何商业用途（包括在公司/工作中使用）：需要[购买商业授权](https://appidge.com)。
+- 使用官方签名构建（appidge.com 下载）需要购买授权。
+
+「Appidge」名称与图标不在许可证授权范围内，见 [`TRADEMARKS.md`](./TRADEMARKS.md)。
